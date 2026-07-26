@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import FaceCapture from '@/components/FaceCapture';
+import { findBestMatch } from '@/lib/faceRecognition';
 
 export default function AccessStation() {
   const [cycle, setCycle] = useState(0);
@@ -19,21 +20,68 @@ export default function AccessStation() {
     } catch {}
   }, []);
 
-  const handleCaptured = async (file) => {
+  const handleCaptured = async (file, descriptor) => {
     setVerifying(true);
     setResult(null);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      const res = await base44.functions.invoke('faceIdentify', {
-        captured_photo_url: file_url,
-      });
-      if (res.data.verified) {
-        setResult({ ok: true, person_name: res.data.person_name, accred: res.data.accred });
-      } else {
-        setResult({ ok: false, message: res.data.message || 'No se encontró coincidencia facial.' });
+      if (!descriptor) {
+        setResult({ ok: false, message: 'No se detectó un rostro humano en la captura.' });
+        return;
       }
+
+      // Fetch all active biometrics with descriptors
+      const bios = await base44.entities.Biometric.filter(
+        { status: 'active' },
+        '-created_date',
+        500
+      );
+
+      const withDescriptors = bios.filter((b) => b.face_descriptor && b.face_descriptor.length > 0);
+      if (withDescriptors.length === 0) {
+        setResult({ ok: false, message: 'No hay rostros registrados en el sistema.' });
+        return;
+      }
+
+      // Fetch all active accreditations
+      const accreditations = await base44.entities.Accreditation.filter(
+        { status: 'active' },
+        '-created_date',
+        500
+      );
+
+      // Find best match using face-api.js descriptors (real face recognition)
+      const { match, distance } = findBestMatch(descriptor, withDescriptors);
+
+      if (!match) {
+        setResult({ ok: false, message: `No se encontró coincidencia facial (mejor distancia: ${distance.toFixed(2)}).` });
+        return;
+      }
+
+      // Find the active accreditation for this person
+      const accred = accreditations.find((a) => a.person_id === match.person_id);
+      if (!accred) {
+        setResult({
+          ok: false,
+          message: 'Persona identificada pero sin acreditación activa.',
+          person_name: match.person_name,
+        });
+        return;
+      }
+
+      // Log the access
+      const me = await base44.auth.me();
+      await base44.entities.AccessLog.create({
+        accreditation_id: accred.id,
+        person_name: accred.person_name,
+        badge_code: accred.badge_code,
+        event_name: accred.event_name,
+        verified_by: me?.full_name || me?.email || 'Sistema',
+        method: 'biometric',
+      });
+
+      setResult({ ok: true, person_name: accred.person_name, accred });
     } catch (err) {
-      setResult({ ok: false, message: err.response?.data?.error || err.message || 'Error en la verificación.' });
+      setResult({ ok: false, message: err.message || 'Error en la verificación.' });
     } finally {
       setVerifying(false);
     }

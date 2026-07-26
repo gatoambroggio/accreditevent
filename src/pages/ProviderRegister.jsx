@@ -96,15 +96,21 @@ export default function ProviderRegister() {
     }
   };
 
-  const handleFaceCapture = async (file) => {
+  const handleFaceCapture = async (file, descriptor) => {
     setError('');
     setSaving(true);
     try {
+      if (!descriptor) {
+        setError('No se detectó un rostro humano. Probá de nuevo.');
+        return;
+      }
+
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       await base44.entities.Biometric.create({
         person_id: personId,
         person_name: form.full_name,
         face_photo_url: file_url,
+        face_descriptor: descriptor,
         status: 'active',
       });
       toast({ title: '¡Rostro registrado!', description: 'Ya podés ingresar al portal.' });

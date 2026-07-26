@@ -18,6 +18,13 @@
       "type": "string",
       "description": "URL de la foto de rostro capturada con c\u00e1mara web"
     },
+    "face_descriptor": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "description": "Vector de 128 dimensiones del rostro (face-api.js)"
+    },
     "credential_id": {
       "type": "string",
       "description": "ID de credencial WebAuthn (base64url) \u2014 legacy"

@@ -8,10 +8,15 @@ export default function BiometricButton({ accreditation, onRegistered }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const handleCaptured = async (file) => {
+  const handleCaptured = async (file, descriptor) => {
     setSaving(true);
     setError('');
     try {
+      if (!descriptor) {
+        setError('No se detectó un rostro humano. Probá de nuevo.');
+        return;
+      }
+
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
 
       const existing = await base44.entities.Biometric.filter({
@@ -27,6 +32,7 @@ export default function BiometricButton({ accreditation, onRegistered }) {
         person_id: accreditation.person_id,
         person_name: accreditation.person_name,
         face_photo_url: file_url,
+        face_descriptor: descriptor,
         status: 'active',
       });
 

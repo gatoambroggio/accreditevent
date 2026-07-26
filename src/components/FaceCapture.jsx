@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Camera, RefreshCw, Check, Loader2, X } from 'lucide-react';
+import { Camera, RefreshCw, Check, Loader2, X, AlertCircle } from 'lucide-react';
+import { getFaceDescriptor } from '@/lib/faceRecognition';
 
 export default function FaceCapture({ onCaptured, disabled, label = 'Abrir cámara', autoCapture = false }) {
   const [stream, setStream] = useState(null);
@@ -7,8 +8,11 @@ export default function FaceCapture({ onCaptured, disabled, label = 'Abrir cáma
   const [photoFile, setPhotoFile] = useState(null);
   const [error, setError] = useState('');
   const [starting, setStarting] = useState(false);
+  const [detecting, setDetecting] = useState(false);
+  const [faceDetected, setFaceDetected] = useState(true);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const descriptorRef = useRef(null);
 
   const stopCamera = useCallback(() => {
     setStream((prev) => {
@@ -22,6 +26,8 @@ export default function FaceCapture({ onCaptured, disabled, label = 'Abrir cáma
     setStarting(true);
     setPhotoUrl(null);
     setPhotoFile(null);
+    setFaceDetected(true);
+    descriptorRef.current = null;
     try {
       const s = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
@@ -65,12 +71,6 @@ export default function FaceCapture({ onCaptured, disabled, label = 'Abrir cáma
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoCapture, stream]);
 
-  // Auto mode: auto-confirm when photo captured
-  useEffect(() => {
-    if (autoCapture && photoFile) onCaptured(photoFile);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoCapture, photoFile]);
-
   const capture = () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -81,29 +81,63 @@ export default function FaceCapture({ onCaptured, disabled, label = 'Abrir cáma
     ctx.translate(canvas.width, 0);
     ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob((blob) => {
+
+    setDetecting(true);
+
+    canvas.toBlob(async (blob) => {
+      if (!blob) { setDetecting(false); return; }
       const file = new File([blob], 'face-capture.jpg', { type: 'image/jpeg' });
       setPhotoUrl(URL.createObjectURL(file));
       setPhotoFile(file);
       stopCamera();
+
+      // Extract face descriptor using face-api.js
+      try {
+        const descriptor = await getFaceDescriptor(canvas);
+        descriptorRef.current = descriptor;
+        setFaceDetected(!!descriptor);
+
+        if (autoCapture) {
+          onCaptured(file, descriptor);
+        }
+      } catch (err) {
+        descriptorRef.current = null;
+        setFaceDetected(false);
+        if (autoCapture) {
+          onCaptured(file, null);
+        }
+      } finally {
+        setDetecting(false);
+      }
     }, 'image/jpeg', 0.85);
   };
 
   const retake = () => {
     setPhotoUrl(null);
     setPhotoFile(null);
+    setFaceDetected(true);
+    descriptorRef.current = null;
     startCamera();
   };
 
   const confirm = () => {
-    if (photoFile) onCaptured(photoFile);
+    if (photoFile) {
+      onCaptured(photoFile, descriptorRef.current);
+    }
   };
 
   return (
     <div>
       <canvas ref={canvasRef} className="hidden" />
 
-      {stream && !photoUrl && (
+      {detecting && (
+        <div className="flex flex-col items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+          <span className="mt-3 text-sm text-slate-500">Analizando rostro…</span>
+        </div>
+      )}
+
+      {stream && !photoUrl && !detecting && (
         <>
           <div className="relative overflow-hidden rounded-xl bg-slate-900">
             <video ref={videoRef} autoPlay playsInline muted className="w-full" style={{ transform: 'scaleX(-1)' }} />
@@ -128,14 +162,20 @@ export default function FaceCapture({ onCaptured, disabled, label = 'Abrir cáma
         </>
       )}
 
-      {photoUrl && (
+      {photoUrl && !detecting && (
         <>
           <div className="overflow-hidden rounded-xl bg-slate-100">
             <img src={photoUrl} alt="Captura de rostro" className="w-full" />
           </div>
+          {!faceDetected && (
+            <div className="mt-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 ring-1 ring-amber-200">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>No se detectó un rostro humano. Probá de nuevo.</span>
+            </div>
+          )}
           {!autoCapture && (
             <div className="mt-3 flex gap-2">
-              <button onClick={confirm} disabled={disabled}
+              <button onClick={confirm} disabled={disabled || !faceDetected}
                 className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:opacity-50">
                 <Check className="h-5 w-5" /> Confirmar
               </button>
@@ -148,7 +188,7 @@ export default function FaceCapture({ onCaptured, disabled, label = 'Abrir cáma
         </>
       )}
 
-      {!stream && !photoUrl && (
+      {!stream && !photoUrl && !detecting && (
         autoCapture ? (
           <div className="flex flex-col items-center justify-center py-8">
             <Loader2 className="h-5 w-5 animate-spin text-emerald-600" />

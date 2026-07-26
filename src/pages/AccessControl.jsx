@@ -13,6 +13,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import FaceCapture from '@/components/FaceCapture';
+import { compareDescriptors, MATCH_THRESHOLD } from '@/lib/faceRecognition';
 
 export default function AccessControl({ standalone = false }) {
   const [events, setEvents] = useState([]);
@@ -92,18 +93,45 @@ export default function AccessControl({ standalone = false }) {
     }
   };
 
-  const handleFaceCaptured = async (file) => {
+  const handleFaceCaptured = async (file, descriptor) => {
     setVerifying(true);
     setResult(null);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      if (!descriptor) {
+        setResult({ ok: false, message: 'No se detectó un rostro humano en la captura.', accred: found });
+        setFound(null);
+        setBadgeCode('');
+        return;
+      }
 
-      const res = await base44.functions.invoke('faceVerify', {
-        accreditation_id: found.id,
-        captured_photo_url: file_url,
-      });
+      // Fetch the stored biometric for this person
+      const bios = await base44.entities.Biometric.filter(
+        { person_id: found.person_id, status: 'active' },
+        '-created_date',
+        1
+      );
 
-      if (res.data.verified) {
+      if (bios.length === 0 || !bios[0].face_descriptor) {
+        setResult({ ok: false, message: 'Sin descriptor facial registrado para esta persona.', accred: found });
+        setFound(null);
+        setBadgeCode('');
+        return;
+      }
+
+      // Compare descriptors client-side (real face recognition algorithm)
+      const distance = compareDescriptors(descriptor, bios[0].face_descriptor);
+      const isMatch = distance < MATCH_THRESHOLD;
+
+      if (isMatch) {
+        const me = await base44.auth.me();
+        await base44.entities.AccessLog.create({
+          accreditation_id: found.id,
+          person_name: found.person_name,
+          badge_code: found.badge_code,
+          event_name: found.event_name,
+          verified_by: me?.full_name || me?.email || 'Sistema',
+          method: 'biometric',
+        });
         setResult({ ok: true, method: 'biometric', accred: found });
         setFound(null);
         setBadgeCode('');
@@ -111,14 +139,14 @@ export default function AccessControl({ standalone = false }) {
       } else {
         setResult({
           ok: false,
-          message: 'El rostro no coincide con el registrado.',
+          message: `El rostro no coincide con el registrado (distancia: ${distance.toFixed(2)}).`,
           accred: found,
         });
         setFound(null);
         setBadgeCode('');
       }
     } catch (err) {
-      setResult({ ok: false, message: err.response?.data?.error || err.message || 'Error en la verificación.' });
+      setResult({ ok: false, message: err.message || 'Error en la verificación.' });
     } finally {
       setVerifying(false);
       setShowCamera(false);
