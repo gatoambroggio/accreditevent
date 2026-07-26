@@ -202,12 +202,20 @@ export default function EntityModal({
     }
 
     if (f.type === 'address') {
+      const latField = f.latField || `${f.name}_lat`;
+      const lngField = f.lngField || `${f.name}_lng`;
       return (
         <div key={f.name} className={f.full ? 'sm:col-span-2' : ''}>
           <span className="mb-1.5 block text-xs font-semibold text-slate-600">{f.label}{f.required && ' *'}</span>
           <AddressInput
             value={value}
             onChange={(val) => setField(f.name, val)}
+            lat={data[latField]}
+            lng={data[lngField]}
+            onCoordinatesChange={(latVal, lngVal) => {
+              setField(latField, latVal);
+              setField(lngField, lngVal);
+            }}
             placeholder={f.placeholder || 'Buscar dirección…'}
             required={f.required}
             disabled={f.disabled}

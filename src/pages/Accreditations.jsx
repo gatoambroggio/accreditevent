@@ -114,7 +114,9 @@ export default function Accreditations() {
       // Send pickup notification email (only reaches registered app users)
       if (person?.email && evt?.pickup_address) {
         try {
-          const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(evt.pickup_address)}`;
+          const mapsUrl = evt.pickup_lat && evt.pickup_lng
+            ? `https://www.google.com/maps/search/?api=1&query=${evt.pickup_lat},${evt.pickup_lng}`
+            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(evt.pickup_address)}`;
           const pickupDate = evt.pickup_date
             ? new Date(evt.pickup_date + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
             : 'a confirmar';

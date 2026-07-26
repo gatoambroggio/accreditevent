@@ -55,6 +55,14 @@
     "pickup_address": {
       "type": "string",
       "description": "Direcci\u00f3n de retiro de credenciales"
+    },
+    "pickup_lat": {
+      "type": "number",
+      "description": "Latitud del punto de retiro"
+    },
+    "pickup_lng": {
+      "type": "number",
+      "description": "Longitud del punto de retiro"
     }
   },
   "required": [
