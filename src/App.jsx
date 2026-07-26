@@ -22,6 +22,7 @@ import Users from '@/pages/Users';
 import Audit from '@/pages/Audit';
 import ProviderPortal from '@/pages/ProviderPortal';
 import AccessControl from '@/pages/AccessControl';
+import AccessStation from '@/pages/AccessStation';
 import ProviderRegister from '@/pages/ProviderRegister';
 
 const AUTH_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password', '/provider-register'];
@@ -70,6 +71,7 @@ const AuthenticatedApp = () => {
         <Route path="/access-control" element={<AccessControl />} />
       </Route>
       <Route path="/portal" element={<ProviderPortal />} />
+      <Route path="/control-acceso" element={<AccessStation />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

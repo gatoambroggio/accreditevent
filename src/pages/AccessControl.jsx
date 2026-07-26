@@ -10,10 +10,11 @@ import {
   Hand,
   ShieldCheck,
   X,
+  ExternalLink,
 } from 'lucide-react';
 import FaceCapture from '@/components/FaceCapture';
 
-export default function AccessControl() {
+export default function AccessControl({ standalone = false }) {
   const [events, setEvents] = useState([]);
   const [eventFilter, setEventFilter] = useState('');
   const [badgeCode, setBadgeCode] = useState('');
@@ -143,9 +144,17 @@ export default function AccessControl() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="font-mono text-[10px] uppercase tracking-wider text-emerald-600">Verificación de identidad</p>
-        <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-slate-900">Control de acceso</h1>
+      <div className="flex items-end justify-between">
+        <div>
+          <p className="font-mono text-[10px] uppercase tracking-wider text-emerald-600">Verificación de identidad</p>
+          <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-slate-900">Control de acceso</h1>
+        </div>
+        {!standalone && (
+          <a href="/control-acceso" target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+            <ExternalLink className="h-4 w-4" /> Abrir estación
+          </a>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

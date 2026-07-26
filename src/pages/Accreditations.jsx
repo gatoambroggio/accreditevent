@@ -9,6 +9,24 @@ import BadgePrint from '@/components/BadgePrint';
 
 const ACCESS_LEVELS = ['general', 'backstage', 'technical', 'vip', 'all-access'];
 
+const TYPE_PREFIXES = {
+  provider: 'PR',
+  technician: 'TE',
+  staff: 'ST',
+  press: 'PS',
+  artist: 'AR',
+  guest: 'GU',
+};
+
+function generateBadgeCode(personType, existingCodes) {
+  const prefix = TYPE_PREFIXES[personType] || 'GE';
+  const nums = existingCodes
+    .map((code) => (code?.startsWith(prefix) ? parseInt(code.slice(prefix.length), 10) : 0))
+    .filter((n) => !isNaN(n) && n > 0);
+  const next = (nums.length > 0 ? Math.max(...nums) : 0) + 1;
+  return `${prefix}${String(next).padStart(4, '0')}`;
+}
+
 export default function Accreditations() {
   const { items, loading, create, update, remove, reload } = useCrud('Accreditation');
   const [events, setEvents] = useState([]);
@@ -42,7 +60,7 @@ export default function Accreditations() {
   const fields = [
     { name: 'event_id', label: 'Evento', type: 'select', options: eventOptions, required: true },
     { name: 'person_id', label: 'Persona', type: 'searchable-select', options: personOptions, required: true, placeholder: 'Buscar por nombre o documento…', full: true },
-    { name: 'badge_code', label: 'Código de credencial', type: 'text', required: true },
+    ...(editing ? [{ name: 'badge_code', label: 'Código de credencial', type: 'text', required: true }] : []),
     { name: 'area', label: 'Área', type: 'text' },
     {
       name: 'access_level', label: 'Nivel de acceso', type: 'select',
@@ -72,6 +90,9 @@ export default function Accreditations() {
       person_name: person?.full_name || '',
       person_type: person?.person_type || '',
     };
+    if (!editing) {
+      enriched.badge_code = generateBadgeCode(person?.person_type, items.map((a) => a.badge_code));
+    }
     if (editing) await update(editing.id, enriched);
     else await create(enriched);
   };
