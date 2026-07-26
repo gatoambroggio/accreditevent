@@ -43,6 +43,23 @@ export default function AccessControl() {
     loadRecent();
   }, [loadRecent]);
 
+  const speak = useCallback((text) => {
+    try {
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'es-AR';
+      u.rate = 0.9;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(u);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (!result) return;
+    speak(result.ok ? 'Aceptado' : 'Denegado');
+    const timer = setTimeout(() => setResult(null), 5000);
+    return () => clearTimeout(timer);
+  }, [result, speak]);
+
   const handleSearch = async (e) => {
     e?.preventDefault();
     if (!badgeCode.trim()) return;
@@ -203,30 +220,6 @@ export default function AccessControl() {
               </div>
             )}
 
-            {/* Result */}
-            {result && (
-              <div className={`mt-4 flex items-center gap-3 rounded-xl p-5 ${result.ok ? 'bg-emerald-50 ring-1 ring-emerald-200' : 'bg-red-50 ring-1 ring-red-200'}`}>
-                {result.ok ? (
-                  <>
-                    <CheckCircle2 className="h-8 w-8 text-emerald-600" />
-                    <div>
-                      <p className="text-base font-bold text-emerald-800">Acceso concedido</p>
-                      <p className="text-sm text-emerald-600">
-                        {result.accred?.person_name} — verificado por {result.method === 'biometric' ? 'reconocimiento facial' : 'control manual'}
-                      </p>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <XCircle className="h-8 w-8 text-red-600" />
-                    <div>
-                      <p className="text-base font-bold text-red-800">Acceso denegado</p>
-                      <p className="text-sm text-red-600">{result.message}</p>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
           </div>
         </div>
 
@@ -256,6 +249,30 @@ export default function AccessControl() {
           )}
         </div>
       </div>
+
+      {/* Full-screen result overlay */}
+      {result && (
+        <div
+          className={`fixed inset-0 z-[60] flex flex-col items-center justify-center ${result.ok ? 'bg-emerald-600' : 'bg-red-600'}`}
+          onClick={() => setResult(null)}
+        >
+          {result.ok ? (
+            <CheckCircle2 className="h-32 w-32 text-white" strokeWidth={1.5} />
+          ) : (
+            <XCircle className="h-32 w-32 text-white" strokeWidth={1.5} />
+          )}
+          <p className="mt-6 text-5xl font-extrabold tracking-tight text-white sm:text-6xl">
+            {result.ok ? 'ACEPTADO' : 'DENEGADO'}
+          </p>
+          {result.accred?.person_name && (
+            <p className="mt-3 text-lg text-white/80">{result.accred.person_name}</p>
+          )}
+          {!result.ok && result.message && (
+            <p className="mt-1 max-w-md px-6 text-center text-sm text-white/70">{result.message}</p>
+          )}
+          <p className="mt-10 text-xs text-white/50">Tocá para continuar</p>
+        </div>
+      )}
 
       {/* Camera modal */}
       {showCamera && (
