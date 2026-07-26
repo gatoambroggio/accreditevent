@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { logAudit } from '@/lib/audit';
 import { Loader2, Upload, FileText, IdCard, UserCircle, CheckCircle2 } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
+import PersonBiometricCard from '@/components/PersonBiometricCard';
 
 const DOC_TYPES = {
   dni: 'Documento de identidad',
@@ -188,6 +189,11 @@ export default function ProviderPortal() {
               </button>
             </form>
           </div>
+        </div>
+
+        {/* Biometric */}
+        <div className="mt-6">
+          <PersonBiometricCard person={person} />
         </div>
 
         {/* Accreditations */}
