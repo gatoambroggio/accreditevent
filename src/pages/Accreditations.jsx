@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useCrud } from '@/lib/crud';
-import { Plus, Pencil, Loader2, Fingerprint } from 'lucide-react';
+import { Plus, Pencil, Loader2, Fingerprint, Printer } from 'lucide-react';
 import BiometricButton from '@/components/BiometricButton';
 import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
+import BadgePrint from '@/components/BadgePrint';
 
 const ACCESS_LEVELS = ['general', 'backstage', 'technical', 'vip', 'all-access'];
 
@@ -15,6 +16,7 @@ export default function Accreditations() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [eventFilter, setEventFilter] = useState('');
+  const [badgeAccred, setBadgeAccred] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -35,11 +37,11 @@ export default function Accreditations() {
   }, [items, eventFilter]);
 
   const eventOptions = events.map((e) => ({ value: e.id, label: e.name }));
-  const personOptions = people.map((p) => ({ value: p.id, label: `${p.full_name} (${p.person_type})` }));
+  const personOptions = people.map((p) => ({ value: p.id, label: `${p.full_name} — ${p.document || 'sin doc'} (${p.person_type})` }));
 
   const fields = [
     { name: 'event_id', label: 'Evento', type: 'select', options: eventOptions, required: true },
-    { name: 'person_id', label: 'Persona', type: 'select', options: personOptions, required: true },
+    { name: 'person_id', label: 'Persona', type: 'searchable-select', options: personOptions, required: true, placeholder: 'Buscar por nombre o documento…', full: true },
     { name: 'badge_code', label: 'Código de credencial', type: 'text', required: true },
     { name: 'area', label: 'Área', type: 'text' },
     {
@@ -135,9 +137,14 @@ export default function Accreditations() {
                       <BiometricButton accreditation={a} onRegistered={reload} />
                     </td>
                     <td className="px-4 py-3.5 text-right">
-                      <button onClick={() => openEdit(a)} className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700">
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button onClick={() => setBadgeAccred(a)} className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700" title="Imprimir credencial">
+                          <Printer className="h-3.5 w-3.5" />
+                        </button>
+                        <button onClick={() => openEdit(a)} className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -159,6 +166,14 @@ export default function Accreditations() {
         canDelete={!!editing}
         submitLabel={editing ? 'Guardar cambios' : 'Crear acreditación'}
       />
+
+      {badgeAccred && (
+        <BadgePrint
+          accreditation={badgeAccred}
+          event={events.find((e) => e.id === badgeAccred.event_id)}
+          onClose={() => setBadgeAccred(null)}
+        />
+      )}
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useCrud } from '@/lib/crud';
 import { Plus, Pencil, Search, Loader2 } from 'lucide-react';
+import { base44 } from '@/api/base44Client';
+import { Image as UIImage } from '@/components/ui/image';
 import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
 
@@ -32,6 +34,7 @@ export default function People() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [query, setQuery] = useState('');
+  const [personPhoto, setPersonPhoto] = useState(null);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -41,8 +44,16 @@ export default function People() {
     );
   }, [items, query]);
 
-  const openNew = () => { setEditing(null); setModalOpen(true); };
-  const openEdit = (item) => { setEditing(item); setModalOpen(true); };
+  const openNew = () => { setEditing(null); setPersonPhoto(null); setModalOpen(true); };
+  const openEdit = async (item) => {
+    setEditing(item);
+    setPersonPhoto(null);
+    setModalOpen(true);
+    try {
+      const bios = await base44.entities.Biometric.filter({ person_id: item.id, status: 'active' }, '-created_date', 1);
+      if (bios[0]?.face_photo_url) setPersonPhoto(bios[0].face_photo_url);
+    } catch {}
+  };
   const handleSubmit = async (data) => {
     if (editing) await update(editing.id, data);
     else await create(data);
@@ -125,6 +136,17 @@ export default function People() {
         onDelete={editing ? handleDelete : null}
         canDelete={!!editing}
         submitLabel={editing ? 'Guardar cambios' : 'Crear persona'}
+        topContent={personPhoto && (
+          <div className="flex items-center gap-4 rounded-lg bg-slate-50 p-4">
+            <div className="h-20 w-20 overflow-hidden rounded-lg">
+              <UIImage src={personPhoto} alt="Foto de registro" className="h-full w-full" fittingType="fit" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-600">Foto de registro facial</p>
+              <p className="text-xs text-slate-400">Capturada para verificación biométrica</p>
+            </div>
+          </div>
+        )}
       />
     </div>
   );

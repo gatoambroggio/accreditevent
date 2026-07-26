@@ -7,6 +7,7 @@ import StatusBadge from '@/components/StatusBadge';
 const FIELDS = [
   { name: 'name', label: 'Nombre del evento', type: 'text', required: true, full: true },
   { name: 'venue', label: 'Sede', type: 'text' },
+  { name: 'logo_url', label: 'Logo del evento', type: 'image-upload', full: true },
   { name: 'start_at', label: 'Inicio', type: 'datetime-local' },
   { name: 'end_at', label: 'Fin', type: 'datetime-local' },
   {

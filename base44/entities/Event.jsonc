@@ -10,6 +10,10 @@
       "type": "string",
       "description": "Sede o lugar del evento"
     },
+    "logo_url": {
+      "type": "string",
+      "description": "Logo del evento para credenciales"
+    },
     "start_at": {
       "type": "string",
       "format": "date-time",

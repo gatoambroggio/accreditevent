@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Trash2, Loader2 } from 'lucide-react';
+import { X, Trash2, Loader2, Upload } from 'lucide-react';
+import { base44 } from '@/api/base44Client';
 
 export default function EntityModal({
   open,
@@ -12,9 +13,11 @@ export default function EntityModal({
   onDelete,
   canDelete = false,
   submitLabel = 'Guardar',
+  topContent,
 }) {
   const [data, setData] = useState({});
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -81,6 +84,94 @@ export default function EntityModal({
       );
     }
 
+    if (f.type === 'searchable-select') {
+      const selectedOption = (f.options || []).find((o) => o.value === data[f.name]);
+      const searchQuery = data[`_search_${f.name}`] || '';
+      const showResults = searchQuery && !selectedOption;
+      const filteredOptions = (f.options || []).filter((o) =>
+        o.label.toLowerCase().includes(searchQuery.toLowerCase())
+      ).slice(0, 10);
+
+      return (
+        <div key={f.name} className="relative" style={{ gridColumn: f.full ? 'span 2' : undefined }}>
+          <span className="mb-1.5 block text-xs font-semibold text-slate-600">{f.label}{f.required && ' *'}</span>
+          <input
+            type="text"
+            value={selectedOption ? selectedOption.label : searchQuery}
+            onChange={(e) => {
+              setField(f.name, '');
+              setField(`_search_${f.name}`, e.target.value);
+            }}
+            placeholder={f.placeholder || 'Buscar…'}
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+          />
+          {selectedOption && (
+            <p className="mt-1 text-xs font-medium text-emerald-600">✓ {selectedOption.label}</p>
+          )}
+          {showResults && filteredOptions.length > 0 && (
+            <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+              {filteredOptions.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => {
+                    setField(f.name, o.value);
+                    setField(`_search_${f.name}`, '');
+                  }}
+                  className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-emerald-50"
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          )}
+          {showResults && filteredOptions.length === 0 && (
+            <p className="mt-1 text-xs text-slate-400">Sin resultados.</p>
+          )}
+        </div>
+      );
+    }
+
+    if (f.type === 'image-upload') {
+      const handleFile = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setUploading(true);
+        setError('');
+        try {
+          const { file_url } = await base44.integrations.Core.UploadFile({ file });
+          setField(f.name, file_url);
+        } catch (err) {
+          setError('No se pudo subir la imagen.');
+        } finally {
+          setUploading(false);
+        }
+      };
+
+      return (
+        <div key={f.name} className={f.full ? 'sm:col-span-2' : ''}>
+          <span className="mb-1.5 block text-xs font-semibold text-slate-600">{f.label}</span>
+          {value && (
+            <div className="mb-2">
+              <img src={value} alt="Vista previa" className="h-24 rounded-lg object-contain" />
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+              {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              {uploading ? 'Subiendo…' : (value ? 'Cambiar' : 'Subir imagen')}
+              <input type="file" accept="image/*" onChange={handleFile} className="hidden" disabled={uploading} />
+            </label>
+            {value && (
+              <button type="button" onClick={() => setField(f.name, '')} className="text-xs text-red-500 hover:underline">
+                Quitar
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     if (f.type === 'textarea') {
       return (
         <label key={f.name} className="block">
@@ -130,6 +221,7 @@ export default function EntityModal({
           </button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
+          {topContent && <div className="mb-2">{topContent}</div>}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {fields.map((f) => (
               <div key={f.name} className={f.full ? 'sm:col-span-2' : ''}>

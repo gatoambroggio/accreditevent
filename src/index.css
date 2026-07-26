@@ -90,3 +90,10 @@
     @apply bg-background text-foreground font-body;
   }
 }
+
+@media print {
+  body * { visibility: hidden; }
+  .badge-print, .badge-print * { visibility: visible; }
+  .badge-print { position: absolute; top: 0; left: 0; margin: 0 !important; box-shadow: none !important; }
+  .no-print { display: none !important; }
+}
