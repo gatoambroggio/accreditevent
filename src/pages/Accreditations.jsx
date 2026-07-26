@@ -107,8 +107,34 @@ export default function Accreditations() {
     if (!editing) {
       enriched.badge_code = generateBadgeCode(person?.person_type, items.map((a) => a.badge_code));
     }
-    if (editing) await update(editing.id, enriched);
-    else await create(enriched);
+    if (editing) {
+      await update(editing.id, enriched);
+    } else {
+      await create(enriched);
+      // Send pickup notification email (only reaches registered app users)
+      if (person?.email && evt?.pickup_address) {
+        try {
+          const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(evt.pickup_address)}`;
+          const pickupDate = evt.pickup_date
+            ? new Date(evt.pickup_date + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+            : 'a confirmar';
+          const pickupTime = evt.pickup_start_time && evt.pickup_end_time
+            ? `${evt.pickup_start_time} a ${evt.pickup_end_time} hs`
+            : (evt.pickup_start_time || 'a confirmar');
+          await base44.integrations.Core.SendEmail({
+            to: person.email,
+            subject: `Tu acreditación para ${evt.name} está lista`,
+            body:
+              `Hola ${person.full_name},\n\n` +
+              `Tu acreditación para "${evt.name}" ya está lista.\n\n` +
+              `Podés retirarla el día ${pickupDate}, en el horario de ${pickupTime}.\n\n` +
+              `Dirección de retiro: ${evt.pickup_address}\n` +
+              `Ver ubicación en el mapa: ${mapsUrl}\n\n` +
+              `Te esperamos.\n\nAccreditEvent`,
+          });
+        } catch {}
+      }
+    }
   };
 
   const handleDelete = async () => { await remove(editing.id); };

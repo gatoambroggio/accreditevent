@@ -11,6 +11,10 @@ const FIELDS = [
   { name: 'start_at', label: 'Inicio', type: 'datetime-local' },
   { name: 'end_at', label: 'Fin', type: 'datetime-local' },
   { name: 'grace_hours', label: 'Horas extra post-evento', type: 'number' },
+  { name: 'pickup_date', label: 'Fecha de retiro', type: 'date' },
+  { name: 'pickup_start_time', label: 'Retiro desde', type: 'time' },
+  { name: 'pickup_end_time', label: 'Retiro hasta', type: 'time' },
+  { name: 'pickup_address', label: 'Dirección de retiro', type: 'text', full: true },
   {
     name: 'status', label: 'Estado', type: 'select',
     options: [

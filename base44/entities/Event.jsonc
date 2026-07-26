@@ -38,6 +38,23 @@
       ],
       "default": "draft",
       "description": "Estado del evento"
+    },
+    "pickup_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de retiro de credenciales"
+    },
+    "pickup_start_time": {
+      "type": "string",
+      "description": "Hora de inicio del retiro"
+    },
+    "pickup_end_time": {
+      "type": "string",
+      "description": "Hora de fin del retiro"
+    },
+    "pickup_address": {
+      "type": "string",
+      "description": "Direcci\u00f3n de retiro de credenciales"
     }
   },
   "required": [
