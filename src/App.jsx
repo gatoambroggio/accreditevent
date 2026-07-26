@@ -22,8 +22,9 @@ import Users from '@/pages/Users';
 import Audit from '@/pages/Audit';
 import ProviderPortal from '@/pages/ProviderPortal';
 import AccessControl from '@/pages/AccessControl';
+import ProviderRegister from '@/pages/ProviderRegister';
 
-const AUTH_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password'];
+const AUTH_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password', '/provider-register'];
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -57,6 +58,7 @@ const AuthenticatedApp = () => {
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/provider-register" element={<ProviderRegister />} />
       <Route element={<AppLayout />}>
         <Route path="/" element={<Home />} />
         <Route path="/events" element={<Events />} />

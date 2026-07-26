@@ -66,9 +66,11 @@ export default async function (req) {
         challenge: '',
       });
 
-      await base44.asServiceRole.entities.Accreditation.update(biometric.accreditation_id, {
-        has_biometric: true,
-      });
+      if (biometric.accreditation_id) {
+        await base44.asServiceRole.entities.Accreditation.update(biometric.accreditation_id, {
+          has_biometric: true,
+        });
+      }
 
       await base44.asServiceRole.entities.AuditLog.create({
         actor_name: user.full_name || user.email,

@@ -4,7 +4,7 @@
   "properties": {
     "accreditation_id": {
       "type": "string",
-      "description": "Acreditaci\u00f3n asociada"
+      "description": "Acreditaci\u00f3n asociada (opcional para registro de proveedores)"
     },
     "person_id": {
       "type": "string",
@@ -43,7 +43,6 @@
     }
   },
   "required": [
-    "accreditation_id",
     "person_id"
   ]
 }
