@@ -86,6 +86,13 @@ export default function Accreditations() {
   const openEdit = (item) => { setEditing(item); setModalOpen(true); };
 
   const handleSubmit = async (data) => {
+    // Prevent duplicate: one credential per person per event
+    const duplicate = items.find(
+      (a) => a.event_id === data.event_id && a.person_id === data.person_id && (!editing || a.id !== editing.id)
+    );
+    if (duplicate) {
+      throw new Error('Esta persona ya tiene una credencial registrada para este evento.');
+    }
     // Denormalize event/person data
     const evt = events.find((e) => e.id === data.event_id);
     const person = people.find((p) => p.id === data.person_id);
