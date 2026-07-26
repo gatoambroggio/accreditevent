@@ -24,6 +24,11 @@
       "format": "date-time",
       "description": "Fecha y hora de fin"
     },
+    "grace_hours": {
+      "type": "number",
+      "default": 4,
+      "description": "Horas extra de acceso tras finalizar el evento"
+    },
     "status": {
       "type": "string",
       "enum": [

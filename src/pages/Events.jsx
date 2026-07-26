@@ -10,6 +10,7 @@ const FIELDS = [
   { name: 'logo_url', label: 'Logo del evento', type: 'image-upload', full: true },
   { name: 'start_at', label: 'Inicio', type: 'datetime-local' },
   { name: 'end_at', label: 'Fin', type: 'datetime-local' },
+  { name: 'grace_hours', label: 'Horas extra post-evento', type: 'number' },
   {
     name: 'status', label: 'Estado', type: 'select',
     options: [
