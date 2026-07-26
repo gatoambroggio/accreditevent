@@ -86,11 +86,13 @@ export default function Accreditations() {
   const openEdit = (item) => { setEditing(item); setModalOpen(true); };
 
   const handleSubmit = async (data) => {
-    // Prevent duplicate: one credential per person per event
-    const duplicate = items.find(
-      (a) => a.event_id === data.event_id && a.person_id === data.person_id && (!editing || a.id !== editing.id)
+    // Prevent duplicate: one credential per person per event (server-side check)
+    const existing = await base44.entities.Accreditation.filter(
+      { event_id: data.event_id, person_id: data.person_id },
+      '-created_date',
+      5
     );
-    if (duplicate) {
+    if (existing.some((a) => !editing || a.id !== editing.id)) {
       throw new Error('Esta persona ya tiene una credencial registrada para este evento.');
     }
     // Denormalize event/person data
