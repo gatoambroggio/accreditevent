@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Trash2, Loader2, Upload } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import AddressInput from '@/components/AddressInput';
 
 export default function EntityModal({
   open,
@@ -197,6 +198,21 @@ export default function EntityModal({
           <span className="mb-1.5 block text-xs font-semibold text-slate-600">{f.label}{f.required && ' *'}</span>
           <input type="datetime-local" {...common} value={val} />
         </label>
+      );
+    }
+
+    if (f.type === 'address') {
+      return (
+        <div key={f.name} className={f.full ? 'sm:col-span-2' : ''}>
+          <span className="mb-1.5 block text-xs font-semibold text-slate-600">{f.label}{f.required && ' *'}</span>
+          <AddressInput
+            value={value}
+            onChange={(val) => setField(f.name, val)}
+            placeholder={f.placeholder || 'Buscar dirección…'}
+            required={f.required}
+            disabled={f.disabled}
+          />
+        </div>
       );
     }
 

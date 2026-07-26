@@ -14,7 +14,7 @@ const FIELDS = [
   { name: 'pickup_date', label: 'Fecha de retiro', type: 'date' },
   { name: 'pickup_start_time', label: 'Retiro desde', type: 'time' },
   { name: 'pickup_end_time', label: 'Retiro hasta', type: 'time' },
-  { name: 'pickup_address', label: 'Dirección de retiro', type: 'text', full: true },
+  { name: 'pickup_address', label: 'Dirección de retiro', type: 'address', full: true, placeholder: 'Buscar dirección…' },
   {
     name: 'status', label: 'Estado', type: 'select',
     options: [
