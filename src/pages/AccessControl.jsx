@@ -61,6 +61,12 @@ export default function AccessControl({ standalone = false }) {
     return () => clearTimeout(timer);
   }, [result, speak]);
 
+  useEffect(() => {
+    if (standalone && found?.has_biometric && !showCamera && !verifying && !result) {
+      setShowCamera(true);
+    }
+  }, [standalone, found, showCamera, verifying, result]);
+
   const handleSearch = async (e) => {
     e?.preventDefault();
     if (!badgeCode.trim()) return;
@@ -109,6 +115,7 @@ export default function AccessControl({ standalone = false }) {
           accred: found,
         });
         setFound(null);
+        setBadgeCode('');
       }
     } catch (err) {
       setResult({ ok: false, message: err.response?.data?.error || err.message || 'Error en la verificación.' });
@@ -308,7 +315,7 @@ export default function AccessControl({ standalone = false }) {
                   <p className="mb-4 text-sm text-slate-500">
                     Pedile a la persona que mire a la cámara y capturá el rostro.
                   </p>
-                  <FaceCapture onCaptured={handleFaceCaptured} />
+                  <FaceCapture onCaptured={handleFaceCaptured} autoCapture={standalone} />
                 </>
               )}
             </div>

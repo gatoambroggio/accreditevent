@@ -21,10 +21,14 @@ const TYPE_PREFIXES = {
 function generateBadgeCode(personType, existingCodes) {
   const prefix = TYPE_PREFIXES[personType] || 'GE';
   const nums = existingCodes
-    .map((code) => (code?.startsWith(prefix) ? parseInt(code.slice(prefix.length), 10) : 0))
-    .filter((n) => !isNaN(n) && n > 0);
+    .map((code) => {
+      if (!code?.startsWith(prefix + '-')) return 0;
+      const n = parseInt(code.slice(prefix.length + 1), 10);
+      return isNaN(n) ? 0 : n;
+    })
+    .filter((n) => n > 0);
   const next = (nums.length > 0 ? Math.max(...nums) : 0) + 1;
-  return `${prefix}${String(next).padStart(4, '0')}`;
+  return `${prefix}-${String(next).padStart(4, '0')}`;
 }
 
 export default function Accreditations() {
