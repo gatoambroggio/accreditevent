@@ -81,8 +81,10 @@ export default async function (req) {
         },
       });
 
-      if (result.match_index >= 2 && typeof result.confidence === 'number' && result.confidence >= 0.85) {
-        matchedBiometric = batch[result.match_index - 2];
+      const matchIndex = Number(result.match_index) || 0;
+      const confidence = Number(result.confidence) || 0;
+      if (matchIndex >= 2 && confidence >= 0.7) {
+        matchedBiometric = batch[matchIndex - 2];
         if (matchedBiometric) break;
       }
     }

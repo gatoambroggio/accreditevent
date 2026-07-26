@@ -66,7 +66,9 @@ export default async function (req) {
       },
     });
 
-    const verified = result.match === true && typeof result.confidence === 'number' && result.confidence >= 0.85;
+    const match = result.match === true || result.match === 'true';
+    const confidence = Number(result.confidence) || 0;
+    const verified = match && confidence >= 0.7;
 
     if (verified) {
       await base44.asServiceRole.entities.AccessLog.create({
@@ -90,7 +92,8 @@ export default async function (req) {
 
     return Response.json({
       verified,
-      confidence: result.confidence,
+      confidence,
+      reason: result.reason || '',
       person_name: accreditation.person_name,
     });
   } catch (error) {
