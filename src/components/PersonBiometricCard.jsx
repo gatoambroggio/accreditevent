@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { startRegistration } from '@simplewebauthn/browser';
 import { Fingerprint, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import FaceCapture from '@/components/FaceCapture';
 
 export default function PersonBiometricCard({ person }) {
   const [biometric, setBiometric] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [registering, setRegistering] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const load = async () => {
@@ -28,44 +28,38 @@ export default function PersonBiometricCard({ person }) {
     load();
   }, [person.id]);
 
-  const handleRegister = async () => {
+  const handleCaptured = async (file) => {
+    setSaving(true);
     setError('');
-    setRegistering(true);
     try {
-      if (!window.PublicKeyCredential) {
-        throw new Error('Tu navegador no soporta autenticación biométrica.');
-      }
-      const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-      if (!available) {
-        throw new Error('Tu dispositivo no tiene un autenticador biométrico disponible.');
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+
+      if (biometric) {
+        await base44.entities.Biometric.update(biometric.id, { status: 'revoked' });
       }
 
-      const beginRes = await base44.functions.invoke('webauthnRegister', {
-        step: 'begin',
+      await base44.entities.Biometric.create({
         person_id: person.id,
         person_name: person.full_name,
-        origin: window.location.origin,
+        face_photo_url: file_url,
+        status: 'active',
       });
 
-      const attestationResponse = await startRegistration({
-        optionsJSON: beginRes.data.options,
+      const accreds = await base44.entities.Accreditation.filter({
+        person_id: person.id,
+        status: 'active',
       });
-
-      await base44.functions.invoke('webauthnRegister', {
-        step: 'finish',
-        biometric_id: beginRes.data.biometric_id,
-        attestation_response: attestationResponse,
-      });
+      if (accreds.length > 0) {
+        await base44.entities.Accreditation.bulkUpdate(
+          accreds.map((a) => ({ id: a.id, has_biometric: true }))
+        );
+      }
 
       await load();
     } catch (err) {
-      if (err.name === 'NotAllowedError') {
-        setError('Cancelaste el registro biométrico.');
-      } else {
-        setError(err.message || 'No se pudo registrar la biometría.');
-      }
+      setError(err.message || 'No se pudo guardar el rostro.');
     } finally {
-      setRegistering(false);
+      setSaving(false);
     }
   };
 
@@ -85,35 +79,26 @@ export default function PersonBiometricCard({ person }) {
         <Fingerprint className="h-4 w-4 text-emerald-600" /> Biometría
       </h3>
 
-      {biometric ? (
-        <div className="flex items-center gap-3 rounded-lg bg-emerald-50 px-4 py-3 ring-1 ring-emerald-200">
+      {biometric && !saving && (
+        <div className="mb-4 flex items-center gap-3 rounded-lg bg-emerald-50 px-4 py-3 ring-1 ring-emerald-200">
           <CheckCircle2 className="h-5 w-5 text-emerald-600" />
           <div className="flex-1">
             <p className="text-sm font-semibold text-emerald-800">Rostro registrado</p>
-            <p className="text-xs text-emerald-600">Ya podés usar Face ID o huella para ingresar a eventos.</p>
+            <p className="text-xs text-emerald-600">Ya podés usar la cámara para ingresar a eventos.</p>
           </div>
-          <button
-            onClick={handleRegister}
-            disabled={registering}
-            className="text-xs font-medium text-slate-500 hover:text-slate-700 disabled:opacity-50"
-          >
-            Volver a registrar
-          </button>
+        </div>
+      )}
+
+      {saving ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+          <span className="ml-2 text-sm text-slate-500">Guardando rostro…</span>
         </div>
       ) : (
-        <div>
-          <p className="mb-4 text-sm text-slate-500">
-            No registraste tu biometría todavía. Registrala para agilizar tu ingreso a los eventos.
-          </p>
-          <button
-            onClick={handleRegister}
-            disabled={registering}
-            className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:opacity-50"
-          >
-            {registering ? <Loader2 className="h-4 w-4 animate-spin" /> : <Fingerprint className="h-4 w-4" />}
-            {registering ? 'Registrando…' : 'Registrar rostro'}
-          </button>
-        </div>
+        <FaceCapture
+          onCaptured={handleCaptured}
+          label={biometric ? 'Volver a registrar rostro' : 'Registrar rostro'}
+        />
       )}
 
       {error && (

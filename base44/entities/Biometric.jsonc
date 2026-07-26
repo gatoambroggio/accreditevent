@@ -14,22 +14,26 @@
       "type": "string",
       "description": "Nombre de la persona (denormalizado)"
     },
+    "face_photo_url": {
+      "type": "string",
+      "description": "URL de la foto de rostro capturada con c\u00e1mara web"
+    },
     "credential_id": {
       "type": "string",
-      "description": "ID de credencial WebAuthn (base64url)"
+      "description": "ID de credencial WebAuthn (base64url) \u2014 legacy"
     },
     "public_key": {
       "type": "string",
-      "description": "Clave p\u00fablica COSE (base64)"
+      "description": "Clave p\u00fablica COSE (base64) \u2014 legacy"
     },
     "counter": {
       "type": "number",
       "default": 0,
-      "description": "Contador de reproducci\u00f3n"
+      "description": "Contador de reproducci\u00f3n \u2014 legacy"
     },
     "challenge": {
       "type": "string",
-      "description": "Challenge temporal pendiente"
+      "description": "Challenge temporal pendiente \u2014 legacy"
     },
     "status": {
       "type": "string",

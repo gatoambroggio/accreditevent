@@ -1,19 +1,18 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { startRegistration } from '@simplewebauthn/browser';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import AuthLayout from '@/components/AuthLayout';
+import FaceCapture from '@/components/FaceCapture';
 import {
   UserPlus,
   Mail,
   Lock,
   Loader2,
-  Fingerprint,
-  CheckCircle2,
+  Camera,
   Building2,
   Phone,
   IdCard,
@@ -36,6 +35,7 @@ export default function ProviderRegister() {
   const [otpCode, setOtpCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [personId, setPersonId] = useState(null);
 
   const setField = (name, value) => setForm((f) => ({ ...f, [name]: value }));
@@ -96,45 +96,23 @@ export default function ProviderRegister() {
     }
   };
 
-  const handleFaceId = async () => {
+  const handleFaceCapture = async (file) => {
     setError('');
-    setLoading(true);
+    setSaving(true);
     try {
-      if (!window.PublicKeyCredential) {
-        throw new Error('Tu navegador no soporta autenticación biométrica.');
-      }
-      const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-      if (!available) {
-        throw new Error('Tu dispositivo no tiene un autenticador biométrico disponible.');
-      }
-
-      const beginRes = await base44.functions.invoke('webauthnRegister', {
-        step: 'begin',
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      await base44.entities.Biometric.create({
         person_id: personId,
         person_name: form.full_name,
-        origin: window.location.origin,
+        face_photo_url: file_url,
+        status: 'active',
       });
-
-      const attestationResponse = await startRegistration({
-        optionsJSON: beginRes.data.options,
-      });
-
-      await base44.functions.invoke('webauthnRegister', {
-        step: 'finish',
-        biometric_id: beginRes.data.biometric_id,
-        attestation_response: attestationResponse,
-      });
-
       toast({ title: '¡Rostro registrado!', description: 'Ya podés ingresar al portal.' });
       window.location.href = '/portal';
     } catch (err) {
-      if (err.name === 'NotAllowedError') {
-        setError('Cancelaste el registro biométrico.');
-      } else {
-        setError(err.message || 'No se pudo registrar la biometría.');
-      }
+      setError(err.message || 'No se pudo guardar el rostro.');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
@@ -190,24 +168,14 @@ export default function ProviderRegister() {
     );
   }
 
-  // Step 3: Face ID
+  // Step 3: Face capture
   if (step === 3) {
     return (
       <AuthLayout
-        icon={Fingerprint}
+        icon={Camera}
         title="Registrá tu rostro"
-        subtitle="Usá Face ID o huella para tu acreditación en eventos"
+        subtitle="Capturá una foto para tu acreditación"
       >
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
-            <Fingerprint className="w-8 h-8 text-primary" />
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Tu rostro se registrará de forma segura en tu dispositivo. Lo usaremos para validar tu
-            ingreso en los eventos.
-          </p>
-        </div>
-
         {error && (
           <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm flex items-start gap-2">
             <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
@@ -215,28 +183,27 @@ export default function ProviderRegister() {
           </div>
         )}
 
-        <Button
-          className="w-full h-12 font-medium mb-3"
-          onClick={handleFaceId}
-          disabled={loading}
-        >
-          {loading ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Registrando…
-            </>
-          ) : (
-            <>
-              <Fingerprint className="w-4 h-4 mr-2" /> Registrar rostro con Face ID
-            </>
-          )}
-        </Button>
-        <Button
-          variant="ghost"
-          className="w-full text-sm text-muted-foreground"
-          onClick={() => { window.location.href = '/portal'; }}
-        >
-          Registrar más tarde <ArrowRight className="w-4 h-4 ml-1" />
-        </Button>
+        {saving ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            <span className="ml-2 text-sm text-muted-foreground">Guardando rostro…</span>
+          </div>
+        ) : (
+          <>
+            <p className="mb-4 text-center text-sm text-muted-foreground">
+              Tu foto se usará para validar tu identidad en el ingreso a eventos.
+            </p>
+            <FaceCapture onCaptured={handleFaceCapture} />
+            <button
+              className="mt-3 w-full text-sm text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                window.location.href = '/portal';
+              }}
+            >
+              Registrar más tarde <ArrowRight className="w-4 h-4 inline ml-1" />
+            </button>
+          </>
+        )}
       </AuthLayout>
     );
   }

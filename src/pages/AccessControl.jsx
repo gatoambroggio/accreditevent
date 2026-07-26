@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
-import { startAuthentication } from '@simplewebauthn/browser';
 import {
-  Fingerprint,
+  Camera,
   Loader2,
   Search,
   CheckCircle2,
@@ -10,7 +9,9 @@ import {
   DoorOpen,
   Hand,
   ShieldCheck,
+  X,
 } from 'lucide-react';
+import FaceCapture from '@/components/FaceCapture';
 
 export default function AccessControl() {
   const [events, setEvents] = useState([]);
@@ -19,8 +20,9 @@ export default function AccessControl() {
   const [found, setFound] = useState(null);
   const [searching, setSearching] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const [result, setResult] = useState(null); // { ok: boolean, person, method }
+  const [result, setResult] = useState(null);
   const [recent, setRecent] = useState([]);
+  const [showCamera, setShowCamera] = useState(false);
 
   const loadEvents = async () => {
     try {
@@ -66,45 +68,35 @@ export default function AccessControl() {
     }
   };
 
-  const handleBiometric = async () => {
+  const handleFaceCaptured = async (file) => {
     setVerifying(true);
     setResult(null);
     try {
-      const me = await base44.auth.me();
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
 
-      const beginRes = await base44.functions.invoke('webauthnVerify', {
-        step: 'begin',
+      const res = await base44.functions.invoke('faceVerify', {
         accreditation_id: found.id,
-        origin: window.location.origin,
+        captured_photo_url: file_url,
       });
 
-      const assertionResponse = await startAuthentication({
-        optionsJSON: beginRes.data.options,
-      });
-
-      const finishRes = await base44.functions.invoke('webauthnVerify', {
-        step: 'finish',
-        accreditation_id: found.id,
-        person_name: found.person_name,
-        badge_code: found.badge_code,
-        event_name: found.event_name,
-        verified_by: me?.full_name || me?.email || 'Sistema',
-      });
-
-      if (finishRes.data.verified) {
+      if (res.data.verified) {
         setResult({ ok: true, method: 'biometric', accred: found });
         setFound(null);
         setBadgeCode('');
         await loadRecent();
+      } else {
+        setResult({
+          ok: false,
+          message: 'El rostro no coincide con el registrado.',
+          accred: found,
+        });
+        setFound(null);
       }
     } catch (err) {
-      if (err.name === 'NotAllowedError') {
-        setResult({ ok: false, message: 'Verificación biométrica cancelada.' });
-      } else {
-        setResult({ ok: false, message: err.message || 'Error en la verificación biométrica.' });
-      }
+      setResult({ ok: false, message: err.response?.data?.error || err.message || 'Error en la verificación.' });
     } finally {
       setVerifying(false);
+      setShowCamera(false);
     }
   };
 
@@ -187,7 +179,7 @@ export default function AccessControl() {
                   </div>
                   {found.has_biometric ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                      <ShieldCheck className="h-3 w-3" /> Biométrico activo
+                      <ShieldCheck className="h-3 w-3" /> Rostro registrado
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500 ring-1 ring-inset ring-slate-200">
@@ -197,10 +189,10 @@ export default function AccessControl() {
                 </div>
                 <div className="flex gap-2">
                   {found.has_biometric && (
-                    <button onClick={handleBiometric} disabled={verifying}
+                    <button onClick={() => setShowCamera(true)} disabled={verifying}
                       className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50">
-                      {verifying ? <Loader2 className="h-5 w-5 animate-spin" /> : <Fingerprint className="h-5 w-5" />}
-                      Verificar con biometría
+                      {verifying ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
+                      Verificar con cámara
                     </button>
                   )}
                   <button onClick={handleManual} disabled={verifying}
@@ -220,7 +212,7 @@ export default function AccessControl() {
                     <div>
                       <p className="text-base font-bold text-emerald-800">Acceso concedido</p>
                       <p className="text-sm text-emerald-600">
-                        {result.accred?.person_name} — verificado por {result.method === 'biometric' ? 'biometría' : 'control manual'}
+                        {result.accred?.person_name} — verificado por {result.method === 'biometric' ? 'reconocimiento facial' : 'control manual'}
                       </p>
                     </div>
                   </>
@@ -252,7 +244,7 @@ export default function AccessControl() {
                   <div>
                     <p className="text-sm font-semibold text-slate-900">{log.person_name || '—'}</p>
                     <p className="text-xs text-slate-400">
-                      {log.method === 'biometric' ? 'Biométrico' : 'Manual'} · {log.event_name}
+                      {log.method === 'biometric' ? 'Facial' : 'Manual'} · {log.event_name}
                     </p>
                   </div>
                   <time className="font-mono text-xs text-slate-400">
@@ -264,6 +256,39 @@ export default function AccessControl() {
           )}
         </div>
       </div>
+
+      {/* Camera modal */}
+      {showCamera && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-sm sm:p-6">
+          <div className="my-8 w-full max-w-md rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Verificar rostro</h2>
+                <p className="text-xs text-slate-500">{found?.person_name}</p>
+              </div>
+              <button onClick={() => setShowCamera(false)} disabled={verifying}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 disabled:opacity-50">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              {verifying ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+                  <span className="mt-3 text-sm text-slate-500">Verificando rostro…</span>
+                </div>
+              ) : (
+                <>
+                  <p className="mb-4 text-sm text-slate-500">
+                    Pedile a la persona que mire a la cámara y capturá el rostro.
+                  </p>
+                  <FaceCapture onCaptured={handleFaceCaptured} />
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
