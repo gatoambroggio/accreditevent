@@ -45,16 +45,27 @@ export default async function (req) {
       const fileUrls = [captured_photo_url, ...batch.map((b) => b.face_photo_url)];
 
       const prompt =
-        `Sos un sistema de identificación facial. Vas a recibir ${batch.length + 1} imágenes. ` +
-        `La PRIMERA imagen (índice 1) es una captura en vivo de una cámara. ` +
-        `Las imágenes 2 a ${batch.length + 1} son fotos de registro de diferentes personas. ` +
-        `Compará la captura en vivo con cada foto de registro. ` +
-        `¿Qué foto de registro muestra la misma persona que la captura en vivo? ` +
-        `Analizá forma de rostro, ojos, nariz, boca, cejas y estructura facial. ` +
-        `Devolvé el índice (basado en 1) de la imagen que coincide (2 = primera foto de registro, 3 = segunda, etc.). ` +
-        `Si ninguna coincide, devolvé 0.`;
+        `Sos un sistema de identificación biométrica facial. Vas a recibir ${batch.length + 1} imágenes.\n` +
+        `IMAGEN 1 (índice 1): captura en vivo de una cámara.\n` +
+        `IMÁGENES 2 a ${batch.length + 1}: fotos de registro de diferentes personas.\n\n` +
+        `INSTRUCCIONES:\n` +
+        `1. Verificá PRIMERO que la IMAGEN 1 contenga un ROSTRO HUMANO claramente visible y frontal. ` +
+        `Si NO hay un rostro humano (es un objeto, animal, mano, pared, pantalla, o cualquier cosa que no sea una cara humana), ` +
+        `devolvé match_index: 0 y confidence: 0.\n` +
+        `2. Si hay un rostro humano, compará con CADA foto de registro analizando:\n` +
+        `   - Forma y proporciones del rostro (ovalado, redondo, cuadrado)\n` +
+        `   - Distancia entre ojos y posición relativa\n` +
+        `   - Forma y tamaño de la nariz\n` +
+        `   - Forma de la boca y grosor de labios\n` +
+        `   - Cejas: forma, grosor, curvatura y posición\n` +
+        `   - Línea mandibular y mentón\n` +
+        `   - Color y estilo de cabello (si visible)\n` +
+        `3. Solo devolvé un match_index distinto de 0 si estás MUY seguro de que es la misma persona. ` +
+        `Ante la MÍNIMA duda, devolvé match_index: 0. La seguridad es prioridad.\n` +
+        `Respondé únicamente con el JSON.`;
 
       const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
+        model: 'claude_sonnet_4_6',
         prompt,
         file_urls: fileUrls,
         response_json_schema: {
@@ -62,14 +73,15 @@ export default async function (req) {
           properties: {
             match_index: {
               type: 'number',
-              description: 'Índice basado en 1 de la imagen que coincide, o 0 si no hay coincidencia',
+              description: 'Índice basado en 1 de la imagen que coincide, o 0 si no hay coincidencia o no hay rostro humano',
             },
+            confidence: { type: 'number', description: 'Nivel de confianza de 0 a 1' },
           },
-          required: ['match_index'],
+          required: ['match_index', 'confidence'],
         },
       });
 
-      if (result.match_index >= 2) {
+      if (result.match_index >= 2 && typeof result.confidence === 'number' && result.confidence >= 0.85) {
         matchedBiometric = batch[result.match_index - 2];
         if (matchedBiometric) break;
       }
