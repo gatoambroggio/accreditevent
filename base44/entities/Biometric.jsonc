@@ -1,0 +1,49 @@
+{
+  "name": "Biometric",
+  "type": "object",
+  "properties": {
+    "accreditation_id": {
+      "type": "string",
+      "description": "Acreditaci\u00f3n asociada"
+    },
+    "person_id": {
+      "type": "string",
+      "description": "Persona asociada"
+    },
+    "person_name": {
+      "type": "string",
+      "description": "Nombre de la persona (denormalizado)"
+    },
+    "credential_id": {
+      "type": "string",
+      "description": "ID de credencial WebAuthn (base64url)"
+    },
+    "public_key": {
+      "type": "string",
+      "description": "Clave p\u00fablica COSE (base64)"
+    },
+    "counter": {
+      "type": "number",
+      "default": 0,
+      "description": "Contador de reproducci\u00f3n"
+    },
+    "challenge": {
+      "type": "string",
+      "description": "Challenge temporal pendiente"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "active",
+        "revoked"
+      ],
+      "default": "pending",
+      "description": "Estado del registro biom\u00e9trico"
+    }
+  },
+  "required": [
+    "accreditation_id",
+    "person_id"
+  ]
+}

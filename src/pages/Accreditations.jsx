@@ -2,13 +2,14 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useCrud } from '@/lib/crud';
 import { Plus, Pencil, Loader2, Fingerprint } from 'lucide-react';
+import BiometricButton from '@/components/BiometricButton';
 import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
 
 const ACCESS_LEVELS = ['general', 'backstage', 'technical', 'vip', 'all-access'];
 
 export default function Accreditations() {
-  const { items, loading, create, update, remove } = useCrud('Accreditation');
+  const { items, loading, create, update, remove, reload } = useCrud('Accreditation');
   const [events, setEvents] = useState([]);
   const [people, setPeople] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -131,11 +132,7 @@ export default function Accreditations() {
                     <td className="px-4 py-3.5 text-sm text-slate-500">{a.area || '—'} / {a.access_level}</td>
                     <td className="px-4 py-3.5"><StatusBadge status={a.status} /></td>
                     <td className="px-4 py-3.5">
-                      {a.has_biometric ? (
-                        <Fingerprint className="h-4 w-4 text-emerald-600" />
-                      ) : (
-                        <span className="text-xs text-slate-300">—</span>
-                      )}
+                      <BiometricButton accreditation={a} onRegistered={reload} />
                     </td>
                     <td className="px-4 py-3.5 text-right">
                       <button onClick={() => openEdit(a)} className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700">

@@ -16,6 +16,7 @@ import Documents from '@/pages/Documents';
 import Users from '@/pages/Users';
 import Audit from '@/pages/Audit';
 import ProviderPortal from '@/pages/ProviderPortal';
+import AccessControl from '@/pages/AccessControl';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -51,6 +52,7 @@ const AuthenticatedApp = () => {
         <Route path="/documents" element={<Documents />} />
         <Route path="/users" element={<Users />} />
         <Route path="/audit" element={<Audit />} />
+        <Route path="/access-control" element={<AccessControl />} />
       </Route>
       <Route path="/portal" element={<ProviderPortal />} />
       <Route path="*" element={<PageNotFound />} />
