@@ -278,7 +278,22 @@ export default function AccessStation() {
                 Mirá a la cámara. El sistema te identificará automáticamente al detectar tu rostro.
               </p>
 
-              {verifying ? (
+              {(eventStatus === 'upcoming' || eventStatus === 'ended') ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <AlertTriangle className="h-12 w-12 text-amber-500" />
+                  <p className="mt-4 text-lg font-bold text-slate-900">
+                    {eventStatus === 'upcoming' ? 'El evento aún no ha comenzado' : 'El evento ha finalizado'}
+                  </p>
+                  <p className="mt-1 max-w-xs text-sm text-slate-500">
+                    {eventStatus === 'upcoming'
+                      ? `Inicia el ${selectedEvent.start_at ? new Date(selectedEvent.start_at).toLocaleString('es-AR', { dateStyle: 'long', timeStyle: 'short' }) : 'fecha no definida'}`
+                      : `Finalizó el ${selectedEvent.end_at ? new Date(selectedEvent.end_at).toLocaleString('es-AR', { dateStyle: 'long', timeStyle: 'short' }) : 'fecha no definida'}`}
+                  </p>
+                  <button onClick={backToSelect} className="mt-6 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+                    ← Volver a selección de evento
+                  </button>
+                </div>
+              ) : verifying ? (
                 <div className="flex flex-col items-center justify-center py-16">
                   <Loader2 className="h-10 w-10 animate-spin text-emerald-600" />
                   <span className="mt-3 text-sm text-slate-500">Identificando…</span>

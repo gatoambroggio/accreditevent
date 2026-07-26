@@ -22,8 +22,9 @@ function generateBadgeCode(personType, existingCodes) {
   const prefix = TYPE_PREFIXES[personType] || 'GE';
   const nums = existingCodes
     .map((code) => {
-      if (!code?.startsWith(prefix + '-')) return 0;
-      const n = parseInt(code.slice(prefix.length + 1), 10);
+      if (!code || !code.startsWith(prefix)) return 0;
+      const rest = code.startsWith(prefix + '-') ? code.slice(prefix.length + 1) : code.slice(prefix.length);
+      const n = parseInt(rest, 10);
       return isNaN(n) ? 0 : n;
     })
     .filter((n) => n > 0);
