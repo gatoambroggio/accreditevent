@@ -1,0 +1,57 @@
+{
+  "name": "Person",
+  "type": "object",
+  "properties": {
+    "full_name": {
+      "type": "string",
+      "description": "Nombre completo"
+    },
+    "document": {
+      "type": "string",
+      "description": "Documento de identidad"
+    },
+    "company": {
+      "type": "string",
+      "description": "Empresa o raz\u00f3n social"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Tel\u00e9fono de contacto"
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "Email de contacto"
+    },
+    "person_type": {
+      "type": "string",
+      "enum": [
+        "provider",
+        "technician",
+        "staff",
+        "press",
+        "artist",
+        "guest"
+      ],
+      "default": "provider",
+      "description": "Tipo de persona"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas internas"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "inactive",
+        "pending"
+      ],
+      "default": "active",
+      "description": "Estado de la persona"
+    }
+  },
+  "required": [
+    "full_name"
+  ]
+}

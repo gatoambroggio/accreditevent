@@ -1,0 +1,21 @@
+{
+  "properties": {
+    "role": {
+      "type": "string",
+      "description": "Rol del usuario en el sistema de acreditaciones",
+      "enum": [
+        "superadmin",
+        "admin",
+        "coordinator",
+        "control",
+        "provider"
+      ],
+      "default": "provider"
+    }
+  },
+  "required": [
+    "role"
+  ],
+  "name": "User",
+  "type": "object"
+}

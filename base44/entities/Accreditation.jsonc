@@ -1,0 +1,66 @@
+{
+  "name": "Accreditation",
+  "type": "object",
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "description": "Evento asociado"
+    },
+    "event_name": {
+      "type": "string",
+      "description": "Nombre del evento (denormalizado)"
+    },
+    "person_id": {
+      "type": "string",
+      "description": "Persona acreditada"
+    },
+    "person_name": {
+      "type": "string",
+      "description": "Nombre de la persona (denormalizado)"
+    },
+    "person_type": {
+      "type": "string",
+      "description": "Tipo de persona (denormalizado)"
+    },
+    "badge_code": {
+      "type": "string",
+      "description": "C\u00f3digo \u00fanico de credencial"
+    },
+    "area": {
+      "type": "string",
+      "description": "\u00c1rea de trabajo asignada"
+    },
+    "access_level": {
+      "type": "string",
+      "enum": [
+        "general",
+        "backstage",
+        "technical",
+        "vip",
+        "all-access"
+      ],
+      "default": "general",
+      "description": "Nivel de acceso"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "blocked",
+        "revoked"
+      ],
+      "default": "active",
+      "description": "Estado de la acreditaci\u00f3n"
+    },
+    "has_biometric": {
+      "type": "boolean",
+      "default": false,
+      "description": "Indica si tiene biometr\u00eda registrada"
+    }
+  },
+  "required": [
+    "event_id",
+    "person_id",
+    "badge_code"
+  ]
+}

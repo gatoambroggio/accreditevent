@@ -1,0 +1,37 @@
+{
+  "name": "Event",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre del evento"
+    },
+    "venue": {
+      "type": "string",
+      "description": "Sede o lugar del evento"
+    },
+    "start_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de inicio"
+    },
+    "end_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de fin"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "active",
+        "closed"
+      ],
+      "default": "draft",
+      "description": "Estado del evento"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "name": "AccessLog",
+  "type": "object",
+  "properties": {
+    "accreditation_id": {
+      "type": "string",
+      "description": "Acreditaci\u00f3n validada"
+    },
+    "person_name": {
+      "type": "string",
+      "description": "Nombre de la persona (denormalizado)"
+    },
+    "badge_code": {
+      "type": "string",
+      "description": "C\u00f3digo de credencial (denormalizado)"
+    },
+    "event_name": {
+      "type": "string",
+      "description": "Nombre del evento (denormalizado)"
+    },
+    "verified_by": {
+      "type": "string",
+      "description": "Usuario que valid\u00f3 el acceso"
+    },
+    "method": {
+      "type": "string",
+      "enum": [
+        "biometric",
+        "manual"
+      ],
+      "default": "biometric",
+      "description": "M\u00e9todo de verificaci\u00f3n"
+    }
+  },
+  "required": [
+    "accreditation_id",
+    "method"
+  ]
+}

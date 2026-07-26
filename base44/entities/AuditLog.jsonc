@@ -1,0 +1,34 @@
+{
+  "name": "AuditLog",
+  "type": "object",
+  "properties": {
+    "actor_name": {
+      "type": "string",
+      "description": "Nombre del usuario que realiz\u00f3 la acci\u00f3n"
+    },
+    "actor_id": {
+      "type": "string",
+      "description": "ID del usuario que realiz\u00f3 la acci\u00f3n"
+    },
+    "action": {
+      "type": "string",
+      "description": "Acci\u00f3n realizada (create, update, delete, etc.)"
+    },
+    "entity": {
+      "type": "string",
+      "description": "Entidad afectada"
+    },
+    "entity_id": {
+      "type": "string",
+      "description": "ID del registro afectado"
+    },
+    "detail": {
+      "type": "string",
+      "description": "Detalle adicional de la acci\u00f3n"
+    }
+  },
+  "required": [
+    "action",
+    "entity"
+  ]
+}

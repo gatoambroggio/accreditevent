@@ -1,0 +1,76 @@
+{
+  "name": "Document",
+  "type": "object",
+  "properties": {
+    "person_id": {
+      "type": "string",
+      "description": "Persona due\u00f1a del documento"
+    },
+    "person_name": {
+      "type": "string",
+      "description": "Nombre de la persona (denormalizado)"
+    },
+    "document_type": {
+      "type": "string",
+      "enum": [
+        "dni",
+        "work_insurance",
+        "tax_certificate",
+        "contract",
+        "other"
+      ],
+      "description": "Tipo de documento"
+    },
+    "original_name": {
+      "type": "string",
+      "description": "Nombre original del archivo"
+    },
+    "file_url": {
+      "type": "string",
+      "description": "URL del archivo almacenado"
+    },
+    "mime_type": {
+      "type": "string",
+      "description": "Tipo MIME del archivo"
+    },
+    "size": {
+      "type": "number",
+      "description": "Tama\u00f1o en bytes"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "rejected",
+        "expired"
+      ],
+      "default": "pending",
+      "description": "Estado de revisi\u00f3n"
+    },
+    "review_note": {
+      "type": "string",
+      "description": "Nota del revisor"
+    },
+    "reviewed_by": {
+      "type": "string",
+      "description": "Usuario que revis\u00f3 el documento"
+    },
+    "reviewed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha de revisi\u00f3n"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de vencimiento"
+    }
+  },
+  "required": [
+    "person_id",
+    "document_type",
+    "original_name",
+    "file_url"
+  ]
+}
