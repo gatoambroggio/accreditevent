@@ -142,9 +142,7 @@ export default function Accreditations() {
 <p style="margin:0 0 6px;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;">📅 Fecha de retiro</p>
 <p style="margin:0 0 20px;color:#0f172a;font-size:15px;font-weight:700;">${pickupDate}</p>
 <p style="margin:0 0 6px;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;">🕐 Horario</p>
-<p style="margin:0 0 20px;color:#0f172a;font-size:15px;font-weight:700;">${pickupTime}</p>
-<p style="margin:0 0 6px;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;">📍 Dirección</p>
-<p style="margin:0;color:#0f172a;font-size:15px;font-weight:700;">${evt.pickup_address}</p>
+<p style="margin:0;color:#0f172a;font-size:15px;font-weight:700;">${pickupTime}</p>
 </td></tr>
 </table>
 <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
@@ -176,7 +174,6 @@ export default function Accreditations() {
             `Hola ${person.full_name},\n\n` +
             `Tu acreditación para "${evt.name}" ya está lista.\n\n` +
             `Podés retirarla el día ${pickupDate}, en el horario de ${pickupTime}.\n\n` +
-            `Dirección de retiro: ${evt.pickup_address}\n` +
             `Ver ubicación en el mapa: ${mapsUrl}\n\n` +
             `Te esperamos.\n\nAccreditEvent`
           );
