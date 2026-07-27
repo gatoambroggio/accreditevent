@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { X, Loader2, FileText, ExternalLink } from 'lucide-react';
+import { X, Loader2, FileText, ExternalLink, User } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
+import { Image } from '@/components/ui/image';
 
 const DOC_LABELS = {
   dni: 'DNI',
@@ -13,14 +14,19 @@ const DOC_LABELS = {
 
 export default function PersonDetailModal({ person, onClose }) {
   const [docs, setDocs] = useState([]);
+  const [bio, setBio] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!person) return;
     (async () => {
       try {
-        const data = await base44.entities.Document.filter({ person_id: person.id }, '-created_date', 100);
-        setDocs(data);
+        const [docData, bioData] = await Promise.all([
+          base44.entities.Document.filter({ person_id: person.id }, '-created_date', 100),
+          base44.entities.Biometric.filter({ person_id: person.id, status: 'active' }, '-created_date', 1),
+        ]);
+        setDocs(docData);
+        setBio(bioData[0] || null);
       } catch {}
       setLoading(false);
     })();
@@ -41,7 +47,33 @@ export default function PersonDetailModal({ person, onClose }) {
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="space-y-3 px-6 py-5">
+        <div className="px-6 py-5">
+          {/* Face photo */}
+          <div className="mb-5 flex items-center gap-4">
+            {loading ? (
+              <div className="grid h-20 w-20 place-items-center rounded-xl bg-slate-100">
+                <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+              </div>
+            ) : bio?.face_photo_url ? (
+              <Image src={bio.face_photo_url} alt={person.full_name} className="h-20 w-20 rounded-xl object-cover" fittingType="fill" />
+            ) : (
+              <div className="grid h-20 w-20 place-items-center rounded-xl bg-slate-100 text-slate-300">
+                <User className="h-8 w-8" />
+              </div>
+            )}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Rostro registrado</p>
+              {bio?.face_photo_url ? (
+                <p className="mt-0.5 text-sm text-emerald-600">✓ Biometría activa</p>
+              ) : (
+                <p className="mt-0.5 text-sm text-slate-400">Sin biometría registrada</p>
+              )}
+            </div>
+          </div>
+
+          {/* Documents */}
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Documentación</p>
+          <div className="space-y-3">
           {loading ? (
             <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-emerald-600" /></div>
           ) : docs.length === 0 ? (
@@ -70,6 +102,7 @@ export default function PersonDetailModal({ person, onClose }) {
               </div>
             ))
           )}
+          </div>
         </div>
       </div>
     </div>
