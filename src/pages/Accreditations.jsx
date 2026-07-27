@@ -97,7 +97,9 @@ export default function Accreditations() {
     );
   };
 
-  const eventOptions = events.map((e) => ({ value: e.id, label: e.name }));
+  const eventOptions = events
+    .filter((e) => e.status !== 'closed' || (editing && editing.event_id === e.id))
+    .map((e) => ({ value: e.id, label: e.name }));
   const personOptions = people.map((p) => ({ value: p.id, label: `${p.full_name} — ${p.document || 'sin doc'} (${p.person_type})` }));
 
   const fields = [
