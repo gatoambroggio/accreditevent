@@ -10,9 +10,11 @@ const ROLES = [
   { value: 'coordinator', label: 'Coordinador' },
   { value: 'admin', label: 'Administrador' },
   { value: 'superadmin', label: 'Superadministrador' },
+  { value: 'productora', label: 'Productora' },
 ];
 
 const ROLE_LABELS = {
+  productora: 'Productora',
   superadmin: 'Superadmin',
   admin: 'Administrador',
   coordinator: 'Coordinador',
@@ -21,6 +23,7 @@ const ROLE_LABELS = {
 };
 
 const ROLE_STYLES = {
+  productora: 'bg-amber-50 text-amber-800 ring-amber-300',
   superadmin: 'bg-purple-50 text-purple-700 ring-purple-200',
   admin: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
   coordinator: 'bg-blue-50 text-blue-700 ring-blue-200',
@@ -31,6 +34,7 @@ const ROLE_STYLES = {
 const EDIT_FIELDS = [
   { name: 'company', label: 'Empresa', type: 'text', placeholder: 'Ej: Producciones SA', full: true },
   { name: 'role', label: 'Rol', type: 'select', options: ROLES, required: true },
+  { name: 'password', label: 'Nueva contraseña', type: 'password', placeholder: 'Dejar en blanco para no cambiar', full: true, hint: 'Mínimo 6 caracteres' },
 ];
 
 export default function Users() {
@@ -72,6 +76,14 @@ export default function Users() {
   const openEdit = (u) => { setEditing(u); setModalOpen(true); setResetMsg(''); };
 
   const handleUpdate = async (data) => {
+    if (data.password) {
+      try {
+        await base44.functions.invoke('changeUserPassword', { userId: editing.id, newPassword: data.password });
+        await logAudit('change_password', 'User', editing.id, 'Cambio manual de contraseña');
+      } catch (err) {
+        throw new Error('No se pudo cambiar la contraseña: ' + (err.data?.error || err.message || err));
+      }
+    }
     await base44.entities.User.update(editing.id, { role: data.role, company: data.company || '' });
     await logAudit('update', 'User', editing.id, `Rol: ${data.role}, Empresa: ${data.company || '—'}`);
     setUsers((prev) => prev.map((u) => (u.id === editing.id ? { ...u, role: data.role, company: data.company } : u)));

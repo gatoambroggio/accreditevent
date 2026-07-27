@@ -4,6 +4,7 @@
       "type": "string",
       "description": "Rol del usuario en el sistema de acreditaciones",
       "enum": [
+        "productora",
         "superadmin",
         "admin",
         "coordinator",

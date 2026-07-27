@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 
-export const ROLE_LEVEL = { provider: -1, control: 0, coordinator: 1, admin: 2, superadmin: 3 };
+export const ROLE_LEVEL = { provider: -1, control: 0, coordinator: 1, admin: 2, superadmin: 3, productora: 4 };
 
 const NAV_ITEMS = [
   { path: '/', label: 'Resumen', icon: LayoutDashboard, minLevel: 0 },
