@@ -1,9 +1,10 @@
 import React from 'react';
 import { X, Printer, Car } from 'lucide-react';
+import { printBadge } from '@/lib/printBadge';
 
 export default function VehicleBadgePrint({ vehicle, settings, events = [], parkingSectors = [], onClose }) {
   const handlePrint = () => {
-    window.print();
+    printBadge();
   };
 
   const orgName = settings?.organization_name || 'Acceso Eventos';

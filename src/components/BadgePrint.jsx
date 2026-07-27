@@ -1,10 +1,11 @@
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { X, Printer } from 'lucide-react';
+import { printBadge } from '@/lib/printBadge';
 
 export default function BadgePrint({ accreditation, event, onClose }) {
   const handlePrint = () => {
-    window.print();
+    printBadge();
   };
 
   return (
