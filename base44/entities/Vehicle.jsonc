@@ -60,11 +60,6 @@
       "$or": [
         {
           "user_condition": {
-            "role": "productora"
-          }
-        },
-        {
-          "user_condition": {
             "role": "superadmin"
           }
         },
@@ -90,11 +85,6 @@
     },
     "create": {
       "$or": [
-        {
-          "user_condition": {
-            "role": "productora"
-          }
-        },
         {
           "user_condition": {
             "role": "superadmin"
@@ -126,11 +116,6 @@
       "$or": [
         {
           "user_condition": {
-            "role": "productora"
-          }
-        },
-        {
-          "user_condition": {
             "role": "superadmin"
           }
         },
@@ -156,11 +141,6 @@
     },
     "delete": {
       "$or": [
-        {
-          "user_condition": {
-            "role": "productora"
-          }
-        },
         {
           "user_condition": {
             "role": "superadmin"
