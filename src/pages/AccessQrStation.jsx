@@ -92,7 +92,7 @@ export default function AccessQrStation() {
         '-created_date',
         500
       );
-      const accred = accreditations.find((a) => a.badge_code === code);
+      const accred = accreditations.find((a) => a.id === code);
 
       if (accred) {
         if (!canAccessAnyZone(accred.access_level, selectedZones)) {

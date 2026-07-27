@@ -123,7 +123,7 @@ export default function BadgePrint({ accreditation, event, onClose }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem' }}>
             <div style={{ flexShrink: 0 }}>
               <QRCodeSVG
-                value={accreditation?.badge_code || accreditation?.id || ''}
+                value={accreditation?.id || ''}
                 size={72}
                 level="M"
               />
