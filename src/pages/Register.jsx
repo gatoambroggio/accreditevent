@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { UserPlus, Mail, Lock, Loader2 } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import AuthLayout from "@/components/AuthLayout";
+import AuthSessionBanner from "@/components/AuthSessionBanner";
 import GoogleIcon from "@/components/GoogleIcon";
 import { toast } from "@/components/ui/use-toast";
 
@@ -138,6 +139,7 @@ export default function Register() {
         </>
       }
     >
+      <AuthSessionBanner actionLabel="registrar una cuenta nueva" />
       <Button
         variant="outline"
         className="w-full h-12 text-sm font-medium mb-6"
