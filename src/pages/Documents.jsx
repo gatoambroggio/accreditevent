@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useCrud } from '@/lib/crud';
-import { Eye, Loader2, FileText, Search, Download, Plus, Pencil, Settings2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Eye, FileText, Download, Plus, Pencil, Settings2, ChevronDown, ChevronRight } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
 import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
@@ -9,6 +9,11 @@ import { base44 } from '@/api/base44Client';
 import { logAudit } from '@/lib/audit';
 import { useDocumentTypes } from '@/lib/useDocumentTypes';
 import { slugify } from '@/lib/slugify';
+import PageHeader from '@/components/ui/page-header';
+import SearchInput from '@/components/ui/search-input';
+import FilterSelect from '@/components/ui/filter-select';
+import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
+import { btnOutline, btnIcon } from '@/components/ui/button-styles';
 
 const TYPE_FIELDS = [
   { name: 'label', label: 'Nombre', type: 'text', required: true, placeholder: 'Ej: Seguro de trabajo' },
@@ -27,6 +32,13 @@ const REVIEW_FIELDS = [
   },
   { name: 'expires_at', label: 'Fecha de vencimiento', type: 'date' },
   { name: 'review_note', label: 'Nota del revisor', type: 'textarea', full: true },
+];
+
+const STATUS_OPTIONS = [
+  { value: 'pending', label: 'Pendiente' },
+  { value: 'approved', label: 'Aprobado' },
+  { value: 'rejected', label: 'Rechazado' },
+  { value: 'expired', label: 'Vencido' },
 ];
 
 export default function Documents() {
@@ -111,23 +123,15 @@ export default function Documents() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between">
-        <div>
-          <p className="font-mono text-[10px] uppercase tracking-wider text-emerald-600">Revisión</p>
-          <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-slate-900">Documentos</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setShowTypes((s) => !s)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
-            {showTypes ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            <Settings2 className="h-4 w-4" /> Tipos de documento
-          </button>
-          <button onClick={handleExport}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
-            <Download className="h-4 w-4" /> Exportar
-          </button>
-        </div>
-      </div>
+      <PageHeader kicker="Revisión" title="Documentos">
+        <button onClick={() => setShowTypes((s) => !s)} className={btnOutline}>
+          {showTypes ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          <Settings2 className="h-4 w-4" /> Tipos de documento
+        </button>
+        <button onClick={handleExport} className={btnOutline}>
+          <Download className="h-4 w-4" /> Exportar
+        </button>
+      </PageHeader>
 
       {showTypes && (
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -145,24 +149,24 @@ export default function Documents() {
               <table className="w-full text-left">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50">
-                    <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Nombre</th>
-                    <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Identificador</th>
-                    <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Descripción</th>
-                    <th className="px-4 py-3" />
+                    <Th>Nombre</Th>
+                    <Th>Identificador</Th>
+                    <Th>Descripción</Th>
+                    <Th />
                   </tr>
                 </thead>
                 <tbody>
                   {rawItems.map((t) => (
-                    <tr key={t.id} className="border-b border-slate-50 hover:bg-slate-50/50">
-                      <td className="px-4 py-3 text-sm font-semibold text-slate-900">{t.label}</td>
-                      <td className="px-4 py-3"><code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700">{t.value}</code></td>
-                      <td className="px-4 py-3 text-sm text-slate-500">{t.description || '—'}</td>
-                      <td className="px-4 py-3 text-right">
-                        <button onClick={() => openEditType(t)} className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700">
+                    <Tr key={t.id}>
+                      <Td className="text-sm font-semibold text-slate-900">{t.label}</Td>
+                      <Td><code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700">{t.value}</code></Td>
+                      <Td className="text-sm text-slate-500">{t.description || '—'}</Td>
+                      <Td className="text-right">
+                        <button onClick={() => openEditType(t)} className={btnIcon}>
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
-                      </td>
-                    </tr>
+                      </Td>
+                    </Tr>
                   ))}
                 </tbody>
               </table>
@@ -172,80 +176,50 @@ export default function Documents() {
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        <div className="relative min-w-[200px] flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar por persona o archivo…"
-            className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-          />
-        </div>
-        <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-        >
-          <option value="">Todos los tipos</option>
-          {docTypes.map((t) => (<option key={t.value} value={t.value}>{t.label}</option>))}
-        </select>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-        >
-          <option value="">Todos los estados</option>
-          <option value="pending">Pendiente</option>
-          <option value="approved">Aprobado</option>
-          <option value="rejected">Rechazado</option>
-          <option value="expired">Vencido</option>
-        </select>
+        <SearchInput value={query} onChange={setQuery} placeholder="Buscar por persona o archivo…" />
+        <FilterSelect value={typeFilter} onChange={setTypeFilter} options={docTypes.map((t) => ({ value: t.value, label: t.label }))} placeholder="Todos los tipos" />
+        <FilterSelect value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} placeholder="Todos los estados" />
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        {loading ? (
-          <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-emerald-600" /></div>
-        ) : filtered.length === 0 ? (
-          <p className="py-16 text-center text-sm text-slate-400">{query || typeFilter || statusFilter ? 'Sin resultados para tu búsqueda.' : 'No hay documentos cargados.'}</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[800px] text-left">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50">
-                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Persona</th>
-                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Tipo</th>
-                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Archivo</th>
-                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Vence</th>
-                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Estado</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((d) => (
-                  <tr key={d.id} className="border-b border-slate-50 transition hover:bg-slate-50/50">
-                    <td className="px-4 py-3.5 text-sm font-semibold text-slate-900">{d.person_name || '—'}</td>
-                    <td className="px-4 py-3.5 text-sm text-slate-500">{docTypeLabel(d.document_type)}</td>
-                    <td className="px-4 py-3.5">
-                      <button onClick={() => setViewingDoc(d)}
-                        className="inline-flex items-center gap-1.5 text-sm text-emerald-700 hover:underline">
-                        <FileText className="h-3.5 w-3.5" /> {d.original_name}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3.5 text-sm text-slate-500">{d.expires_at ? d.expires_at.split('-').reverse().join('-') : '—'}</td>
-                    <td className="px-4 py-3.5"><StatusBadge status={d.status} /></td>
-                    <td className="px-4 py-3.5 text-right">
-                      <button onClick={() => setReviewing(d)}
-                        className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">
-                        <Eye className="h-3.5 w-3.5" /> Revisar
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      <DataTable
+        loading={loading}
+        isEmpty={filtered.length === 0}
+        emptyMessage={query || typeFilter || statusFilter ? 'Sin resultados para tu búsqueda.' : 'No hay documentos cargados.'}
+        tableClassName="min-w-[800px]"
+      >
+        <thead>
+          <tr className="border-b border-slate-100 bg-slate-50">
+            <Th>Persona</Th>
+            <Th>Tipo</Th>
+            <Th>Archivo</Th>
+            <Th>Vence</Th>
+            <Th>Estado</Th>
+            <Th />
+          </tr>
+        </thead>
+        <tbody>
+          {filtered.map((d) => (
+            <Tr key={d.id}>
+              <Td className="text-sm font-semibold text-slate-900">{d.person_name || '—'}</Td>
+              <Td className="text-sm text-slate-500">{docTypeLabel(d.document_type)}</Td>
+              <Td>
+                <button onClick={() => setViewingDoc(d)}
+                  className="inline-flex items-center gap-1.5 text-sm text-emerald-700 hover:underline">
+                  <FileText className="h-3.5 w-3.5" /> {d.original_name}
+                </button>
+              </Td>
+              <Td className="text-sm text-slate-500">{d.expires_at ? d.expires_at.split('-').reverse().join('-') : '—'}</Td>
+              <Td><StatusBadge status={d.status} /></Td>
+              <Td className="text-right">
+                <button onClick={() => setReviewing(d)}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">
+                  <Eye className="h-3.5 w-3.5" /> Revisar
+                </button>
+              </Td>
+            </Tr>
+          ))}
+        </tbody>
+      </DataTable>
 
       <EntityModal
         open={!!reviewing}

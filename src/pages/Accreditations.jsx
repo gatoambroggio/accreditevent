@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useCrud } from '@/lib/crud';
-import { Plus, Pencil, Loader2, Fingerprint, Printer, Search, Download } from 'lucide-react';
+import { Plus, Pencil, Printer, Download } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
 import BiometricButton from '@/components/BiometricButton';
 import EntityModal from '@/components/EntityModal';
@@ -11,6 +11,17 @@ import BatchBadgePrint from '@/components/BatchBadgePrint';
 import { useZones } from '@/lib/useZones';
 import { usePersonTypes } from '@/lib/usePersonTypes';
 import { generateBadgeCode } from '@/lib/badgeCode';
+import PageHeader from '@/components/ui/page-header';
+import SearchInput from '@/components/ui/search-input';
+import FilterSelect from '@/components/ui/filter-select';
+import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
+import { btnPrimary, btnOutline, btnIcon } from '@/components/ui/button-styles';
+
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Activa' },
+  { value: 'blocked', label: 'Bloqueada' },
+  { value: 'revoked', label: 'Revocada' },
+];
 
 export default function Accreditations() {
   const { items, loading, create, update, remove, reload } = useCrud('Accreditation');
@@ -111,14 +122,7 @@ export default function Accreditations() {
       name: 'access_level', label: 'Nivel de acceso', type: 'select',
       options: accessLevels.map((l) => ({ value: l, label: l })),
     },
-    {
-      name: 'status', label: 'Estado', type: 'select',
-      options: [
-        { value: 'active', label: 'Activa' },
-        { value: 'blocked', label: 'Bloqueada' },
-        { value: 'revoked', label: 'Revocada' },
-      ],
-    },
+    { name: 'status', label: 'Estado', type: 'select', options: STATUS_OPTIONS },
     { name: 'has_biometric', label: 'Biometría registrada', type: 'checkbox' },
   ];
 
@@ -135,7 +139,6 @@ export default function Accreditations() {
   };
 
   const handleSubmit = async (data) => {
-    // Prevent duplicate: one credential per person per event (server-side check)
     const existing = await base44.entities.Accreditation.filter(
       { event_id: data.event_id, person_id: data.person_id },
       '-created_date',
@@ -144,14 +147,12 @@ export default function Accreditations() {
     if (existing.some((a) => !editing || a.id !== editing.id)) {
       throw new Error('Esta persona ya tiene una credencial registrada para este evento.');
     }
-    // Block assignment if the person has pending/rejected/expired documentation
     if (!editing) {
       const res = await base44.functions.invoke('checkPersonDocuments', { person_id: data.person_id });
       if (res.data?.has_pending) {
         throw new Error(`No se puede asignar: la persona tiene documentación pendiente o vencida (${res.data.pending_statuses.join(', ')}).`);
       }
     }
-    // Denormalize event/person data
     const evt = events.find((e) => e.id === data.event_id);
     const person = people.find((p) => p.id === data.person_id);
     const enriched = {
@@ -169,7 +170,6 @@ export default function Accreditations() {
       await update(editing.id, enriched);
     } else {
       await create(enriched);
-      // Send pickup notifications (email + WhatsApp)
       if (evt?.pickup_address) {
         const mapsUrl = evt.pickup_lat && evt.pickup_lng
           ? `https://www.google.com/maps?q=${evt.pickup_lat},${evt.pickup_lng}`
@@ -181,7 +181,6 @@ export default function Accreditations() {
           ? `${evt.pickup_start_time} a ${evt.pickup_end_time} hs`
           : (evt.pickup_start_time || 'a confirmar');
 
-        // Email (only reaches registered app users)
         if (person?.email) {
           try {
             const htmlBody = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background-color:#f0fdf4;font-family:Arial,Helvetica,sans-serif;">
@@ -222,7 +221,6 @@ export default function Accreditations() {
           } catch {}
         }
 
-        // WhatsApp (opens chat with pre-filled message)
         if (person?.phone) {
           let cleanPhone = person.phone.replace(/\D/g, '');
           if (!cleanPhone.startsWith('54')) {
@@ -251,123 +249,81 @@ export default function Accreditations() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between">
-        <div>
-          <p className="font-mono text-[10px] uppercase tracking-wider text-emerald-600">Control de accesos</p>
-          <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-slate-900">Acreditaciones</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={handleExport}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
-            <Download className="h-4 w-4" /> Exportar
-          </button>
-          <button onClick={handleBatchPrint} disabled={selected.size === 0}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">
-            <Printer className="h-4 w-4" /> Imprimir ({selected.size})
-          </button>
-          <button onClick={openNew}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800">
-            <Plus className="h-4 w-4" /> Nueva acreditación
-          </button>
-        </div>
-      </div>
+      <PageHeader kicker="Control de accesos" title="Acreditaciones">
+        <button onClick={handleExport} className={btnOutline}>
+          <Download className="h-4 w-4" /> Exportar
+        </button>
+        <button onClick={handleBatchPrint} disabled={selected.size === 0}
+          className={`${btnOutline} disabled:opacity-40 disabled:cursor-not-allowed`}>
+          <Printer className="h-4 w-4" /> Imprimir ({selected.size})
+        </button>
+        <button onClick={openNew} className={btnPrimary}>
+          <Plus className="h-4 w-4" /> Nueva acreditación
+        </button>
+      </PageHeader>
 
       <div className="flex flex-wrap items-center gap-3">
-        <div className="relative min-w-[200px] flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar por persona, código o tipo…"
-            className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-          />
-        </div>
-        <select
-          value={eventFilter}
-          onChange={(e) => setEventFilter(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-        >
-          <option value="">Todos los eventos</option>
-          {events.map((e) => (<option key={e.id} value={e.id}>{e.name}</option>))}
-        </select>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-        >
-          <option value="">Todos los estados</option>
-          <option value="active">Activa</option>
-          <option value="blocked">Bloqueada</option>
-          <option value="revoked">Revocada</option>
-        </select>
+        <SearchInput value={query} onChange={setQuery} placeholder="Buscar por persona, código o tipo…" />
+        <FilterSelect value={eventFilter} onChange={setEventFilter} options={events.map((e) => ({ value: e.id, label: e.name }))} placeholder="Todos los eventos" />
+        <FilterSelect value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} placeholder="Todos los estados" />
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        {loading ? (
-          <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-emerald-600" /></div>
-        ) : filtered.length === 0 ? (
-          <p className="py-16 text-center text-sm text-slate-400">No hay acreditaciones registradas.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[800px] text-left">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50">
-                  <th className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selected.size === filtered.length && filtered.length > 0}
-                      onChange={toggleSelectAll}
-                      className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                    />
-                  </th>
-                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Persona</th>
-                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Evento</th>
-                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Código</th>
-                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Área / Nivel</th>
-                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Estado</th>
-                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Bio</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((a) => (
-                  <tr key={a.id} className="border-b border-slate-50 transition hover:bg-slate-50/50">
-                    <td className="px-4 py-3.5">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(a.id)}
-                        onChange={() => toggleSelect(a.id)}
-                        className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                      />
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <p className="text-sm font-semibold text-slate-900">{a.person_name || '—'}</p>
-                      <p className="text-xs text-slate-400">{a.person_type}</p>
-                    </td>
-                    <td className="px-4 py-3.5 text-sm text-slate-500">{a.event_name || '—'}</td>
-                    <td className="px-4 py-3.5"><code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700">{a.badge_code}</code></td>
-                    <td className="px-4 py-3.5 text-sm text-slate-500">{a.area || '—'} / {a.access_level}</td>
-                    <td className="px-4 py-3.5"><StatusBadge status={a.status} /></td>
-                    <td className="px-4 py-3.5">
-                      <BiometricButton accreditation={a} onRegistered={reload} />
-                    </td>
-                    <td className="px-4 py-3.5 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => setBadgeAccred(a)} className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700" title="Imprimir credencial">
-                          <Printer className="h-3.5 w-3.5" />
-                        </button>
-                        <button onClick={() => openEdit(a)} className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      <DataTable loading={loading} isEmpty={filtered.length === 0} emptyMessage="No hay acreditaciones registradas." tableClassName="min-w-[800px]">
+        <thead>
+          <tr className="border-b border-slate-100 bg-slate-50">
+            <Th>
+              <input
+                type="checkbox"
+                checked={selected.size === filtered.length && filtered.length > 0}
+                onChange={toggleSelectAll}
+                className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              />
+            </Th>
+            <Th>Persona</Th>
+            <Th>Evento</Th>
+            <Th>Código</Th>
+            <Th>Área / Nivel</Th>
+            <Th>Estado</Th>
+            <Th>Bio</Th>
+            <Th />
+          </tr>
+        </thead>
+        <tbody>
+          {filtered.map((a) => (
+            <Tr key={a.id}>
+              <Td>
+                <input
+                  type="checkbox"
+                  checked={selected.has(a.id)}
+                  onChange={() => toggleSelect(a.id)}
+                  className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                />
+              </Td>
+              <Td>
+                <p className="text-sm font-semibold text-slate-900">{a.person_name || '—'}</p>
+                <p className="text-xs text-slate-400">{a.person_type}</p>
+              </Td>
+              <Td className="text-sm text-slate-500">{a.event_name || '—'}</Td>
+              <Td><code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700">{a.badge_code}</code></Td>
+              <Td className="text-sm text-slate-500">{a.area || '—'} / {a.access_level}</Td>
+              <Td><StatusBadge status={a.status} /></Td>
+              <Td>
+                <BiometricButton accreditation={a} onRegistered={reload} />
+              </Td>
+              <Td className="text-right">
+                <div className="flex items-center justify-end gap-1">
+                  <button onClick={() => setBadgeAccred(a)} className={btnIcon} title="Imprimir credencial">
+                    <Printer className="h-3.5 w-3.5" />
+                  </button>
+                  <button onClick={() => openEdit(a)} className={btnIcon}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </Td>
+            </Tr>
+          ))}
+        </tbody>
+      </DataTable>
 
       <EntityModal
         open={modalOpen}

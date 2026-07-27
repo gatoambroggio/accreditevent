@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useCrud } from '@/lib/crud';
-import { Plus, Pencil, Search, Loader2, Download, Car, Printer } from 'lucide-react';
+import { Plus, Pencil, Download, Car, Printer } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
 import EntityModal from '@/components/EntityModal';
 import VehicleBadgePrint from '@/components/VehicleBadgePrint';
@@ -8,6 +8,10 @@ import BatchVehicleBadgePrint from '@/components/BatchVehicleBadgePrint';
 import { useParkingSectors } from '@/lib/useParkingSectors';
 import { useAuth } from '@/lib/AuthContext';
 import { base44 } from '@/api/base44Client';
+import PageHeader from '@/components/ui/page-header';
+import SearchInput from '@/components/ui/search-input';
+import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
+import { btnPrimary, btnOutline, btnIconSm } from '@/components/ui/button-styles';
 
 const validateVehicle = (data) => {
   const e = {};
@@ -34,7 +38,6 @@ export default function Vehicles() {
   const { sectors } = useParkingSectors();
 
   const [peopleLoaded, setPeopleLoaded] = useState(false);
-  const [showPersonSearch, setShowPersonSearch] = useState(false);
 
   const isEventExpired = (e) => {
     if (e.status === 'closed') return true;
@@ -58,7 +61,7 @@ export default function Vehicles() {
       const personDoc = person?.document || '';
       return `${v.person_name || ''} ${v.brand || ''} ${v.model || ''} ${v.plate || ''} ${personDoc}`.toLowerCase().includes(q);
     });
-  }, [items, activeEventIds, isProductora, currentUser, query]);
+  }, [items, activeEventIds, isProductora, currentUser, query, people]);
 
   const toggleSelect = (id) => {
     setSelected((prev) => {
@@ -117,24 +120,19 @@ export default function Vehicles() {
         setEvents(evs);
       } catch {}
     })();
+    loadPeople();
   }, []);
 
   const openPrint = (vehicle) => setPrintingVehicle(vehicle);
 
-  React.useEffect(() => {
-    loadPeople();
-  }, []);
-
   const openNew = () => {
     setEditing(null);
-    setShowPersonSearch(false);
     loadPeople();
     setModalOpen(true);
   };
 
   const openEdit = (item) => {
     setEditing(item);
-    setShowPersonSearch(false);
     loadPeople();
     setModalOpen(true);
   };
@@ -184,109 +182,88 @@ export default function Vehicles() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between">
-        <div>
-          <p className="font-mono text-[10px] uppercase tracking-wider text-emerald-600">Logística</p>
-          <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-slate-900">Vehículos</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={handleExport}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
-            <Download className="h-4 w-4" /> Exportar
-          </button>
-          <button onClick={handleBatchPrint} disabled={selected.size === 0}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">
-            <Printer className="h-4 w-4" /> Imprimir ({selected.size})
-          </button>
-          <button onClick={openNew}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800">
-            <Plus className="h-4 w-4" /> Nuevo vehículo
-          </button>
-        </div>
+      <PageHeader kicker="Logística" title="Vehículos">
+        <button onClick={handleExport} className={btnOutline}>
+          <Download className="h-4 w-4" /> Exportar
+        </button>
+        <button onClick={handleBatchPrint} disabled={selected.size === 0}
+          className={`${btnOutline} disabled:opacity-40 disabled:cursor-not-allowed`}>
+          <Printer className="h-4 w-4" /> Imprimir ({selected.size})
+        </button>
+        <button onClick={openNew} className={btnPrimary}>
+          <Plus className="h-4 w-4" /> Nuevo vehículo
+        </button>
+      </PageHeader>
+
+      <div className="max-w-md">
+        <SearchInput value={query} onChange={setQuery} placeholder="Buscar por patente, persona, marca…" />
       </div>
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar por patente, persona, marca…"
-          className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-        />
-      </div>
-
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        {loading ? (
-          <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-emerald-600" /></div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <Car className="h-10 w-10 text-slate-300" />
-            <p className="mt-3 text-sm text-slate-400">{query ? 'Sin resultados para tu búsqueda.' : 'No hay vehículos registrados todavía.'}</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px] text-left">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50">
-                  <th className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selected.size === filtered.length && filtered.length > 0}
-                      onChange={toggleSelectAll}
-                      className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                    />
-                  </th>
-                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Persona</th>
-                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Vehículo</th>
-                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Patente</th>
-                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Eventos</th>
-                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Estacionamiento</th>
-                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Color</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((v) => (
-                  <tr key={v.id} className="border-b border-slate-50 transition hover:bg-slate-50/50">
-                    <td className="px-4 py-3.5">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(v.id)}
-                        onChange={() => toggleSelect(v.id)}
-                        className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                      />
-                    </td>
-                    <td className="px-4 py-3.5 text-sm font-semibold text-slate-900">{v.person_name || '—'}</td>
-                    <td className="px-4 py-3.5 text-sm text-slate-600">{v.brand} {v.model}</td>
-                    <td className="px-4 py-3.5">
-                       <span className="inline-flex items-center rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1 font-mono text-xs font-bold uppercase tracking-wider text-slate-700">
-                         {v.plate}
-                       </span>
-                     </td>
-                     <td className="px-4 py-3.5 text-sm text-slate-600">
-                       {v.event_names?.length ? v.event_names.join(', ') : '—'}
-                     </td>
-                     <td className="px-4 py-3.5 text-sm text-slate-600">
-                       {sectors.find((s) => s.value === v.parking_sector)?.label || v.parking_sector || '—'}
-                     </td>
-                     <td className="px-4 py-3.5 text-sm text-slate-500">{v.color || '—'}</td>
-                    <td className="px-4 py-3.5 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => openPrint(v)} className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-emerald-700" title="Imprimir credencial">
-                          <Printer className="h-3.5 w-3.5" />
-                        </button>
-                        <button onClick={() => openEdit(v)} className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      <DataTable
+        loading={loading}
+        isEmpty={filtered.length === 0}
+        emptyIcon={Car}
+        emptyMessage={query ? 'Sin resultados para tu búsqueda.' : 'No hay vehículos registrados todavía.'}
+        tableClassName="min-w-[820px]"
+      >
+        <thead>
+          <tr className="border-b border-slate-100 bg-slate-50">
+            <Th>
+              <input
+                type="checkbox"
+                checked={selected.size === filtered.length && filtered.length > 0}
+                onChange={toggleSelectAll}
+                className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              />
+            </Th>
+            <Th>Persona</Th>
+            <Th>Vehículo</Th>
+            <Th>Patente</Th>
+            <Th>Eventos</Th>
+            <Th>Estacionamiento</Th>
+            <Th>Color</Th>
+            <Th />
+          </tr>
+        </thead>
+        <tbody>
+          {filtered.map((v) => (
+            <Tr key={v.id}>
+              <Td>
+                <input
+                  type="checkbox"
+                  checked={selected.has(v.id)}
+                  onChange={() => toggleSelect(v.id)}
+                  className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                />
+              </Td>
+              <Td className="text-sm font-semibold text-slate-900">{v.person_name || '—'}</Td>
+              <Td className="text-sm text-slate-600">{v.brand} {v.model}</Td>
+              <Td>
+                <span className="inline-flex items-center rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1 font-mono text-xs font-bold uppercase tracking-wider text-slate-700">
+                  {v.plate}
+                </span>
+              </Td>
+              <Td className="text-sm text-slate-600">
+                {v.event_names?.length ? v.event_names.join(', ') : '—'}
+              </Td>
+              <Td className="text-sm text-slate-600">
+                {sectors.find((s) => s.value === v.parking_sector)?.label || v.parking_sector || '—'}
+              </Td>
+              <Td className="text-sm text-slate-500">{v.color || '—'}</Td>
+              <Td className="text-right">
+                <div className="flex items-center justify-end gap-1">
+                  <button onClick={() => openPrint(v)} className={btnIconSm} title="Imprimir credencial">
+                    <Printer className="h-3.5 w-3.5" />
+                  </button>
+                  <button onClick={() => openEdit(v)} className={btnIconSm}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </Td>
+            </Tr>
+          ))}
+        </tbody>
+      </DataTable>
 
       <EntityModal
         open={modalOpen}

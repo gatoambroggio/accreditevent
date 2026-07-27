@@ -6,6 +6,9 @@ import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
 import { useZones } from '@/lib/useZones';
 import { toast } from '@/components/ui/use-toast';
+import PageHeader from '@/components/ui/page-header';
+import DataTable, { Th } from '@/components/ui/data-table';
+import { btnPrimary, btnIcon } from '@/components/ui/button-styles';
 
 export default function ZKTecoDevices() {
   const { items: devices, loading, create, update, remove } = useCrud('ZKTecoDevice');
@@ -130,15 +133,11 @@ export default function ZKTecoDevices() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between">
-        <div>
-          <p className="font-mono text-[10px] uppercase tracking-wider text-emerald-600">Hardware</p>
-          <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-slate-900">Terminales ZKTeco</h1>
-        </div>
-        <button onClick={openNew} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800">
+      <PageHeader kicker="Hardware" title="Terminales ZKTeco">
+        <button onClick={openNew} className={btnPrimary}>
           <Plus className="h-4 w-4" /> Nuevo dispositivo
         </button>
-      </div>
+      </PageHeader>
 
       <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-5">
         <div className="flex items-start gap-3">
@@ -204,7 +203,7 @@ export default function ZKTecoDevices() {
                     {syncingId === d.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                     {syncingId === d.id ? 'Sincronizando…' : 'Sync usuarios'}
                   </button>
-                  <button onClick={() => openEdit(d)} className="rounded-lg border border-slate-200 bg-white p-2 text-slate-500 transition hover:bg-slate-50">
+                  <button onClick={() => openEdit(d)} className={btnIcon}>
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -225,9 +224,9 @@ export default function ZKTecoDevices() {
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
-                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Dispositivo</th>
-                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Persona</th>
-                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Tipo</th>
+                  <Th>Dispositivo</Th>
+                  <Th>Persona</Th>
+                  <Th>Tipo</Th>
                 </tr>
               </thead>
               <tbody>
