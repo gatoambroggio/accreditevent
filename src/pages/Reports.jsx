@@ -35,9 +35,18 @@ export default function Reports() {
     })();
 
     const unsubscribe = base44.entities.AccessLog.subscribe((event) => {
-      if (event.type === 'create' && event.data) {
-        setAccessLogs((prev) => [event.data, ...prev].slice(0, 500));
-      }
+      setAccessLogs((prev) => {
+        if (event.type === 'create' && event.data) {
+          return [{ ...event.data, result: event.data.result || 'granted' }, ...prev].slice(0, 500);
+        }
+        if (event.type === 'update' && event.data) {
+          return prev.map((l) => (l.id === event.data.id ? { ...event.data, result: event.data.result || 'granted' } : l));
+        }
+        if (event.type === 'delete' && event.id) {
+          return prev.filter((l) => l.id !== event.id);
+        }
+        return prev;
+      });
     });
 
     return () => unsubscribe();
