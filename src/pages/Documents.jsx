@@ -69,7 +69,7 @@ export default function Documents() {
         d.person_name || '',
         docTypeLabel(d.document_type) || '',
         d.original_name || '',
-        d.expires_at || '',
+        d.expires_at ? d.expires_at.split('-').reverse().join('-') : '',
         d.status || '',
         d.reviewed_by || '',
         d.reviewed_at ? new Date(d.reviewed_at).toLocaleString('es-AR') : '',
@@ -231,7 +231,7 @@ export default function Documents() {
                         <FileText className="h-3.5 w-3.5" /> {d.original_name}
                       </button>
                     </td>
-                    <td className="px-4 py-3.5 text-sm text-slate-500">{d.expires_at || '—'}</td>
+                    <td className="px-4 py-3.5 text-sm text-slate-500">{d.expires_at ? d.expires_at.split('-').reverse().join('-') : '—'}</td>
                     <td className="px-4 py-3.5"><StatusBadge status={d.status} /></td>
                     <td className="px-4 py-3.5 text-right">
                       <button onClick={() => setReviewing(d)}
