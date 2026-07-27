@@ -48,6 +48,16 @@
           },
           "notes": {
             "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "approved",
+              "rejected"
+            ],
+            "default": "pending",
+            "description": "Estado de aprobaci\u00f3n del \u00edtem"
           }
         }
       },
@@ -61,7 +71,7 @@
         "rejected"
       ],
       "default": "pending",
-      "description": "Estado de la solicitud"
+      "description": "Estado global de la solicitud (calculado seg\u00fan \u00edtems)"
     },
     "notes": {
       "type": "string",

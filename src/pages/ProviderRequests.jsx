@@ -157,31 +157,53 @@ export default function ProviderRequests() {
   );
 }
 
+const ITEM_STATUS_CLS = {
+  pending: 'bg-amber-50 text-amber-700 ring-amber-200',
+  approved: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  rejected: 'bg-red-50 text-red-700 ring-red-200',
+};
+
 function RequestDetailModal({ request, onClose, onStatusChange }) {
   const [adminNotes, setAdminNotes] = useState(request.admin_notes || '');
-  const [status, setStatus] = useState(request.status || 'pending');
+  const [items, setItems] = useState(
+    (request.items || []).map((it) => ({ ...it, status: it.status || 'pending' }))
+  );
   const [saving, setSaving] = useState(false);
 
-  const handleSaveNotes = async () => {
+  const setItemStatus = (idx, status) => {
+    setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, status } : it)));
+  };
+
+  const overallStatus = useMemo(() => {
+    if (items.length === 0) return 'pending';
+    if (items.every((it) => it.status === 'approved')) return 'approved';
+    if (items.every((it) => it.status === 'rejected')) return 'rejected';
+    return 'pending';
+  }, [items]);
+
+  const handleSave = async () => {
     setSaving(true);
     try {
-      await base44.entities.ProviderRequest.update(request.id, { admin_notes: adminNotes, status });
-      onStatusChange(request.id, status);
+      await base44.entities.ProviderRequest.update(request.id, {
+        admin_notes: adminNotes,
+        items,
+        status: overallStatus,
+      });
+      onStatusChange(request.id, overallStatus);
       onClose();
     } catch {}
     setSaving(false);
   };
 
   const grouped = useMemo(() => {
-    const items = request.items || [];
     const map = {};
-    items.forEach((it) => {
+    items.forEach((it, idx) => {
       const cat = it.category || 'Sin categoría';
       if (!map[cat]) map[cat] = [];
-      map[cat].push(it);
+      map[cat].push({ ...it, _idx: idx });
     });
     return map;
-  }, [request]);
+  }, [items]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-sm sm:p-6">
@@ -198,17 +220,34 @@ function RequestDetailModal({ request, onClose, onStatusChange }) {
         </div>
 
         <div className="space-y-4 px-6 py-5">
-          {Object.entries(grouped).map(([cat, items]) => (
+          {Object.entries(grouped).map(([cat, catItems]) => (
             <div key={cat}>
               <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500">{cat}</p>
               <div className="space-y-1.5">
-                {items.map((it, idx) => (
-                  <div key={idx} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2">
-                    <div>
+                {catItems.map((it) => (
+                  <div key={it._idx} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2">
+                    <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-slate-900">{it.item_name}</p>
+                      <p className="text-sm text-slate-500">{it.quantity || 1} {it.unit || ''}</p>
                       {it.notes && <p className="text-xs text-slate-400">{it.notes}</p>}
                     </div>
-                    <p className="text-sm font-medium text-slate-600">{it.quantity || 1} {it.unit || ''}</p>
+                    <div className="ml-3 flex shrink-0 items-center gap-1.5">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${ITEM_STATUS_CLS[it.status]}`}>
+                        {STATUS_LABELS[it.status]?.label || 'Pendiente'}
+                      </span>
+                      <button
+                        onClick={() => setItemStatus(it._idx, 'approved')}
+                        className={`rounded-md px-2 py-1 text-xs font-semibold transition ${it.status === 'approved' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
+                      >
+                        Aprobar
+                      </button>
+                      <button
+                        onClick={() => setItemStatus(it._idx, 'rejected')}
+                        className={`rounded-md px-2 py-1 text-xs font-semibold transition ${it.status === 'rejected' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-700 hover:bg-red-100'}`}
+                      >
+                        Rechazar
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -235,26 +274,23 @@ function RequestDetailModal({ request, onClose, onStatusChange }) {
         </div>
 
         <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium outline-none focus:border-emerald-500"
-          >
-            <option value="pending">Pendiente</option>
-            <option value="approved">Aprobado</option>
-            <option value="rejected">Rechazado</option>
-          </select>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Estado global</span>
+            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${STATUS_LABELS[overallStatus]?.cls || STATUS_LABELS.pending.cls}`}>
+              {STATUS_LABELS[overallStatus]?.label || 'Pendiente'}
+            </span>
+          </div>
           <div className="flex gap-2">
             <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">
               Cerrar
             </button>
             <button
-              onClick={handleSaveNotes}
+              onClick={handleSave}
               disabled={saving}
               className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
             >
               {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-              Guardar notas
+              Guardar
             </button>
           </div>
         </div>
