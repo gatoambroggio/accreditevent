@@ -90,9 +90,17 @@ export default function Messages() {
     return { date, time, mapsUrl };
   };
 
+  const escapeHtml = (str) => String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
   const buildEmailHtml = (personName) => {
     const pickup = buildPickupInfo();
-    const bodyHtml = body.replace(/\n/g, '<br>');
+    const safeName = escapeHtml(personName);
+    const bodyHtml = escapeHtml(body).replace(/\n/g, '<br>');
     let pickupHtml = '';
     if (pickup && (pickup.date || pickup.time || pickup.mapsUrl)) {
       pickupHtml = `<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0fdf4;border-radius:12px;border:1px solid #bbf7d0;margin-top:24px;">
@@ -109,10 +117,10 @@ export default function Messages() {
 <table width="560" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
 <tr><td style="background:linear-gradient(135deg,#047857,#065f46);padding:32px 40px;text-align:center;">
 <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:800;letter-spacing:-0.5px;">AccreditEvent</h1>
-<p style="margin:8px 0 0;color:#a7f3d0;font-size:12px;text-transform:uppercase;letter-spacing:2px;">${selectedEvent?.name || ''}</p>
+<p style="margin:8px 0 0;color:#a7f3d0;font-size:12px;text-transform:uppercase;letter-spacing:2px;">${escapeHtml(selectedEvent?.name || '')}</p>
 </td></tr>
 <tr><td style="padding:36px 40px;">
-<p style="margin:0 0 20px;color:#0f172a;font-size:16px;line-height:1.6;">Hola <strong>${personName}</strong>,</p>
+<p style="margin:0 0 20px;color:#0f172a;font-size:16px;line-height:1.6;">Hola <strong>${safeName}</strong>,</p>
 <div style="color:#475569;font-size:15px;line-height:1.6;">${bodyHtml}</div>
 ${pickupHtml}
 </td></tr>
