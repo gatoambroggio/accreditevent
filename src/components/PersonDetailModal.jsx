@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { X, Loader2, FileText, ExternalLink, User, UploadCloud } from 'lucide-react';
+import { X, Loader2, FileText, ExternalLink, User, UploadCloud, Car, Plus, Pencil, Trash2 } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
 import { Image } from '@/components/ui/image';
 import { useDocumentTypes } from '@/lib/useDocumentTypes';
 import DocumentViewer from '@/components/DocumentViewer';
+import EntityModal from '@/components/EntityModal';
 
 export default function PersonDetailModal({ person, onClose }) {
   const [docs, setDocs] = useState([]);
   const [bio, setBio] = useState(null);
+  const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [docType, setDocType] = useState('work_insurance');
   const [selectedFile, setSelectedFile] = useState(null);
   const [viewingDoc, setViewingDoc] = useState(null);
+  const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState(null);
   const { docTypes } = useDocumentTypes();
 
   const loadDocs = async (personId) => {
@@ -21,20 +25,58 @@ export default function PersonDetailModal({ person, onClose }) {
     setDocs(docData);
   };
 
+  const loadVehicles = async (personId) => {
+    const vehData = await base44.entities.Vehicle.filter({ person_id: personId }, '-created_date', 50);
+    setVehicles(vehData);
+  };
+
   useEffect(() => {
     if (!person) return;
     (async () => {
       try {
-        const [docData, bioData] = await Promise.all([
+        const [docData, bioData, vehData] = await Promise.all([
           base44.entities.Document.filter({ person_id: person.id }, '-created_date', 100),
           base44.entities.Biometric.filter({ person_id: person.id, status: 'active' }, '-created_date', 1),
+          base44.entities.Vehicle.filter({ person_id: person.id }, '-created_date', 50),
         ]);
         setDocs(docData);
         setBio(bioData[0] || null);
+        setVehicles(vehData);
       } catch {}
       setLoading(false);
     })();
   }, [person]);
+
+  const VEHICLE_FIELDS = [
+    { name: 'brand', label: 'Marca', type: 'text', required: true, placeholder: 'Ej: Ford' },
+    { name: 'model', label: 'Modelo', type: 'text', required: true, placeholder: 'Ej: Fiesta' },
+    { name: 'plate', label: 'Patente', type: 'text', required: true, placeholder: 'Ej: AB123CD' },
+    { name: 'color', label: 'Color', type: 'text', placeholder: 'Ej: Blanco' },
+    { name: 'notes', label: 'Notas', type: 'textarea', full: true, placeholder: 'Ej: Vehículo de carga' },
+  ];
+
+  const openNewVehicle = () => { setEditingVehicle(null); setVehicleModalOpen(true); };
+  const openEditVehicle = (v) => { setEditingVehicle(v); setVehicleModalOpen(true); };
+
+  const handleVehicleSubmit = async (data) => {
+    const enriched = {
+      ...data,
+      person_id: person.id,
+      person_name: person.full_name,
+      plate: (data.plate || '').toUpperCase().trim(),
+    };
+    if (editingVehicle) {
+      await base44.entities.Vehicle.update(editingVehicle.id, enriched);
+    } else {
+      await base44.entities.Vehicle.create(enriched);
+    }
+    await loadVehicles(person.id);
+  };
+
+  const handleVehicleDelete = async () => {
+    await base44.entities.Vehicle.delete(editingVehicle.id);
+    await loadVehicles(person.id);
+  };
 
   const handleUpload = async () => {
     if (!selectedFile || !docType) return;
@@ -165,8 +207,64 @@ export default function PersonDetailModal({ person, onClose }) {
               </div>
             </div>
           )}
+
+          {/* Vehicles */}
+          {!loading && (
+            <div className="mt-5">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Vehículos asignados</p>
+                <button onClick={openNewVehicle}
+                  className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50">
+                  <Plus className="h-3 w-3" /> Agregar
+                </button>
+              </div>
+              {vehicles.length === 0 ? (
+                <p className="py-4 text-center text-sm text-slate-400">Sin vehículos asignados.</p>
+              ) : (
+                <div className="space-y-2">
+                  {vehicles.map((v) => (
+                    <div key={v.id} className="flex items-center justify-between rounded-lg border border-slate-200 p-3">
+                      <div className="flex items-center gap-3">
+                        <div className="grid h-9 w-9 place-items-center rounded-lg bg-slate-50 text-slate-400">
+                          <Car className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{v.brand} {v.model}</p>
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                              {v.plate}
+                            </span>
+                            {v.color && <span className="text-xs text-slate-400">{v.color}</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => openEditVehicle(v)}
+                          className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
+
+      <EntityModal
+        open={vehicleModalOpen}
+        onClose={() => setVehicleModalOpen(false)}
+        title={editingVehicle ? 'Editar vehículo' : 'Nuevo vehículo'}
+        kicker={editingVehicle ? 'EDITAR VEHÍCULO' : 'CREAR VEHÍCULO'}
+        fields={VEHICLE_FIELDS}
+        initialData={editingVehicle || {}}
+        onSubmit={handleVehicleSubmit}
+        onDelete={editingVehicle ? handleVehicleDelete : null}
+        canDelete={!!editingVehicle}
+        submitLabel={editingVehicle ? 'Guardar cambios' : 'Crear vehículo'}
+      />
 
       <DocumentViewer doc={viewingDoc} onClose={() => setViewingDoc(null)} />
     </div>
