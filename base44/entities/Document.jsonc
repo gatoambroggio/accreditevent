@@ -62,6 +62,11 @@
       "type": "string",
       "format": "date",
       "description": "Fecha de vencimiento"
+    },
+    "expiry_notified_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha del \u00faltimo aviso de vencimiento enviado al proveedor"
     }
   },
   "required": [

@@ -1,0 +1,44 @@
+{
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "0 9 * * *",
+      "one_time_date": null,
+      "timezone": "America/Cordoba",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "aviso_vencimiento_documentos",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "notify": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "notifyExpiringDocuments"
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Enviar avisos de vencimiento",
+            "description": "Documentos por vencer en 7 d\u00edas"
+          }
+        }
+      }
+    ]
+  },
+  "name": "Aviso Vencimiento Documentos",
+  "description": "Env\u00eda correo a los proveedores cuando sus documentos aprobados est\u00e1n por vencer (dentro de 7 d\u00edas)."
+}
