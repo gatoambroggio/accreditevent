@@ -25,6 +25,7 @@ import ProviderPortal from '@/pages/ProviderPortal';
 import AccessControl from '@/pages/AccessControl';
 import AccessMonitor from '@/pages/AccessMonitor';
 import AccessStation from '@/pages/AccessStation';
+import AccessQrStation from '@/pages/AccessQrStation';
 import AccessManual from '@/pages/AccessManual';
 import ProviderRegister from '@/pages/ProviderRegister';
 import Messages from '@/pages/Messages';
@@ -98,6 +99,7 @@ const AuthenticatedApp = () => {
       </Route>
       <Route path="/portal" element={<ProviderPortal />} />
       <Route path="/control-acceso" element={<AccessStation />} />
+      <Route path="/control-qr" element={<AccessQrStation />} />
       <Route path="/control-manual" element={<AccessManual />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>

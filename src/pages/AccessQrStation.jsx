@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Loader2, CheckCircle2, XCircle, Calendar, Clock, AlertTriangle } from 'lucide-react';
-import FaceCapture from '@/components/FaceCapture';
-import { findBestMatch } from '@/lib/faceRecognition';
+import QrScanner from '@/components/QrScanner';
 import { canAccessAnyZone } from '@/lib/accessZones';
 import { useZones } from '@/lib/useZones';
 
@@ -27,7 +26,7 @@ const STATUS_INFO = {
   ended: { label: 'Finalizado', cls: 'bg-red-50 text-red-700 ring-red-200' },
 };
 
-export default function AccessStation() {
+export default function AccessQrStation() {
   const [phase, setPhase] = useState('select');
   const [events, setEvents] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState('');
@@ -37,6 +36,7 @@ export default function AccessStation() {
   const [cycle, setCycle] = useState(0);
   const [verifying, setVerifying] = useState(false);
   const [result, setResult] = useState(null);
+  const qrCooldown = useRef(false);
   const { zones } = useZones();
 
   useEffect(() => {
@@ -76,108 +76,39 @@ export default function AccessStation() {
     } catch {}
   }, []);
 
-  const handleCaptured = async (file, descriptor) => {
+  const handleQrDetected = async (code) => {
+    if (qrCooldown.current || verifying || result) return;
+    qrCooldown.current = true;
     setVerifying(true);
     setResult(null);
     try {
-      if (!descriptor) {
-        const me = await base44.auth.me();
-        await base44.entities.AccessLog.create({
-          accreditation_id: 'unknown',
-          person_name: 'Desconocido',
-          badge_code: '',
-          event_name: selectedEvent.name,
-          event_id: selectedEvent.id,
-          verified_by: me?.full_name || me?.email || 'Sistema',
-          method: 'biometric',
-          zone: selectedZones.join(', '),
-          result: 'denied',
-          access_level: '',
-        });
-        setResult({ ok: false, message: 'No se detectó un rostro humano en la captura.' });
-        return;
-      }
+      const me = await base44.auth.me();
+      const verifier = me?.full_name || me?.email || 'Sistema';
+      const zoneLabel = selectedZones.map((z) => zones.find((zz) => zz.value === z)?.label || z).join(', ');
 
-      // Fetch all active biometrics with descriptors
-      const bios = await base44.entities.Biometric.filter(
-        { status: 'active' },
-        '-created_date',
-        500
-      );
-
-      const withDescriptors = bios.filter((b) => b.face_descriptor && b.face_descriptor.length > 0);
-      if (withDescriptors.length === 0) {
-        const me = await base44.auth.me();
-        await base44.entities.AccessLog.create({
-          accreditation_id: 'unknown',
-          person_name: 'Desconocido',
-          badge_code: '',
-          event_name: selectedEvent.name,
-          event_id: selectedEvent.id,
-          verified_by: me?.full_name || me?.email || 'Sistema',
-          method: 'biometric',
-          zone: selectedZones.join(', '),
-          result: 'denied',
-          access_level: '',
-        });
-        setResult({ ok: false, message: 'No hay rostros registrados en el sistema.' });
-        return;
-      }
-
-      // Fetch active accreditations for the SELECTED EVENT only
       const accreditations = await base44.entities.Accreditation.filter(
         { status: 'active', event_id: selectedEvent.id },
         '-created_date',
         500
       );
+      const accred = accreditations.find((a) => a.badge_code === code);
 
-      // Find best match using face-api.js descriptors
-      const { match, distance } = findBestMatch(descriptor, withDescriptors);
-
-      if (!match) {
-        const me = await base44.auth.me();
+      if (!accred) {
         await base44.entities.AccessLog.create({
           accreditation_id: 'unknown',
           person_name: 'Desconocido',
-          badge_code: '',
+          badge_code: code,
           event_name: selectedEvent.name,
           event_id: selectedEvent.id,
-          verified_by: me?.full_name || me?.email || 'Sistema',
-          method: 'biometric',
+          verified_by: verifier,
+          method: 'manual',
           zone: selectedZones.join(', '),
           result: 'denied',
           access_level: '',
         });
-        setResult({ ok: false, message: `No se encontró coincidencia facial (distancia: ${distance.toFixed(2)}).` });
+        setResult({ ok: false, message: 'Credencial no válida para este evento.' });
         return;
       }
-
-      // Find the active accreditation for this person in this event
-      const accred = accreditations.find((a) => a.person_id === match.person_id);
-      if (!accred) {
-        const me = await base44.auth.me();
-        await base44.entities.AccessLog.create({
-          accreditation_id: 'unknown',
-          person_name: match.person_name || 'Desconocido',
-          badge_code: '',
-          event_name: selectedEvent.name,
-          event_id: selectedEvent.id,
-          verified_by: me?.full_name || me?.email || 'Sistema',
-          method: 'biometric',
-          zone: selectedZones.join(', '),
-          result: 'denied',
-          access_level: '',
-        });
-        setResult({
-          ok: false,
-          message: 'Persona identificada pero sin acreditación para este evento.',
-          person_name: match.person_name,
-        });
-        return;
-      }
-
-      const me = await base44.auth.me();
-      const zoneLabel = selectedZones.map((z) => zones.find((zz) => zz.value === z)?.label || z).join(', ');
 
       if (!canAccessAnyZone(accred.access_level, selectedZones)) {
         await base44.entities.AccessLog.create({
@@ -186,8 +117,8 @@ export default function AccessStation() {
           badge_code: accred.badge_code,
           event_name: accred.event_name,
           event_id: accred.event_id,
-          verified_by: me?.full_name || me?.email || 'Sistema',
-          method: 'biometric',
+          verified_by: verifier,
+          method: 'manual',
           zone: selectedZones.join(', '),
           result: 'denied',
           access_level: accred.access_level,
@@ -206,8 +137,8 @@ export default function AccessStation() {
         badge_code: accred.badge_code,
         event_name: accred.event_name,
         event_id: accred.event_id,
-        verified_by: me?.full_name || me?.email || 'Sistema',
-        method: 'biometric',
+        verified_by: verifier,
+        method: 'manual',
         zone: selectedZones.join(', '),
         result: 'granted',
         access_level: accred.access_level,
@@ -218,6 +149,7 @@ export default function AccessStation() {
       setResult({ ok: false, message: err.message || 'Error en la verificación.' });
     } finally {
       setVerifying(false);
+      setTimeout(() => { qrCooldown.current = false; }, 3000);
     }
   };
 
@@ -240,7 +172,7 @@ export default function AccessStation() {
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <div className="flex items-center gap-2.5">
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-[hsl(39_86%_63%)] text-sm font-extrabold text-[hsl(146_34%_11%)]">A</span>
-            <span className="text-lg font-extrabold tracking-tight text-slate-900">Estación de control</span>
+            <span className="text-lg font-extrabold tracking-tight text-slate-900">Control por QR</span>
           </div>
           <div className="flex items-center gap-4">
             {phase === 'active' && (
@@ -248,8 +180,8 @@ export default function AccessStation() {
                 ← Cambiar evento
               </button>
             )}
-            <Link to="/control-qr" className="text-sm font-medium text-slate-500 hover:text-slate-900">
-              Control QR
+            <Link to="/control-acceso" className="text-sm font-medium text-slate-500 hover:text-slate-900">
+              Control facial
             </Link>
             <Link to="/control-manual" className="text-sm font-medium text-slate-500 hover:text-slate-900">
               Validación manual
@@ -271,7 +203,7 @@ export default function AccessStation() {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-slate-900">Seleccionar evento</h2>
-                <p className="text-sm text-slate-500">Elegí el evento para iniciar la estación de control.</p>
+                <p className="text-sm text-slate-500">Elegí el evento para iniciar el control por QR.</p>
               </div>
             </div>
 
@@ -337,7 +269,7 @@ export default function AccessStation() {
                   disabled={!selectedEventId || selectedZones.length === 0}
                   className="mt-5 w-full rounded-lg bg-emerald-700 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50"
                 >
-                  Iniciar estación de control
+                  Iniciar control por QR
                 </button>
               </>
             )}
@@ -377,9 +309,9 @@ export default function AccessStation() {
 
           <div className="mx-auto max-w-2xl px-5 py-8">
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="mb-1 text-xl font-bold text-slate-900">Identificación facial automática</h2>
+              <h2 className="mb-1 text-xl font-bold text-slate-900">Lectura de credencial QR</h2>
               <p className="mb-5 text-sm text-slate-500">
-                Mirá a la cámara. El sistema te identificará automáticamente al detectar tu rostro.
+                Enfocá el código QR impreso en la credencial para validar el ingreso.
               </p>
 
               {(eventStatus === 'upcoming' || eventStatus === 'ended') ? (
@@ -400,10 +332,10 @@ export default function AccessStation() {
               ) : verifying ? (
                 <div className="flex flex-col items-center justify-center py-16">
                   <Loader2 className="h-10 w-10 animate-spin text-emerald-600" />
-                  <span className="mt-3 text-sm text-slate-500">Identificando…</span>
+                  <span className="mt-3 text-sm text-slate-500">Verificando…</span>
                 </div>
               ) : !result ? (
-                <FaceCapture key={cycle} onCaptured={handleCaptured} autoCapture />
+                <QrScanner key={cycle} onDetected={handleQrDetected} paused={!!result || verifying} />
               ) : null}
             </div>
           </div>
