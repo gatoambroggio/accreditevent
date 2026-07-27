@@ -16,21 +16,21 @@ export const MODULES = [
   { path: '/settings', label: 'Configuración' },
 ];
 
-export const ROLES = ['control', 'coordinator', 'admin', 'superadmin'];
+export const ROLES = ['control', 'coordinator', 'productora', 'admin', 'superadmin'];
 
 export const DEFAULT_ROLE_ACCESS = {
-  '/': ['control', 'coordinator', 'admin', 'superadmin'],
-  '/events': ['coordinator', 'admin', 'superadmin'],
-  '/people': ['coordinator', 'admin', 'superadmin'],
-  '/accreditations': ['control', 'coordinator', 'admin', 'superadmin'],
-  '/accreditation-facial': ['coordinator', 'admin', 'superadmin'],
-  '/access-control': ['control', 'coordinator', 'admin', 'superadmin'],
-  '/access-monitor': ['control', 'coordinator', 'admin', 'superadmin'],
-  '/zkteco-devices': ['coordinator', 'admin', 'superadmin'],
-  '/reports': ['coordinator', 'admin', 'superadmin'],
-  '/messages': ['coordinator', 'admin', 'superadmin'],
-  '/documents': ['coordinator', 'admin', 'superadmin'],
-  '/vehicles': ['coordinator', 'admin', 'superadmin'],
+  '/': ['control', 'coordinator', 'productora', 'admin', 'superadmin'],
+  '/events': ['coordinator', 'productora', 'admin', 'superadmin'],
+  '/people': ['coordinator', 'productora', 'admin', 'superadmin'],
+  '/accreditations': ['control', 'coordinator', 'productora', 'admin', 'superadmin'],
+  '/accreditation-facial': ['coordinator', 'productora', 'admin', 'superadmin'],
+  '/access-control': ['control', 'coordinator', 'productora', 'admin', 'superadmin'],
+  '/access-monitor': ['control', 'coordinator', 'productora', 'admin', 'superadmin'],
+  '/zkteco-devices': ['coordinator', 'productora', 'admin', 'superadmin'],
+  '/reports': ['coordinator', 'productora', 'admin', 'superadmin'],
+  '/messages': ['coordinator', 'productora', 'admin', 'superadmin'],
+  '/documents': ['coordinator', 'productora', 'admin', 'superadmin'],
+  '/vehicles': ['coordinator', 'productora', 'admin', 'superadmin'],
   '/users': ['admin', 'superadmin'],
   '/audit': ['admin', 'superadmin'],
   '/settings': ['admin', 'superadmin'],
