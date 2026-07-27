@@ -30,9 +30,11 @@ export default function Vehicles() {
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
     if (!q) return items;
-    return items.filter((v) =>
-      `${v.person_name || ''} ${v.brand || ''} ${v.model || ''} ${v.plate || ''}`.toLowerCase().includes(q)
-    );
+    return items.filter((v) => {
+      const person = people.find((p) => p.id === v.person_id);
+      const personDoc = person?.document || '';
+      return `${v.person_name || ''} ${v.brand || ''} ${v.model || ''} ${v.plate || ''} ${personDoc}`.toLowerCase().includes(q);
+    });
   }, [items, query]);
 
   const handleExport = () => {
@@ -69,6 +71,10 @@ export default function Vehicles() {
   }, []);
 
   const openPrint = (vehicle) => setPrintingVehicle(vehicle);
+
+  React.useEffect(() => {
+    loadPeople();
+  }, []);
 
   const openNew = () => {
     setEditing(null);
