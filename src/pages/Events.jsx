@@ -22,12 +22,17 @@ export default function Events() {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [users, setUsers] = useState([]);
+  const [companies, setCompanies] = useState([]);
 
   useEffect(() => {
     (async () => {
       try {
-        const data = await base44.entities.User.list('-created_date', 200);
-        setUsers(data.filter((u) => u.role !== 'provider' && u.role !== 'superadmin'));
+        const [userData, companyData] = await Promise.all([
+          base44.entities.User.list('-created_date', 200),
+          base44.entities.Company.list('-created_date', 200),
+        ]);
+        setUsers(userData.filter((u) => u.role !== 'provider' && u.role !== 'superadmin'));
+        setCompanies(companyData);
       } catch {}
     })();
   }, []);
@@ -39,7 +44,11 @@ export default function Events() {
       { name: 'logo_url', label: 'Logo del evento', type: 'image-upload', full: true },
     ];
     if (!isProductora) {
-      baseFields.push({ name: 'company', label: 'Empresa', type: 'text', placeholder: 'Ej: Producciones SA', full: true, hint: 'Los usuarios con rol productora de esta empresa verán automáticamente este evento' });
+      baseFields.push({
+        name: 'company', label: 'Empresa', type: 'select', full: true,
+        options: companies.map((c) => ({ value: c.name, label: c.name })),
+        hint: 'Los usuarios con rol productora de esta empresa verán automáticamente este evento',
+      });
     }
     baseFields.push(
       { name: 'start_at', label: 'Inicio', type: 'datetime-local' },
@@ -63,7 +72,7 @@ export default function Events() {
       },
     );
     return baseFields;
-  }, [users, isProductora]);
+  }, [users, companies, isProductora]);
 
   const filtered = useMemo(() => {
     let result = items;
