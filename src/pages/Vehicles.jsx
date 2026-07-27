@@ -36,16 +36,10 @@ export default function Vehicles() {
   const [peopleLoaded, setPeopleLoaded] = useState(false);
   const [showPersonSearch, setShowPersonSearch] = useState(false);
 
-  const activeEventIds = useMemo(() => new Set(events.filter((e) => e.status !== 'closed').map((e) => e.id)), [events]);
-
   const visibleItems = useMemo(() => {
-    return items.filter((v) => {
-      if (isProductora && v.company && v.company !== currentUser?.data?.company) return false;
-      const evtIds = v.event_ids || [];
-      if (evtIds.length === 0) return true;
-      return evtIds.some((id) => activeEventIds.has(id));
-    });
-  }, [items, activeEventIds, isProductora, currentUser]);
+    if (!isProductora) return items;
+    return items.filter((v) => !v.company || v.company === currentUser?.data?.company);
+  }, [items, isProductora, currentUser]);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
