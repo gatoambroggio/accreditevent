@@ -39,6 +39,18 @@ export default function Events() {
   const openEdit = (item) => { setEditing(item); setModalOpen(true); };
 
   const handleSubmit = async (data) => {
+    if (data.pickup_address && (!data.pickup_lat || !data.pickup_lng)) {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(data.pickup_address)}&limit=1&countrycodes=ar`
+        );
+        const results = await res.json();
+        if (results[0]) {
+          data.pickup_lat = parseFloat(results[0].lat);
+          data.pickup_lng = parseFloat(results[0].lon);
+        }
+      } catch {}
+    }
     if (editing) await update(editing.id, data);
     else await create(data);
   };

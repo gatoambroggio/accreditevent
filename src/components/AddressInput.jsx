@@ -102,6 +102,7 @@ export default function AddressInput({ value, onChange, lat, lng, onCoordinatesC
     const val = e.target.value;
     setQuery(val);
     onChange(val);
+    if (onCoordinatesChange) onCoordinatesChange(null, null);
     search(val);
   };
 
