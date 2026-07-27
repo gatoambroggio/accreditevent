@@ -1,8 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { Loader2, Users, CheckCircle2, XCircle, DoorOpen, FileBarChart, Download, Search } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
 import { formatDateTime, parseServerDate } from '@/lib/formatDate';
+
+const userEventIdsRef = { current: [] };
+
+const shouldShowLog = (log) => {
+  const ids = userEventIdsRef.current;
+  if (!ids || ids.length === 0) return true;
+  return ids.includes(log.event_id);
+};
 
 const ZONE_LABELS = {
   general: 'General',
@@ -12,6 +21,7 @@ const ZONE_LABELS = {
 };
 
 export default function Reports() {
+  const { user } = useAuth();
   const [events, setEvents] = useState([]);
   const [accreditations, setAccreditations] = useState([]);
   const [accessLogs, setAccessLogs] = useState([]);
@@ -21,6 +31,9 @@ export default function Reports() {
   const [personQuery, setPersonQuery] = useState('');
 
   useEffect(() => {
+    const isProductora = user?.role === 'productora';
+    userEventIdsRef.current = isProductora ? (user?.assigned_event_ids || user?.data?.assigned_event_ids || []) : [];
+
     (async () => {
       try {
         const [evs, accs, logs] = await Promise.all([
@@ -30,7 +43,7 @@ export default function Reports() {
         ]);
         setEvents(evs);
         setAccreditations(accs);
-        setAccessLogs(logs);
+        setAccessLogs(logs.filter(shouldShowLog));
       } catch {}
       setLoading(false);
     })();
@@ -38,9 +51,11 @@ export default function Reports() {
     const unsubscribe = base44.entities.AccessLog.subscribe((event) => {
       setAccessLogs((prev) => {
         if (event.type === 'create' && event.data) {
+          if (!shouldShowLog(event.data)) return prev;
           return [{ ...event.data, result: event.data.result || 'granted' }, ...prev].slice(0, 500);
         }
         if (event.type === 'update' && event.data) {
+          if (!shouldShowLog(event.data)) return prev.filter((l) => l.id !== event.data.id);
           return prev.map((l) => (l.id === event.data.id ? { ...event.data, result: event.data.result || 'granted' } : l));
         }
         if (event.type === 'delete' && event.id) {
@@ -51,7 +66,7 @@ export default function Reports() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   const filteredLogs = useMemo(() => {
     let logs = accessLogs;

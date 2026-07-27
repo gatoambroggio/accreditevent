@@ -1,7 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { CheckCircle2, XCircle, Loader2, Radio, Users, TrendingUp, AlertTriangle } from 'lucide-react';
 import { formatTimeWithSeconds } from '@/lib/formatDate';
+
+const userEventIdsRef = { current: [] };
+
+const shouldShowLog = (log) => {
+  const ids = userEventIdsRef.current;
+  if (!ids || ids.length === 0) return true;
+  return ids.includes(log.event_id);
+};
 
 const ZONE_LABELS = {
   general: 'General',
@@ -11,6 +20,7 @@ const ZONE_LABELS = {
 };
 
 export default function AccessMonitor() {
+  const { user } = useAuth();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ granted: 0, denied: 0, total: 0 });
@@ -18,17 +28,22 @@ export default function AccessMonitor() {
   const flashTimer = useRef(null);
 
   useEffect(() => {
+    const isProductora = user?.role === 'productora';
+    userEventIdsRef.current = isProductora ? (user?.assigned_event_ids || user?.data?.assigned_event_ids || []) : [];
+
     (async () => {
       try {
         const data = await base44.entities.AccessLog.list('-created_date', 50);
-        setLogs(data);
-        computeStats(data);
+        const filtered = data.filter(shouldShowLog);
+        setLogs(filtered);
+        computeStats(filtered);
       } catch {}
       setLoading(false);
     })();
 
     const unsubscribe = base44.entities.AccessLog.subscribe((event) => {
       if (event.type === 'create' && event.data) {
+        if (!shouldShowLog(event.data)) return;
         setLogs((prev) => [event.data, ...prev].slice(0, 50));
         setStats((prev) => ({
           granted: prev.granted + (event.data.result !== 'denied' ? 1 : 0),
@@ -45,7 +60,7 @@ export default function AccessMonitor() {
       unsubscribe();
       if (flashTimer.current) clearTimeout(flashTimer.current);
     };
-  }, []);
+  }, [user]);
 
   const computeStats = (data) => {
     setStats({
