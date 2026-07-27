@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { Loader2, CheckCircle2, XCircle, Calendar, Clock, AlertTriangle } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Calendar, Clock, AlertTriangle, ScanFace, QrCode } from 'lucide-react';
 import FaceCapture from '@/components/FaceCapture';
+import QrScanner from '@/components/QrScanner';
 import { findBestMatch } from '@/lib/faceRecognition';
 import { canAccessAnyZone } from '@/lib/accessZones';
 import { useZones } from '@/lib/useZones';
@@ -37,6 +38,8 @@ export default function AccessStation() {
   const [cycle, setCycle] = useState(0);
   const [verifying, setVerifying] = useState(false);
   const [result, setResult] = useState(null);
+  const [mode, setMode] = useState('facial');
+  const qrCooldown = useRef(false);
   const { zones } = useZones();
 
   useEffect(() => {
@@ -75,6 +78,66 @@ export default function AccessStation() {
       window.speechSynthesis.speak(u);
     } catch {}
   }, []);
+
+  // Shared: validate an accreditation against the selected zones and log the access
+  const validateAndLog = async (accred, method, fallbackName, fallbackBadge) => {
+    const me = await base44.auth.me();
+    const verifier = me?.full_name || me?.email || 'Sistema';
+    const zoneLabel = selectedZones.map((z) => zones.find((zz) => zz.value === z)?.label || z).join(', ');
+
+    if (!accred) {
+      await base44.entities.AccessLog.create({
+        accreditation_id: 'unknown',
+        person_name: fallbackName || 'Desconocido',
+        badge_code: fallbackBadge || '',
+        event_name: selectedEvent.name,
+        event_id: selectedEvent.id,
+        verified_by: verifier,
+        method,
+        zone: selectedZones.join(', '),
+        result: 'denied',
+        access_level: '',
+      });
+      setResult({ ok: false, message: 'No se encontró una acreditación activa para este evento.' });
+      return;
+    }
+
+    if (!canAccessAnyZone(accred.access_level, selectedZones)) {
+      await base44.entities.AccessLog.create({
+        accreditation_id: accred.id,
+        person_name: accred.person_name,
+        badge_code: accred.badge_code,
+        event_name: accred.event_name,
+        event_id: accred.event_id,
+        verified_by: verifier,
+        method,
+        zone: selectedZones.join(', '),
+        result: 'denied',
+        access_level: accred.access_level,
+      });
+      setResult({
+        ok: false,
+        person_name: accred.person_name,
+        message: `Acceso restringido para la zona: ${zoneLabel}.`,
+      });
+      return;
+    }
+
+    await base44.entities.AccessLog.create({
+      accreditation_id: accred.id,
+      person_name: accred.person_name,
+      badge_code: accred.badge_code,
+      event_name: accred.event_name,
+      event_id: accred.event_id,
+      verified_by: verifier,
+      method,
+      zone: selectedZones.join(', '),
+      result: 'granted',
+      access_level: accred.access_level,
+    });
+
+    setResult({ ok: true, person_name: accred.person_name, accred });
+  };
 
   const handleCaptured = async (file, descriptor) => {
     setVerifying(true);
@@ -155,19 +218,7 @@ export default function AccessStation() {
       // Find the active accreditation for this person in this event
       const accred = accreditations.find((a) => a.person_id === match.person_id);
       if (!accred) {
-        const me = await base44.auth.me();
-        await base44.entities.AccessLog.create({
-          accreditation_id: 'unknown',
-          person_name: match.person_name || 'Desconocido',
-          badge_code: '',
-          event_name: selectedEvent.name,
-          event_id: selectedEvent.id,
-          verified_by: me?.full_name || me?.email || 'Sistema',
-          method: 'biometric',
-          zone: selectedZones.join(', '),
-          result: 'denied',
-          access_level: '',
-        });
+        await validateAndLog(null, 'biometric', match.person_name, '');
         setResult({
           ok: false,
           message: 'Persona identificada pero sin acreditación para este evento.',
@@ -176,48 +227,32 @@ export default function AccessStation() {
         return;
       }
 
-      const me = await base44.auth.me();
-      const zoneLabel = selectedZones.map((z) => zones.find((zz) => zz.value === z)?.label || z).join(', ');
-
-      if (!canAccessAnyZone(accred.access_level, selectedZones)) {
-        await base44.entities.AccessLog.create({
-          accreditation_id: accred.id,
-          person_name: accred.person_name,
-          badge_code: accred.badge_code,
-          event_name: accred.event_name,
-          event_id: accred.event_id,
-          verified_by: me?.full_name || me?.email || 'Sistema',
-          method: 'biometric',
-          zone: selectedZones.join(', '),
-          result: 'denied',
-          access_level: accred.access_level,
-        });
-        setResult({
-          ok: false,
-          person_name: accred.person_name,
-          message: `Acceso restringido para la zona: ${zoneLabel}.`,
-        });
-        return;
-      }
-
-      await base44.entities.AccessLog.create({
-        accreditation_id: accred.id,
-        person_name: accred.person_name,
-        badge_code: accred.badge_code,
-        event_name: accred.event_name,
-        event_id: accred.event_id,
-        verified_by: me?.full_name || me?.email || 'Sistema',
-        method: 'biometric',
-        zone: selectedZones.join(', '),
-        result: 'granted',
-        access_level: accred.access_level,
-      });
-
-      setResult({ ok: true, person_name: accred.person_name, accred });
+      await validateAndLog(accred, 'biometric');
     } catch (err) {
       setResult({ ok: false, message: err.message || 'Error en la verificación.' });
     } finally {
       setVerifying(false);
+    }
+  };
+
+  const handleQrDetected = async (code) => {
+    if (qrCooldown.current || verifying || result) return;
+    qrCooldown.current = true;
+    setVerifying(true);
+    setResult(null);
+    try {
+      const accreditations = await base44.entities.Accreditation.filter(
+        { status: 'active', event_id: selectedEvent.id },
+        '-created_date',
+        500
+      );
+      const accred = accreditations.find((a) => a.badge_code === code);
+      await validateAndLog(accred || null, 'manual', accred?.person_name, code);
+    } catch (err) {
+      setResult({ ok: false, message: err.message || 'Error en la verificación.' });
+    } finally {
+      setVerifying(false);
+      setTimeout(() => { qrCooldown.current = false; }, 3000);
     }
   };
 
@@ -374,10 +409,33 @@ export default function AccessStation() {
 
           <div className="mx-auto max-w-2xl px-5 py-8">
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="mb-1 text-xl font-bold text-slate-900">Identificación facial automática</h2>
+              <div className="mb-1 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-slate-900">
+                  {mode === 'facial' ? 'Identificación facial automática' : 'Lectura de credencial QR'}
+                </h2>
+              </div>
               <p className="mb-5 text-sm text-slate-500">
-                Mirá a la cámara. El sistema te identificará automáticamente al detectar tu rostro.
+                {mode === 'facial'
+                  ? 'Mirá a la cámara. El sistema te identificará automáticamente al detectar tu rostro.'
+                  : 'Enfocá el código QR impreso en la credencial para validar el ingreso.'}
               </p>
+
+              {!(eventStatus === 'upcoming' || eventStatus === 'ended') && !verifying && !result && (
+                <div className="mb-5 inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+                  <button
+                    onClick={() => setMode('facial')}
+                    className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition ${mode === 'facial' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    <ScanFace className="h-4 w-4" /> Facial
+                  </button>
+                  <button
+                    onClick={() => setMode('qr')}
+                    className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition ${mode === 'qr' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    <QrCode className="h-4 w-4" /> QR
+                  </button>
+                </div>
+              )}
 
               {(eventStatus === 'upcoming' || eventStatus === 'ended') ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -400,7 +458,11 @@ export default function AccessStation() {
                   <span className="mt-3 text-sm text-slate-500">Identificando…</span>
                 </div>
               ) : !result ? (
-                <FaceCapture key={cycle} onCaptured={handleCaptured} autoCapture />
+                mode === 'facial' ? (
+                  <FaceCapture key={cycle} onCaptured={handleCaptured} autoCapture />
+                ) : (
+                  <QrScanner key={`qr-${cycle}`} onDetected={handleQrDetected} paused={!!result || verifying} />
+                )
               ) : null}
             </div>
           </div>
