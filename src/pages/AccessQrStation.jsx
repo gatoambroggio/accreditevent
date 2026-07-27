@@ -5,6 +5,7 @@ import { Loader2, CheckCircle2, XCircle, Calendar, Clock, AlertTriangle, Car, Us
 import QrScanner from '@/components/QrScanner';
 import { canAccessAnyZone } from '@/lib/accessZones';
 import { useZones } from '@/lib/useZones';
+import { useParkingSectors } from '@/lib/useParkingSectors';
 
 function getEventStatus(event) {
   const now = Date.now();
@@ -32,6 +33,7 @@ export default function AccessQrStation() {
   const [events, setEvents] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState('');
   const [selectedZones, setSelectedZones] = useState(['general']);
+  const [selectedSectors, setSelectedSectors] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [cycle, setCycle] = useState(0);
@@ -39,6 +41,7 @@ export default function AccessQrStation() {
   const [result, setResult] = useState(null);
   const qrCooldown = useRef(false);
   const { zones } = useZones();
+  const { sectors: parkingSectors } = useParkingSectors();
 
   useEffect(() => {
     (async () => {
@@ -63,6 +66,7 @@ export default function AccessQrStation() {
     setSelectedEvent(null);
     setSelectedEventId('');
     setSelectedZones(['general']);
+    setSelectedSectors([]);
     setResult(null);
     setVerifying(false);
   };
@@ -204,6 +208,31 @@ export default function AccessQrStation() {
         return;
       }
 
+      const sectorLabel = parkingSectors.find((s) => s.value === vehicle.parking_sector)?.label || vehicle.parking_sector || 'Sin sector';
+
+      if (selectedSectors.length > 0 && vehicle.parking_sector && !selectedSectors.includes(vehicle.parking_sector)) {
+        await base44.entities.AccessLog.create({
+          accreditation_id: vehicle.id,
+          person_name: vehicle.person_name || '—',
+          badge_code: vehicle.plate || code,
+          event_name: selectedEvent.name,
+          event_id: selectedEvent.id,
+          verified_by: verifier,
+          method: 'manual',
+          zone: selectedSectors.join(', '),
+          result: 'denied',
+          access_level: vehicle.parking_sector,
+        });
+        setResult({
+          ok: false,
+          person_name: vehicle.person_name,
+          type: 'vehicle',
+          vehicle,
+          message: `Sector de estacionamiento no permitido: ${sectorLabel}.`,
+        });
+        return;
+      }
+
       await base44.entities.AccessLog.create({
         accreditation_id: vehicle.id,
         person_name: vehicle.person_name || '—',
@@ -212,9 +241,9 @@ export default function AccessQrStation() {
         event_id: selectedEvent.id,
         verified_by: verifier,
         method: 'manual',
-        zone: selectedZones.join(', '),
+        zone: selectedSectors.join(', '),
         result: 'granted',
-        access_level: '',
+        access_level: vehicle.parking_sector || '',
       });
 
       setResult({ ok: true, person_name: vehicle.person_name, type: 'vehicle', vehicle });
@@ -373,8 +402,29 @@ export default function AccessQrStation() {
                   </div>
                 )}
                 {mode === 'vehicle' && (
-                  <div className="mt-5 rounded-lg bg-slate-50 px-4 py-3 text-xs text-slate-500">
-                    Se validarán vehículos asignados al evento mediante el QR de su credencial vehicular.
+                  <div className="mt-5">
+                    <label className="mb-1.5 block text-xs font-semibold text-slate-600">Sector(es) de estacionamiento</label>
+                    <p className="mb-2 text-xs text-slate-400">Seleccioná uno o varios. Se permite el ingreso si el vehículo tiene asignado alguno de los sectores seleccionados.</p>
+                    {parkingSectors.length === 0 ? (
+                      <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs text-slate-500">
+                        No hay sectores configurados. Se validará solo la asignación al evento.
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {parkingSectors.map((s) => {
+                          const active = selectedSectors.includes(s.value);
+                          return (
+                            <button
+                              key={s.value}
+                              onClick={() => setSelectedSectors((prev) => active ? prev.filter((v) => v !== s.value) : [...prev, s.value])}
+                              className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                            >
+                              {s.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
                 <button
@@ -398,7 +448,12 @@ export default function AccessQrStation() {
             <div className="mx-auto flex max-w-7xl items-center justify-between">
               <div>
                 <p className="text-sm font-bold text-slate-900">{selectedEvent.name}</p>
-                <p className="text-xs text-slate-500">{selectedEvent.venue || 'Sin sede'} · Zonas: {selectedZones.map((z) => zones.find((zz) => zz.value === z)?.label || z).join(', ')}</p>
+                <p className="text-xs text-slate-500">
+                  {selectedEvent.venue || 'Sin sede'} ·{' '}
+                  {mode === 'person'
+                    ? `Zonas: ${selectedZones.map((z) => zones.find((zz) => zz.value === z)?.label || z).join(', ')}`
+                    : `Sectores: ${selectedSectors.length > 0 ? selectedSectors.map((s) => parkingSectors.find((ps) => ps.value === s)?.label || s).join(', ') : 'Todos'}`}
+                </p>
               </div>
               {eventStatus === 'ended' ? (
                 <div className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-inset ring-red-200">
