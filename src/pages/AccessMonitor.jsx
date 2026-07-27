@@ -28,22 +28,17 @@ export default function AccessMonitor() {
   const flashTimer = useRef(null);
 
   useEffect(() => {
-    const isProductora = user?.role === 'productora';
-    userEventIdsRef.current = isProductora ? (user?.assigned_event_ids || user?.data?.assigned_event_ids || []) : [];
-
     (async () => {
       try {
         const data = await base44.entities.AccessLog.list('-created_date', 50);
-        const filtered = data.filter(shouldShowLog);
-        setLogs(filtered);
-        computeStats(filtered);
+        setLogs(data);
+        computeStats(data);
       } catch {}
       setLoading(false);
     })();
 
     const unsubscribe = base44.entities.AccessLog.subscribe((event) => {
       if (event.type === 'create' && event.data) {
-        if (!shouldShowLog(event.data)) return;
         setLogs((prev) => [event.data, ...prev].slice(0, 50));
         setStats((prev) => ({
           granted: prev.granted + (event.data.result !== 'denied' ? 1 : 0),
