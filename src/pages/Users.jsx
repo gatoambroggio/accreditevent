@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { logAudit } from '@/lib/audit';
-import { UserPlus, Loader2, ShieldCheck, Pencil } from 'lucide-react';
+import { UserPlus, Loader2, Pencil, KeyRound, Trash2, Search, Building2, ShieldCheck } from 'lucide-react';
 import EntityModal from '@/components/EntityModal';
 
 const ROLES = [
@@ -12,7 +12,24 @@ const ROLES = [
   { value: 'superadmin', label: 'Superadministrador' },
 ];
 
+const ROLE_LABELS = {
+  superadmin: 'Superadmin',
+  admin: 'Administrador',
+  coordinator: 'Coordinador',
+  control: 'Control',
+  provider: 'Proveedor',
+};
+
+const ROLE_STYLES = {
+  superadmin: 'bg-purple-50 text-purple-700 ring-purple-200',
+  admin: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  coordinator: 'bg-blue-50 text-blue-700 ring-blue-200',
+  control: 'bg-amber-50 text-amber-700 ring-amber-200',
+  provider: 'bg-slate-100 text-slate-600 ring-slate-200',
+};
+
 const EDIT_FIELDS = [
+  { name: 'company', label: 'Empresa', type: 'text', placeholder: 'Ej: Producciones SA', full: true },
   { name: 'role', label: 'Rol', type: 'select', options: ROLES, required: true },
 ];
 
@@ -26,6 +43,9 @@ export default function Users() {
   const [inviteRole, setInviteRole] = useState('provider');
   const [inviting, setInviting] = useState(false);
   const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [resetting, setResetting] = useState(false);
+  const [resetMsg, setResetMsg] = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -41,12 +61,54 @@ export default function Users() {
 
   useEffect(() => { load(); }, []);
 
-  const openEdit = (u) => { setEditing(u); setModalOpen(true); };
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    if (!q) return users;
+    return users.filter((u) =>
+      `${u.full_name || ''} ${u.email || ''} ${u.company || ''} ${u.role || ''}`.toLowerCase().includes(q)
+    );
+  }, [users, search]);
+
+  const openEdit = (u) => { setEditing(u); setModalOpen(true); setResetMsg(''); };
 
   const handleUpdate = async (data) => {
-    await base44.entities.User.update(editing.id, { role: data.role });
-    await logAudit('update', 'User', editing.id, `Rol: ${data.role}`);
-    setUsers((prev) => prev.map((u) => (u.id === editing.id ? { ...u, role: data.role } : u)));
+    await base44.entities.User.update(editing.id, { role: data.role, company: data.company || '' });
+    await logAudit('update', 'User', editing.id, `Rol: ${data.role}, Empresa: ${data.company || '—'}`);
+    setUsers((prev) => prev.map((u) => (u.id === editing.id ? { ...u, role: data.role, company: data.company } : u)));
+  };
+
+  const handleDelete = async () => {
+    await base44.entities.User.delete(editing.id);
+    await logAudit('delete', 'User', editing.id, `Email: ${editing.email}`);
+    setUsers((prev) => prev.filter((u) => u.id !== editing.id));
+  };
+
+  const handleResetPassword = async () => {
+    if (!editing?.email) return;
+    if (!window.confirm(`¿Enviar email de reseteo de contraseña a ${editing.email}?`)) return;
+    setResetting(true);
+    setResetMsg('');
+    try {
+      await base44.auth.resetPasswordRequest(editing.email);
+      setResetMsg(`Se envió un email de reseteo a ${editing.email}.`);
+      await logAudit('reset_password', 'User', editing.id, `Email: ${editing.email}`);
+    } catch {
+      setResetMsg('No se pudo enviar el email de reseteo.');
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const handleResetPasswordRow = async (u) => {
+    if (!u?.email) return;
+    if (!window.confirm(`¿Enviar email de reseteo de contraseña a ${u.email}?`)) return;
+    try {
+      await base44.auth.resetPasswordRequest(u.email);
+      await logAudit('reset_password', 'User', u.id, `Email: ${u.email}`);
+      alert(`Se envió un email de reseteo a ${u.email}.`);
+    } catch {
+      alert('No se pudo enviar el email de reseteo.');
+    }
   };
 
   const handleInvite = async (e) => {
@@ -55,10 +117,10 @@ export default function Users() {
     setError('');
     try {
       await base44.users.inviteUser(inviteEmail, inviteRole);
-      await logAudit('invite', 'User', '', `Invitación a ${inviteEmail}`);
+      await logAudit('invite', 'User', '', `Invitación a ${inviteEmail} (${inviteRole})`);
       setInviteOpen(false);
       setInviteEmail('');
-      setInviteRole('user');
+      setInviteRole('provider');
       await load();
     } catch (err) {
       setError(err.message || 'No se pudo enviar la invitación.');
@@ -80,37 +142,83 @@ export default function Users() {
         </button>
       </div>
 
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por nombre, email o empresa…"
+          className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+        />
+      </div>
+
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         {loading ? (
           <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-emerald-600" /></div>
+        ) : filtered.length === 0 ? (
+          <div className="py-16 text-center text-sm text-slate-400">
+            {search ? 'No se encontraron usuarios.' : 'No hay usuarios registrados.'}
+          </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left">
+            <table className="w-full min-w-[720px] text-left">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
                   <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Nombre</th>
                   <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Email</th>
+                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Empresa</th>
                   <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Rol</th>
+                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Eventos</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody>
-                {users.map((u) => (
-                  <tr key={u.id} className="border-b border-slate-50 transition hover:bg-slate-50/50">
-                    <td className="px-4 py-3.5 text-sm font-semibold text-slate-900">{u.full_name || '—'}</td>
-                    <td className="px-4 py-3.5 text-sm text-slate-500">{u.email}</td>
-                    <td className="px-4 py-3.5">
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                        <ShieldCheck className="h-3 w-3" /> {u.role}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5 text-right">
-                      <button onClick={() => openEdit(u)} className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700">
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {filtered.map((u) => {
+                  const roleStyle = ROLE_STYLES[u.role] || ROLE_STYLES.provider;
+                  const roleLabel = ROLE_LABELS[u.role] || u.role;
+                  const eventCount = u.assigned_event_ids?.length || 0;
+                  return (
+                    <tr key={u.id} className="border-b border-slate-50 transition hover:bg-slate-50/50">
+                      <td className="px-4 py-3.5 text-sm font-semibold text-slate-900">{u.full_name || '—'}</td>
+                      <td className="px-4 py-3.5 text-sm text-slate-500">{u.email}</td>
+                      <td className="px-4 py-3.5 text-sm text-slate-600">
+                        {u.company ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            <Building2 className="h-3.5 w-3.5 text-slate-400" /> {u.company}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${roleStyle}`}>
+                          <ShieldCheck className="h-3 w-3" /> {roleLabel}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-sm text-slate-500">
+                        {eventCount > 0 ? (
+                          <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{eventCount}</span>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <div className="inline-flex items-center gap-1">
+                          <button onClick={() => handleResetPasswordRow(u)} title="Reseteo de contraseña"
+                            className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-amber-50 hover:text-amber-600">
+                            <KeyRound className="h-3.5 w-3.5" />
+                          </button>
+                          <button onClick={() => openEdit(u)} title="Editar"
+                            className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -151,13 +259,30 @@ export default function Users() {
       <EntityModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="Editar usuario"
+        title={editing?.full_name || editing?.email || 'Editar usuario'}
         kicker="EDITAR USUARIO"
         fields={EDIT_FIELDS}
         initialData={editing || {}}
         onSubmit={handleUpdate}
-        canDelete={false}
+        onDelete={editing ? handleDelete : null}
+        canDelete={!!editing}
         submitLabel="Guardar cambios"
+        topContent={
+          editing?.email ? (
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={handleResetPassword}
+                disabled={resetting}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
+              >
+                {resetting ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+                Enviar email de reseteo de contraseña
+              </button>
+              {resetMsg && <p className="text-center text-xs text-emerald-600">{resetMsg}</p>}
+            </div>
+          ) : null
+        }
       />
     </div>
   );
