@@ -12,7 +12,11 @@
     },
     "company": {
       "type": "string",
-      "description": "Empresa o raz\u00f3n social"
+      "description": "Empresa o raz\u00f3n social del proveedor"
+    },
+    "productora": {
+      "type": "string",
+      "description": "Productora del evento (denormalizado para RLS)"
     },
     "phone": {
       "type": "string",
@@ -69,9 +73,24 @@
           }
         },
         {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.productora": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
           "data.event_id": {
             "$in": "{{user.data.assigned_event_ids}}"
           }
+        },
+        {
+          "data.email": "{{user.email}}"
         },
         {
           "created_by_id": "{{user.id}}"
@@ -94,6 +113,18 @@
           "user_condition": {
             "role": "coordinator"
           }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.productora": "{{user.data.company}}"
+            }
+          ]
         },
         {
           "data.event_id": {
@@ -125,9 +156,24 @@
           }
         },
         {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.productora": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
           "data.event_id": {
             "$in": "{{user.data.assigned_event_ids}}"
           }
+        },
+        {
+          "data.email": "{{user.email}}"
         },
         {
           "created_by_id": "{{user.id}}"
@@ -150,6 +196,18 @@
           "user_condition": {
             "role": "coordinator"
           }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.productora": "{{user.data.company}}"
+            }
+          ]
         },
         {
           "data.event_id": {
