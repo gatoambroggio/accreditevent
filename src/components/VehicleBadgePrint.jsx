@@ -105,6 +105,22 @@ export default function VehicleBadgePrint({ vehicle, settings, events = [], park
               {vehicle?.color && (
                 <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>Color: {vehicle.color}</p>
               )}
+              <div style={{ marginTop: '0.3rem' }}>
+                <span style={{
+                  display: 'inline-block',
+                  fontSize: '0.6rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  padding: '0.15rem 0.5rem',
+                  borderRadius: '0.3rem',
+                  backgroundColor: vehicle?.status === 'approved' ? '#ecfdf5' : vehicle?.status === 'rejected' ? '#fef2f2' : '#fffbeb',
+                  color: vehicle?.status === 'approved' ? '#059669' : vehicle?.status === 'rejected' ? '#dc2626' : '#d97706',
+                  border: `1px solid ${vehicle?.status === 'approved' ? '#a7f3d0' : vehicle?.status === 'rejected' ? '#fecaca' : '#fde68a'}`,
+                }}>
+                  {vehicle?.status === 'approved' ? '✓ Autorizado' : vehicle?.status === 'rejected' ? '✗ Rechazado' : '⏳ Pendiente'}
+                </span>
+              </div>
               {eventNames.length > 0 && (
                 <div style={{ marginTop: '0.3rem' }}>
                   <p style={{ fontSize: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', fontFamily: 'monospace', margin: 0 }}>

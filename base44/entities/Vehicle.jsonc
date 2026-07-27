@@ -48,6 +48,16 @@
       },
       "description": "Nombres de eventos (denormalizado)"
     },
+    "status": {
+      "type": "string",
+      "enum": [
+        "approved",
+        "pending",
+        "rejected"
+      ],
+      "default": "pending",
+      "description": "Estado de autorizaci\u00f3n del veh\u00edculo"
+    },
     "notes": {
       "type": "string",
       "description": "Notas adicionales"

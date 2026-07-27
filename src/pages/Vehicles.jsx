@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { useCrud } from '@/lib/crud';
-import { Plus, Pencil, Download, Car, Printer } from 'lucide-react';
+import { Plus, Pencil, Download, Car, Printer, Check, X } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
 import EntityModal from '@/components/EntityModal';
+import StatusBadge from '@/components/StatusBadge';
 import VehicleBadgePrint from '@/components/VehicleBadgePrint';
 import BatchVehicleBadgePrint from '@/components/BatchVehicleBadgePrint';
 import { useParkingSectors } from '@/lib/useParkingSectors';
@@ -10,8 +11,21 @@ import { useAuth } from '@/lib/AuthContext';
 import { base44 } from '@/api/base44Client';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
+import FilterSelect from '@/components/ui/filter-select';
 import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
 import { btnPrimary, btnOutline, btnIconSm } from '@/components/ui/button-styles';
+
+const VEHICLE_STATUS_OPTIONS = [
+  { value: 'approved', label: 'Aprobado' },
+  { value: 'pending', label: 'Pendiente' },
+  { value: 'rejected', label: 'Rechazado' },
+];
+
+const VEHICLE_STATUS_LABELS = {
+  approved: 'Aprobado',
+  pending: 'Pendiente',
+  rejected: 'Rechazado',
+};
 
 const validateVehicle = (data) => {
   const e = {};
@@ -23,12 +37,13 @@ const validateVehicle = (data) => {
 };
 
 export default function Vehicles() {
-  const { items, loading, create, update, remove } = useCrud('Vehicle');
+  const { items, loading, create, update, remove, reload } = useCrud('Vehicle');
   const { user: currentUser } = useAuth();
   const isProductora = currentUser?.role === 'productora';
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [people, setPeople] = useState([]);
   const [printingVehicle, setPrintingVehicle] = useState(null);
   const [selected, setSelected] = useState(new Set());
@@ -52,6 +67,7 @@ export default function Vehicles() {
     const q = query.toLowerCase().trim();
     return items.filter((v) => {
       if (isProductora && v.company && v.company !== currentUser?.data?.company) return false;
+      if (statusFilter && v.status !== statusFilter) return false;
       if (!q) {
         const evtIds = v.event_ids || [];
         if (evtIds.length === 0) return true;
@@ -61,7 +77,15 @@ export default function Vehicles() {
       const personDoc = person?.document || '';
       return `${v.person_name || ''} ${v.brand || ''} ${v.model || ''} ${v.plate || ''} ${personDoc}`.toLowerCase().includes(q);
     });
-  }, [items, activeEventIds, isProductora, currentUser, query, people]);
+  }, [items, activeEventIds, isProductora, currentUser, query, statusFilter, people]);
+
+  const handleStatusChange = async (vehicle, newStatus) => {
+    try {
+      await base44.entities.Vehicle.update(vehicle.id, { status: newStatus });
+      // Update local state via reload from useCrud
+      await reload();
+    } catch {}
+  };
 
   const toggleSelect = (id) => {
     setSelected((prev) => {
@@ -85,7 +109,7 @@ export default function Vehicles() {
 
   const handleExport = () => {
     exportToExcel(
-      ['Persona', 'Marca', 'Modelo', 'Patente', 'Color', 'Eventos', 'Estacionamiento', 'Notas'],
+      ['Persona', 'Marca', 'Modelo', 'Patente', 'Color', 'Eventos', 'Estacionamiento', 'Estado', 'Notas'],
       filtered.map((v) => [
         v.person_name || '',
         v.brand || '',
@@ -94,6 +118,7 @@ export default function Vehicles() {
         v.color || '',
         (v.event_names || []).join(', '),
         sectors.find((s) => s.value === v.parking_sector)?.label || v.parking_sector || '',
+        VEHICLE_STATUS_LABELS[v.status] || 'Pendiente',
         v.notes || '',
       ]),
       'vehiculos'
@@ -142,6 +167,7 @@ export default function Vehicles() {
     const selectedEventIds = data.event_ids ? String(data.event_ids).split(',').filter(Boolean) : [];
     const enriched = {
       ...data,
+      status: data.status || 'pending',
       person_name: person?.full_name || editing?.person_name || '',
       company: events.find((e) => e.id === selectedEventIds[0])?.company || editing?.company || '',
       plate: (data.plate || '').toUpperCase().trim(),
@@ -177,6 +203,10 @@ export default function Vehicles() {
       options: sectors.map((s) => ({ value: s.value, label: s.label })),
       placeholder: 'Seleccionar sector…',
     },
+    {
+      name: 'status', label: 'Estado de autorización', type: 'select',
+      options: VEHICLE_STATUS_OPTIONS,
+    },
     { name: 'notes', label: 'Notas', type: 'textarea', full: true, placeholder: 'Ej: Vehículo de carga' },
   ], [people, sectors, events]);
 
@@ -195,8 +225,14 @@ export default function Vehicles() {
         </button>
       </PageHeader>
 
-      <div className="max-w-md">
+      <div className="flex flex-wrap items-center gap-3">
         <SearchInput value={query} onChange={setQuery} placeholder="Buscar por patente, persona, marca…" />
+        <FilterSelect
+          value={statusFilter}
+          onChange={setStatusFilter}
+          options={VEHICLE_STATUS_OPTIONS}
+          placeholder="Todos los estados"
+        />
       </div>
 
       <DataTable
@@ -222,6 +258,7 @@ export default function Vehicles() {
             <Th>Eventos</Th>
             <Th>Estacionamiento</Th>
             <Th>Color</Th>
+            <Th>Estado</Th>
             <Th />
           </tr>
         </thead>
@@ -250,8 +287,21 @@ export default function Vehicles() {
                 {sectors.find((s) => s.value === v.parking_sector)?.label || v.parking_sector || '—'}
               </Td>
               <Td className="text-sm text-slate-500">{v.color || '—'}</Td>
+              <Td>
+                <StatusBadge status={v.status || 'pending'} />
+              </Td>
               <Td className="text-right">
                 <div className="flex items-center justify-end gap-1">
+                  {v.status !== 'approved' && (
+                    <button onClick={() => handleStatusChange(v, 'approved')} className={btnIconSm} title="Aprobar vehículo" style={{ color: '#059669' }}>
+                      <Check className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  {v.status !== 'rejected' && (
+                    <button onClick={() => handleStatusChange(v, 'rejected')} className={btnIconSm} title="Rechazar vehículo" style={{ color: '#dc2626' }}>
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                   <button onClick={() => openPrint(v)} className={btnIconSm} title="Imprimir credencial">
                     <Printer className="h-3.5 w-3.5" />
                   </button>

@@ -212,6 +212,30 @@ export default function AccessQrStation({ mode = 'person' }) {
         return;
       }
 
+      if (vehicle.status !== 'approved') {
+        await base44.entities.AccessLog.create({
+          accreditation_id: vehicle.id,
+          person_name: vehicle.person_name || '—',
+          badge_code: vehicle.plate || code,
+          event_name: selectedEvent.name,
+          event_id: selectedEvent.id,
+          verified_by: verifier,
+          method: 'manual',
+            resource_type: mode,
+          zone: selectedSectors.join(', '),
+          result: 'denied',
+          access_level: vehicle.parking_sector || '',
+        });
+        setResult({
+          ok: false,
+          person_name: vehicle.person_name,
+          type: 'vehicle',
+          vehicle,
+          message: 'Vehículo no autorizado. El estado no es aprobado.',
+        });
+        return;
+      }
+
       const sectorLabel = parkingSectors.find((s) => s.value === vehicle.parking_sector)?.label || vehicle.parking_sector || 'Sin sector';
 
       if (selectedSectors.length > 0 && vehicle.parking_sector && !selectedSectors.includes(vehicle.parking_sector)) {
