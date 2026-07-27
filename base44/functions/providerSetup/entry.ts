@@ -8,6 +8,10 @@ export default async function (req) {
 
     const body = await req.json();
 
+    // Look up the event to get the productora company for RLS
+    const event = await base44.asServiceRole.entities.Event.get(body.event_id);
+    const productora = event?.company || '';
+
     // Check if person already exists for this email
     const existing = await base44.asServiceRole.entities.Person.filter({ email: body.email });
     let person;
@@ -17,6 +21,7 @@ export default async function (req) {
         full_name: body.full_name,
         document: body.document,
         company: body.company,
+        productora,
         phone: body.phone,
         person_type: 'provider',
         status: 'active',
@@ -27,6 +32,7 @@ export default async function (req) {
         full_name: body.full_name,
         document: body.document,
         company: body.company,
+        productora,
         phone: body.phone,
         email: body.email,
         person_type: 'provider',
