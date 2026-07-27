@@ -111,30 +111,48 @@ export default function Accreditations() {
       await update(editing.id, enriched);
     } else {
       await create(enriched);
-      // Send pickup notification email (only reaches registered app users)
-      if (person?.email && evt?.pickup_address) {
-        try {
-          const mapsUrl = evt.pickup_lat && evt.pickup_lng
-            ? `https://www.google.com/maps/search/?api=1&query=${evt.pickup_lat},${evt.pickup_lng}`
-            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(evt.pickup_address)}`;
-          const pickupDate = evt.pickup_date
-            ? new Date(evt.pickup_date + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-            : 'a confirmar';
-          const pickupTime = evt.pickup_start_time && evt.pickup_end_time
-            ? `${evt.pickup_start_time} a ${evt.pickup_end_time} hs`
-            : (evt.pickup_start_time || 'a confirmar');
-          await base44.integrations.Core.SendEmail({
-            to: person.email,
-            subject: `Tu acreditación para ${evt.name} está lista`,
-            body:
-              `Hola ${person.full_name},\n\n` +
-              `Tu acreditación para "${evt.name}" ya está lista.\n\n` +
-              `Podés retirarla el día ${pickupDate}, en el horario de ${pickupTime}.\n\n` +
-              `Dirección de retiro: ${evt.pickup_address}\n` +
-              `Ver ubicación en el mapa: ${mapsUrl}\n\n` +
-              `Te esperamos.\n\nAccreditEvent`,
-          });
-        } catch {}
+      // Send pickup notifications (email + WhatsApp)
+      if (evt?.pickup_address) {
+        const mapsUrl = evt.pickup_lat && evt.pickup_lng
+          ? `https://www.google.com/maps/search/?api=1&query=${evt.pickup_lat},${evt.pickup_lng}`
+          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(evt.pickup_address)}`;
+        const pickupDate = evt.pickup_date
+          ? new Date(evt.pickup_date + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+          : 'a confirmar';
+        const pickupTime = evt.pickup_start_time && evt.pickup_end_time
+          ? `${evt.pickup_start_time} a ${evt.pickup_end_time} hs`
+          : (evt.pickup_start_time || 'a confirmar');
+
+        // Email (only reaches registered app users)
+        if (person?.email) {
+          try {
+            await base44.integrations.Core.SendEmail({
+              to: person.email,
+              subject: `Tu acreditación para ${evt.name} está lista`,
+              body:
+                `Hola ${person.full_name},\n\n` +
+                `Tu acreditación para "${evt.name}" ya está lista.\n\n` +
+                `Podés retirarla el día ${pickupDate}, en el horario de ${pickupTime}.\n\n` +
+                `Dirección de retiro: ${evt.pickup_address}\n` +
+                `Ver ubicación en el mapa: ${mapsUrl}\n\n` +
+                `Te esperamos.\n\nAccreditEvent`,
+            });
+          } catch {}
+        }
+
+        // WhatsApp (opens chat with pre-filled message)
+        if (person?.phone) {
+          const cleanPhone = person.phone.replace(/\D/g, '');
+          const waMessage = encodeURIComponent(
+            `Hola ${person.full_name},\n\n` +
+            `Tu acreditación para "${evt.name}" ya está lista.\n\n` +
+            `Podés retirarla el día ${pickupDate}, en el horario de ${pickupTime}.\n\n` +
+            `Dirección de retiro: ${evt.pickup_address}\n` +
+            `Ver ubicación en el mapa: ${mapsUrl}\n\n` +
+            `Te esperamos.\n\nAccreditEvent`
+          );
+          window.open(`https://wa.me/${cleanPhone}?text=${waMessage}`, '_blank');
+        }
       }
     }
   };
