@@ -4,6 +4,7 @@ import { Plus, Pencil, Briefcase, Download } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { exportToExcel } from '@/lib/exportUtils';
 import EntityModal from '@/components/EntityModal';
+import ProviderCompanyPeopleModal from '@/components/ProviderCompanyPeopleModal';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
 import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
@@ -14,6 +15,7 @@ export default function ProviderCompanies() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [query, setQuery] = useState('');
+  const [peopleModalCompany, setPeopleModalCompany] = useState(null);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -92,7 +94,12 @@ export default function ProviderCompanies() {
                     </div>
                   )}
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">{c.name}</p>
+                    <button
+                      onClick={() => setPeopleModalCompany(c)}
+                      className="text-left text-sm font-semibold text-slate-900 transition hover:text-emerald-600 hover:underline"
+                    >
+                      {c.name}
+                    </button>
                     {c.description && <p className="text-xs text-slate-400">{c.description}</p>}
                   </div>
                 </div>
@@ -124,6 +131,13 @@ export default function ProviderCompanies() {
         canDelete={!!editing}
         submitLabel={editing ? 'Guardar cambios' : 'Crear empresa'}
       />
+
+      {peopleModalCompany && (
+        <ProviderCompanyPeopleModal
+          company={peopleModalCompany}
+          onClose={() => setPeopleModalCompany(null)}
+        />
+      )}
     </div>
   );
 }
