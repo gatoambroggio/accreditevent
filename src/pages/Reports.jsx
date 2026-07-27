@@ -33,6 +33,14 @@ export default function Reports() {
       } catch {}
       setLoading(false);
     })();
+
+    const unsubscribe = base44.entities.AccessLog.subscribe((event) => {
+      if (event.type === 'create' && event.data) {
+        setAccessLogs((prev) => [event.data, ...prev].slice(0, 500));
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const filteredLogs = useMemo(() => {
