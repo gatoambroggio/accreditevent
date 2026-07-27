@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { logAudit } from '@/lib/audit';
-import { Loader2, Upload, FileText, IdCard, UserCircle, CheckCircle2, Car, Trash2, Plus } from 'lucide-react';
+import { Loader2, Upload, FileText, IdCard, UserCircle, CheckCircle2, Car, Trash2, Plus, Package } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
 import PersonBiometricCard from '@/components/PersonBiometricCard';
 import DocumentViewer from '@/components/DocumentViewer';
+import ProviderRequirementsSection from '@/components/ProviderRequirementsSection';
 
 const DOC_TYPES = {
   dni: 'Documento de identidad',
@@ -409,6 +410,14 @@ export default function ProviderPortal() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Requirements */}
+        <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="mb-4 flex items-center gap-2 text-base font-bold text-slate-900">
+            <Package className="h-4 w-4 text-emerald-600" /> Requerimientos de logística
+          </h3>
+          <ProviderRequirementsSection user={currentUser} />
         </div>
 
         {/* Documents */}

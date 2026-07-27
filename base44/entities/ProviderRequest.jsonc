@@ -1,0 +1,248 @@
+{
+  "name": "ProviderRequest",
+  "type": "object",
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "description": "Evento asociado a la solicitud"
+    },
+    "event_name": {
+      "type": "string",
+      "description": "Nombre del evento (denormalizado)"
+    },
+    "company": {
+      "type": "string",
+      "description": "Empresa productora (denormalizado para RLS)"
+    },
+    "person_id": {
+      "type": "string",
+      "description": "Persona proveedora que realiza la solicitud"
+    },
+    "person_name": {
+      "type": "string",
+      "description": "Nombre de la persona (denormalizado)"
+    },
+    "person_email": {
+      "type": "string",
+      "description": "Email de la persona (denormalizado para RLS)"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "item_id": {
+            "type": "string"
+          },
+          "item_name": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "\u00cdtems solicitados por el proveedor"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "rejected"
+      ],
+      "default": "pending",
+      "description": "Estado de la solicitud"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas generales del proveedor"
+    },
+    "admin_notes": {
+      "type": "string",
+      "description": "Notas del administrador al revisar"
+    }
+  },
+  "required": [
+    "event_id",
+    "person_id"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
+        },
+        {
+          "data.person_email": "{{user.email}}"
+        },
+        {
+          "created_by_id": "{{user.id}}"
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "provider"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
+        },
+        {
+          "data.person_email": "{{user.email}}"
+        },
+        {
+          "created_by_id": "{{user.id}}"
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
+        },
+        {
+          "data.person_email": "{{user.email}}"
+        },
+        {
+          "created_by_id": "{{user.id}}"
+        }
+      ]
+    }
+  }
+}

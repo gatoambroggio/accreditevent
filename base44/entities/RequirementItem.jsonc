@@ -1,0 +1,111 @@
+{
+  "name": "RequirementItem",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre del \u00edtem de log\u00edstica"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n del \u00edtem"
+    },
+    "category": {
+      "type": "string",
+      "description": "Categor\u00eda (Electricidad, Infraestructura, Conectividad, etc.)"
+    },
+    "unit": {
+      "type": "string",
+      "default": "Unidad",
+      "description": "Unidad de medida (Unidad, m\u00b2, Watts, metros, etc.)"
+    },
+    "requires_quantity": {
+      "type": "boolean",
+      "default": true,
+      "description": "Indica si el \u00edtem requiere especificar cantidad"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Indica si el \u00edtem est\u00e1 activo y disponible para solicitar"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "rls": {
+    "read": {},
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "productora"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "productora"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "productora"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        }
+      ]
+    }
+  }
+}

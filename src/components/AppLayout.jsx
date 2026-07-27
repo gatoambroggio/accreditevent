@@ -25,6 +25,8 @@ import {
   SquareParking,
   Building2,
   Briefcase,
+  Boxes,
+  ClipboardCheck,
   UserSearch,
   ClipboardList,
 } from 'lucide-react';
@@ -50,6 +52,8 @@ const NAV_ITEMS = [
   { path: '/registered-vehicles', label: 'Vehículos registrados', icon: ClipboardList, minLevel: 1 },
   { path: '/vehicles', label: 'Vehículos acreditados', icon: Car, minLevel: 1 },
   { path: '/parking-sectors', label: 'Estacionamiento', icon: SquareParking, minLevel: 1 },
+  { path: '/requirement-items', label: 'Ítems de logística', icon: Boxes, minLevel: 1 },
+  { path: '/provider-requests', label: 'Solicitudes', icon: ClipboardCheck, minLevel: 1 },
   { path: '/companies', label: 'Empresas', icon: Building2, minLevel: 2 },
   { path: '/users', label: 'Usuarios y roles', icon: ShieldCheck, minLevel: 2 },
   { path: '/audit', label: 'Auditoría', icon: ScrollText, minLevel: 2 },

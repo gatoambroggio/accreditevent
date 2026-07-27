@@ -40,6 +40,8 @@ import Companies from '@/pages/Companies';
 import RegisteredPeople from '@/pages/RegisteredPeople';
 import RegisteredVehicles from '@/pages/RegisteredVehicles';
 import ProviderCompanies from '@/pages/ProviderCompanies';
+import RequirementItems from '@/pages/RequirementItems';
+import ProviderRequests from '@/pages/ProviderRequests';
 
 const AUTH_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password', '/provider-register'];
 
@@ -103,6 +105,8 @@ const AuthenticatedApp = () => {
         <Route path="/registered-people" element={<RegisteredPeople />} />
         <Route path="/registered-vehicles" element={<RegisteredVehicles />} />
         <Route path="/provider-companies" element={<ProviderCompanies />} />
+        <Route path="/requirement-items" element={<RequirementItems />} />
+        <Route path="/provider-requests" element={<ProviderRequests />} />
       </Route>
       <Route path="/portal" element={<ProviderPortal />} />
       <Route path="/control-acceso" element={<AccessStation />} />
