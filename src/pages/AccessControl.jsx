@@ -16,6 +16,7 @@ import FaceCapture from '@/components/FaceCapture';
 import { compareDescriptors, MATCH_THRESHOLD } from '@/lib/faceRecognition';
 import { canAccessAnyZone } from '@/lib/accessZones';
 import { useZones } from '@/lib/useZones';
+import { formatTime } from '@/lib/formatDate';
 
 export default function AccessControl({ standalone = false }) {
   const [events, setEvents] = useState([]);
@@ -433,7 +434,7 @@ export default function AccessControl({ standalone = false }) {
                       <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 ring-1 ring-inset ring-emerald-200">OK</span>
                     )}
                     <time className="font-mono text-xs text-slate-400">
-                      {new Date(log.created_date).toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' })}
+                      {formatTime(log.created_date)}
                     </time>
                   </div>
                 </div>

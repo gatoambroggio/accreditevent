@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Loader2, Users, CheckCircle2, XCircle, DoorOpen, FileBarChart, Download, Search } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
+import { formatDateTime, parseServerDate } from '@/lib/formatDate';
 
 const ZONE_LABELS = {
   general: 'General',
@@ -129,7 +130,7 @@ export default function Reports() {
         l.result === 'denied' ? 'Denegado' : 'Concedido',
         l.method === 'biometric' ? 'Facial' : 'Manual',
         l.verified_by || '',
-        l.created_date ? new Date(l.created_date).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }) : '',
+        l.created_date ? parseServerDate(l.created_date).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }) : '',
       ]),
       'accesos'
     );
@@ -313,7 +314,7 @@ export default function Reports() {
                     <td className="px-4 py-3 text-sm text-slate-500">{log.method === 'biometric' ? 'Facial' : 'Manual'}</td>
                     <td className="px-4 py-3 text-sm text-slate-500">{log.verified_by || '—'}</td>
                     <td className="px-4 py-3 text-xs text-slate-400">
-                      {new Date(log.created_date).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', dateStyle: 'short', timeStyle: 'short' })}
+                      {formatDateTime(log.created_date)}
                     </td>
                   </tr>
                 ))}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { CheckCircle2, XCircle, Loader2, Radio, Users, TrendingUp, AlertTriangle } from 'lucide-react';
+import { formatTimeWithSeconds } from '@/lib/formatDate';
 
 const ZONE_LABELS = {
   general: 'General',
@@ -52,11 +53,6 @@ export default function AccessMonitor() {
       denied: data.filter((l) => l.result === 'denied').length,
       total: data.length,
     });
-  };
-
-  const formatTime = (dateStr) => {
-    if (!dateStr) return '';
-    return new Date(dateStr).toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit', second: '2-digit' });
   };
 
   if (loading) {
@@ -163,7 +159,7 @@ export default function AccessMonitor() {
                       {isDenied ? 'Denegado' : 'Concedido'}
                     </span>
                     <div className="text-right">
-                      <p className="font-mono text-sm font-medium text-slate-700">{formatTime(log.created_date)}</p>
+                      <p className="font-mono text-sm font-medium text-slate-700">{formatTimeWithSeconds(log.created_date)}</p>
                       <p className="text-[10px] text-slate-400">{log.method === 'biometric' ? 'Facial' : 'Manual'}</p>
                     </div>
                   </div>
