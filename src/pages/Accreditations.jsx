@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useCrud } from '@/lib/crud';
-import { Plus, Pencil, Loader2, Fingerprint, Printer } from 'lucide-react';
+import { Plus, Pencil, Loader2, Fingerprint, Printer, Search, Download } from 'lucide-react';
+import { exportToExcel } from '@/lib/exportUtils';
 import BiometricButton from '@/components/BiometricButton';
 import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
@@ -25,6 +26,8 @@ export default function Accreditations() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [eventFilter, setEventFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [query, setQuery] = useState('');
   const [badgeAccred, setBadgeAccred] = useState(null);
 
   useEffect(() => {
@@ -41,9 +44,34 @@ export default function Accreditations() {
   }, []);
 
   const filtered = useMemo(() => {
-    if (!eventFilter) return items;
-    return items.filter((a) => a.event_id === eventFilter);
-  }, [items, eventFilter]);
+    let result = items;
+    if (eventFilter) result = result.filter((a) => a.event_id === eventFilter);
+    if (statusFilter) result = result.filter((a) => a.status === statusFilter);
+    const q = query.toLowerCase().trim();
+    if (q) {
+      result = result.filter((a) =>
+        `${a.person_name} ${a.badge_code} ${a.person_type}`.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [items, eventFilter, statusFilter, query]);
+
+  const handleExport = () => {
+    exportToExcel(
+      ['Persona', 'Tipo', 'Evento', 'Código', 'Área', 'Nivel de acceso', 'Estado', 'Biometría'],
+      filtered.map((a) => [
+        a.person_name || '',
+        a.person_type || '',
+        a.event_name || '',
+        a.badge_code || '',
+        a.area || '',
+        a.access_level || '',
+        a.status || '',
+        a.has_biometric ? 'Sí' : 'No',
+      ]),
+      'acreditaciones'
+    );
+  };
 
   const eventOptions = events.map((e) => ({ value: e.id, label: e.name }));
   const personOptions = people.map((p) => ({ value: p.id, label: `${p.full_name} — ${p.document || 'sin doc'} (${p.person_type})` }));
@@ -193,21 +221,45 @@ export default function Accreditations() {
           <p className="font-mono text-[10px] uppercase tracking-wider text-emerald-600">Control de accesos</p>
           <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-slate-900">Acreditaciones</h1>
         </div>
-        <button onClick={openNew}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800">
-          <Plus className="h-4 w-4" /> Nueva acreditación
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={handleExport}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+            <Download className="h-4 w-4" /> Exportar
+          </button>
+          <button onClick={openNew}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800">
+            <Plus className="h-4 w-4" /> Nueva acreditación
+          </button>
+        </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <label className="text-xs font-semibold text-slate-600">Filtrar por evento</label>
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative min-w-[200px] flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar por persona, código o tipo…"
+            className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+          />
+        </div>
         <select
           value={eventFilter}
           onChange={(e) => setEventFilter(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
         >
           <option value="">Todos los eventos</option>
           {events.map((e) => (<option key={e.id} value={e.id}>{e.name}</option>))}
+        </select>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+        >
+          <option value="">Todos los estados</option>
+          <option value="active">Activa</option>
+          <option value="blocked">Bloqueada</option>
+          <option value="revoked">Revocada</option>
         </select>
       </div>
 

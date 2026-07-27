@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Users, CalendarDays, IdCard, DoorOpen, TrendingUp, Download, Loader2 } from 'lucide-react';
+import { Users, CalendarDays, IdCard, DoorOpen, TrendingUp } from 'lucide-react';
 
 function StatCard({ icon: Icon, label, value, sub, color }) {
   return (
@@ -23,7 +23,6 @@ export default function Home() {
   const [stats, setStats] = useState({ people: 0, events: 0, accreditations: 0, accesses: 0 });
   const [recent, setRecent] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -50,53 +49,11 @@ export default function Home() {
     })();
   }, []);
 
-  const handleExport = async () => {
-    setExporting(true);
-    try {
-      const accreds = await base44.entities.Accreditation.list('-created_date', 2000);
-      const headers = ['Persona', 'Tipo', 'Evento', 'Código', 'Área', 'Nivel de acceso', 'Estado', 'Biometría'];
-      const rows = accreds.map((a) => [
-        a.person_name || '',
-        a.person_type || '',
-        a.event_name || '',
-        a.badge_code || '',
-        a.area || '',
-        a.access_level || '',
-        a.status || '',
-        a.has_biometric ? 'Sí' : 'No',
-      ]);
-      const csv = [headers, ...rows]
-        .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-        .join('\n');
-      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `acreditados_${new Date().toISOString().slice(0, 10)}.csv`;
-      link.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      // silent
-    } finally {
-      setExporting(false);
-    }
-  };
-
   return (
     <div className="space-y-7">
-      <div className="flex items-end justify-between">
-        <div>
-          <p className="font-mono text-[10px] uppercase tracking-wider text-emerald-600">Panel administrativo</p>
-          <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-slate-900">Resumen</h1>
-        </div>
-        <button
-          onClick={handleExport}
-          disabled={exporting}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50"
-        >
-          {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-          {exporting ? 'Exportando…' : 'Exportar acreditados'}
-        </button>
+      <div>
+        <p className="font-mono text-[10px] uppercase tracking-wider text-emerald-600">Panel administrativo</p>
+        <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-slate-900">Resumen</h1>
       </div>
 
       {/* Hero */}

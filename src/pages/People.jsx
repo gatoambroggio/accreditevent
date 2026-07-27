@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useCrud } from '@/lib/crud';
-import { Plus, Pencil, Search, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Search, Loader2, Download } from 'lucide-react';
+import { exportToExcel } from '@/lib/exportUtils';
 import { base44 } from '@/api/base44Client';
 import { usePersonTypes } from '@/lib/usePersonTypes';
 import EntityModal from '@/components/EntityModal';
@@ -28,15 +29,39 @@ export default function People() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [query, setQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [detailPerson, setDetailPerson] = useState(null);
 
   const filtered = useMemo(() => {
+    let result = items;
     const q = query.toLowerCase().trim();
-    if (!q) return items;
-    return items.filter((p) =>
-      `${p.full_name} ${p.company || ''} ${p.document || ''}`.toLowerCase().includes(q)
+    if (q) {
+      result = result.filter((p) =>
+        `${p.full_name} ${p.company || ''} ${p.document || ''}`.toLowerCase().includes(q)
+      );
+    }
+    if (typeFilter) result = result.filter((p) => p.person_type === typeFilter);
+    if (statusFilter) result = result.filter((p) => p.status === statusFilter);
+    return result;
+  }, [items, query, typeFilter, statusFilter]);
+
+  const handleExport = () => {
+    exportToExcel(
+      ['Nombre', 'Tipo', 'Documento', 'Empresa', 'Teléfono', 'Email', 'Estado', 'Notas'],
+      filtered.map((p) => [
+        p.full_name || '',
+        personTypes.find((t) => t.value === p.person_type)?.label || p.person_type || '',
+        p.document || '',
+        p.company || '',
+        p.phone || '',
+        p.email || '',
+        p.status || '',
+        p.notes || '',
+      ]),
+      'personas'
     );
-  }, [items, query]);
+  };
 
   const fields = useMemo(() => [
     { name: 'full_name', label: 'Nombre completo', type: 'text', required: true, full: true, placeholder: 'Ej: Juan Pérez' },
@@ -104,20 +129,46 @@ export default function People() {
           <p className="font-mono text-[10px] uppercase tracking-wider text-emerald-600">Directorio</p>
           <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-slate-900">Personas</h1>
         </div>
-        <button onClick={openNew}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800">
-          <Plus className="h-4 w-4" /> Nueva persona
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={handleExport}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+            <Download className="h-4 w-4" /> Exportar
+          </button>
+          <button onClick={openNew}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800">
+            <Plus className="h-4 w-4" /> Nueva persona
+          </button>
+        </div>
       </div>
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar por nombre, empresa o documento…"
-          className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-        />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative min-w-[200px] flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar por nombre, empresa o documento…"
+            className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+          />
+        </div>
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+        >
+          <option value="">Todos los tipos</option>
+          {personTypes.map((t) => (<option key={t.value} value={t.value}>{t.label}</option>))}
+        </select>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+        >
+          <option value="">Todos los estados</option>
+          <option value="active">Activo</option>
+          <option value="inactive">Inactivo</option>
+          <option value="pending">Pendiente</option>
+        </select>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">

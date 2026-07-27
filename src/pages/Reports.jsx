@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Loader2, Users, CheckCircle2, XCircle, DoorOpen, FileBarChart } from 'lucide-react';
+import { Loader2, Users, CheckCircle2, XCircle, DoorOpen, FileBarChart, Download } from 'lucide-react';
+import { exportToExcel } from '@/lib/exportUtils';
 
 const ZONE_LABELS = {
   general: 'General',
@@ -75,6 +76,40 @@ export default function Reports() {
     return Object.values(map).sort((a, b) => (b.granted + b.denied) - (a.granted + a.denied));
   }, [filteredLogs]);
 
+  const handleExportAccreditations = () => {
+    exportToExcel(
+      ['Persona', 'Tipo', 'Evento', 'Código', 'Área', 'Nivel de acceso', 'Estado', 'Biometría'],
+      filteredAccreditations.map((a) => [
+        a.person_name || '',
+        a.person_type || '',
+        a.event_name || '',
+        a.badge_code || '',
+        a.area || '',
+        a.access_level || '',
+        a.status || '',
+        a.has_biometric ? 'Sí' : 'No',
+      ]),
+      'acreditados'
+    );
+  };
+
+  const handleExportLogs = () => {
+    exportToExcel(
+      ['Persona', 'Credencial', 'Evento', 'Zona', 'Resultado', 'Método', 'Usuario', 'Fecha'],
+      filteredLogs.map((l) => [
+        l.person_name || '',
+        l.badge_code || '',
+        l.event_name || '',
+        l.zone || '',
+        l.result === 'denied' ? 'Denegado' : 'Concedido',
+        l.method === 'biometric' ? 'Facial' : 'Manual',
+        l.verified_by || '',
+        l.created_date ? new Date(l.created_date).toLocaleString('es-AR') : '',
+      ]),
+      'accesos'
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center py-16">
@@ -113,6 +148,16 @@ export default function Reports() {
             <option value="granted">Concedidos</option>
             <option value="denied">Denegados</option>
           </select>
+        </div>
+        <div className="ml-auto flex gap-2">
+          <button onClick={handleExportAccreditations}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+            <Download className="h-4 w-4" /> Exportar acreditados
+          </button>
+          <button onClick={handleExportLogs}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+            <Download className="h-4 w-4" /> Exportar accesos
+          </button>
         </div>
       </div>
 

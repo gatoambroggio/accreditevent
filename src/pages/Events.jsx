@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useCrud } from '@/lib/crud';
-import { Plus, Pencil, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Loader2, Search, Download } from 'lucide-react';
+import { exportToExcel } from '@/lib/exportUtils';
 import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
 
@@ -34,6 +35,35 @@ export default function Events() {
   const { items, loading, create, update, remove } = useCrud('Event');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+
+  const filtered = useMemo(() => {
+    let result = items;
+    const q = query.toLowerCase().trim();
+    if (q) {
+      result = result.filter((e) =>
+        `${e.name} ${e.venue || ''}`.toLowerCase().includes(q)
+      );
+    }
+    if (statusFilter) result = result.filter((e) => e.status === statusFilter);
+    return result;
+  }, [items, query, statusFilter]);
+
+  const handleExport = () => {
+    exportToExcel(
+      ['Evento', 'Sede', 'Inicio', 'Fin', 'Estado', 'Retiro'],
+      filtered.map((e) => [
+        e.name || '',
+        e.venue || '',
+        e.start_at ? new Date(e.start_at).toLocaleString('es-AR') : '',
+        e.end_at ? new Date(e.end_at).toLocaleString('es-AR') : '',
+        e.status || '',
+        e.pickup_address || '',
+      ]),
+      'eventos'
+    );
+  };
 
   const openNew = () => { setEditing(null); setModalOpen(true); };
   const openEdit = (item) => { setEditing(item); setModalOpen(true); };
@@ -64,17 +94,45 @@ export default function Events() {
           <p className="font-mono text-[10px] uppercase tracking-wider text-emerald-600">Gestión</p>
           <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-slate-900">Eventos</h1>
         </div>
-        <button onClick={openNew}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800">
-          <Plus className="h-4 w-4" /> Nuevo evento
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={handleExport}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+            <Download className="h-4 w-4" /> Exportar
+          </button>
+          <button onClick={openNew}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800">
+            <Plus className="h-4 w-4" /> Nuevo evento
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative min-w-[200px] flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar por nombre o sede…"
+            className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+        >
+          <option value="">Todos los estados</option>
+          <option value="draft">Borrador</option>
+          <option value="active">Activo</option>
+          <option value="closed">Cerrado</option>
+        </select>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         {loading ? (
           <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-emerald-600" /></div>
-        ) : items.length === 0 ? (
-          <p className="py-16 text-center text-sm text-slate-400">No hay eventos registrados. Creá el primero.</p>
+        ) : filtered.length === 0 ? (
+          <p className="py-16 text-center text-sm text-slate-400">{query || statusFilter ? 'Sin resultados para tu búsqueda.' : 'No hay eventos registrados. Creá el primero.'}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-left">
@@ -88,7 +146,7 @@ export default function Events() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((e) => (
+                {filtered.map((e) => (
                   <tr key={e.id} className="border-b border-slate-50 transition hover:bg-slate-50/50">
                     <td className="px-4 py-3.5 text-sm font-semibold text-slate-900">{e.name}</td>
                     <td className="px-4 py-3.5 text-sm text-slate-500">{e.venue || '—'}</td>
