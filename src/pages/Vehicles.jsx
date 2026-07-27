@@ -109,8 +109,8 @@ export default function Vehicles() {
   const fields = useMemo(() => [
     {
       name: 'person_id', label: 'Persona', type: 'searchable-select', required: true,
-      options: people.map((p) => ({ value: p.id, label: `${p.full_name} · ${p.company || 'Sin empresa'}` })),
-      placeholder: 'Buscar persona por nombre…',
+      options: people.map((p) => ({ value: p.id, label: `${p.full_name} · DNI ${p.document || '—'} · ${p.company || 'Sin empresa'}` })),
+      placeholder: 'Buscar por nombre, DNI o empresa…',
     },
     { name: 'brand', label: 'Marca', type: 'text', required: true, placeholder: 'Ej: Ford' },
     { name: 'model', label: 'Modelo', type: 'text', required: true, placeholder: 'Ej: Fiesta' },
