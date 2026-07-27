@@ -37,7 +37,9 @@ export default function PersonDetailModal({ person, onClose }) {
 
   const loadDocs = async (personId) => {
     const docData = await base44.entities.Document.filter({ person_id: personId }, '-created_date', 100);
-    setDocs(docData.filter((d) => !isExpired(d)));
+    const active = docData.filter((d) => !isExpired(d));
+    const expired = docData.filter((d) => isExpired(d)).slice(0, 3);
+    setDocs([...active, ...expired]);
   };
 
   const loadVehicles = async (personId) => {
@@ -55,7 +57,9 @@ export default function PersonDetailModal({ person, onClose }) {
           base44.entities.Vehicle.filter({ person_id: person.id }, '-created_date', 50),
           base44.entities.Event.list('-start_at', 200),
         ]);
-        setDocs(docData.filter((d) => !isExpired(d)));
+        const active = docData.filter((d) => !isExpired(d));
+        const expired = docData.filter((d) => isExpired(d)).slice(0, 3);
+        setDocs([...active, ...expired]);
         setBio(bioData[0] || null);
         setVehicles(vehData);
         setEvents(evs);
@@ -216,6 +220,11 @@ export default function PersonDetailModal({ person, onClose }) {
                   <div>
                     <p className="text-sm font-semibold text-slate-900">{docTypes.find((t) => t.value === doc.document_type)?.label || doc.document_type}</p>
                     <p className="text-xs text-slate-400">{doc.original_name}</p>
+                    {doc.expires_at && (
+                      <p className={`mt-0.5 text-xs ${isExpired(doc) ? 'text-red-600' : 'text-slate-500'}`}>
+                        Vence: {new Date(doc.expires_at + 'T00:00:00').toLocaleDateString('es-AR')}
+                      </p>
+                    )}
                     {doc.review_note && <p className="mt-0.5 text-xs text-slate-500">Nota: {doc.review_note}</p>}
                   </div>
                 </div>
