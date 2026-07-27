@@ -6,6 +6,7 @@ import StatusBadge from '@/components/StatusBadge';
 import PersonBiometricCard from '@/components/PersonBiometricCard';
 import DocumentViewer from '@/components/DocumentViewer';
 import ProviderRequirementsSection from '@/components/ProviderRequirementsSection';
+import { DEFAULT_ROLE_ACCESS } from '@/lib/modules';
 
 const DOC_TYPES = {
   dni: 'Documento de identidad',
@@ -29,6 +30,7 @@ export default function ProviderPortal() {
   const [currentUser, setCurrentUser] = useState(null);
   const [creatingProfile, setCreatingProfile] = useState(false);
   const [profileError, setProfileError] = useState('');
+  const [logisticsEnabled, setLogisticsEnabled] = useState(true);
 
   const load = useCallback(async () => {
     try {
@@ -46,6 +48,12 @@ export default function ProviderPortal() {
       setAccreditations(accreds);
       setDocuments(docs);
       setVehicles(vehs);
+      try {
+        const settings = await base44.entities.SystemSetting.list('-created_date', 1);
+        const ra = settings[0]?.role_access;
+        const hasAccess = (ra?.['/provider-requests'] ?? DEFAULT_ROLE_ACCESS['/provider-requests'])?.includes('provider');
+        setLogisticsEnabled(!!hasAccess);
+      } catch {}
     } catch {
       // silent
     } finally {
@@ -413,12 +421,14 @@ export default function ProviderPortal() {
         </div>
 
         {/* Requirements */}
-        <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h3 className="mb-4 flex items-center gap-2 text-base font-bold text-slate-900">
-            <Package className="h-4 w-4 text-emerald-600" /> Requerimientos de logística
-          </h3>
-          <ProviderRequirementsSection user={currentUser} person={person} accreditations={accreditations} />
-        </div>
+        {logisticsEnabled && (
+          <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="mb-4 flex items-center gap-2 text-base font-bold text-slate-900">
+              <Package className="h-4 w-4 text-emerald-600" /> Requerimientos de logística
+            </h3>
+            <ProviderRequirementsSection user={currentUser} person={person} accreditations={accreditations} />
+          </div>
+        )}
 
         {/* Documents */}
         <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">

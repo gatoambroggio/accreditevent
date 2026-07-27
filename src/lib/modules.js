@@ -24,7 +24,7 @@ export const MODULES = [
   { path: '/settings', label: 'Configuración' },
 ];
 
-export const ROLES = ['control', 'coordinator', 'productora', 'admin', 'superadmin'];
+export const ROLES = ['provider', 'control', 'coordinator', 'productora', 'admin', 'superadmin'];
 
 export const DEFAULT_ROLE_ACCESS = {
   '/': ['control', 'coordinator', 'productora', 'admin', 'superadmin'],
@@ -44,8 +44,8 @@ export const DEFAULT_ROLE_ACCESS = {
   '/registered-vehicles': ['coordinator', 'productora', 'admin', 'superadmin'],
   '/vehicles': ['coordinator', 'productora', 'admin', 'superadmin'],
   '/parking-sectors': ['coordinator', 'productora', 'admin', 'superadmin'],
-  '/requirement-items': ['coordinator', 'productora', 'admin', 'superadmin'],
-  '/provider-requests': ['coordinator', 'productora', 'admin', 'superadmin'],
+  '/requirement-items': ['provider', 'coordinator', 'productora', 'admin', 'superadmin'],
+  '/provider-requests': ['provider', 'coordinator', 'productora', 'admin', 'superadmin'],
   '/companies': ['admin', 'superadmin'],
   '/users': ['admin', 'superadmin'],
   '/audit': ['admin', 'superadmin'],
