@@ -159,13 +159,14 @@ export default function ProviderRequests() {
 
 function RequestDetailModal({ request, onClose, onStatusChange }) {
   const [adminNotes, setAdminNotes] = useState(request.admin_notes || '');
+  const [status, setStatus] = useState(request.status || 'pending');
   const [saving, setSaving] = useState(false);
 
   const handleSaveNotes = async () => {
     setSaving(true);
     try {
-      await onStatusChange(request.id, request.status);
-      await base44.entities.ProviderRequest.update(request.id, { admin_notes: adminNotes });
+      await base44.entities.ProviderRequest.update(request.id, { admin_notes: adminNotes, status });
+      onStatusChange(request.id, status);
       onClose();
     } catch {}
     setSaving(false);
@@ -235,8 +236,8 @@ function RequestDetailModal({ request, onClose, onStatusChange }) {
 
         <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
           <select
-            value={request.status}
-            onChange={(e) => onStatusChange(request.id, e.target.value)}
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
             className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium outline-none focus:border-emerald-500"
           >
             <option value="pending">Pendiente</option>
