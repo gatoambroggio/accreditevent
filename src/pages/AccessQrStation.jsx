@@ -29,7 +29,14 @@ const STATUS_INFO = {
 
 export default function AccessQrStation() {
   const [phase, setPhase] = useState('select');
-  const [mode, setMode] = useState('person');
+  const [mode, setMode] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('mode') === 'vehicle' ? 'vehicle' : 'person';
+    } catch {
+      return 'person';
+    }
+  });
   const [events, setEvents] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState('');
   const [selectedZones, setSelectedZones] = useState(['general']);
@@ -282,14 +289,11 @@ export default function AccessQrStation() {
                 ← Cambiar evento
               </button>
             )}
-            <Link to="/control-acceso" className="text-sm font-medium text-slate-500 hover:text-slate-900">
-              Control facial
-            </Link>
-            <Link to="/control-manual" className="text-sm font-medium text-slate-500 hover:text-slate-900">
-              Validación manual
+            <Link to="/access-control" className="text-sm font-medium text-slate-500 hover:text-slate-900">
+              ← Control de acceso
             </Link>
             <Link to="/" className="text-sm font-medium text-slate-500 hover:text-slate-900">
-              ← Panel
+              Panel
             </Link>
           </div>
         </div>

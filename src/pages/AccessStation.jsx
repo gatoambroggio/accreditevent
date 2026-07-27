@@ -248,14 +248,11 @@ export default function AccessStation() {
                 ← Cambiar evento
               </button>
             )}
-            <Link to="/control-qr" className="text-sm font-medium text-slate-500 hover:text-slate-900">
-              Control QR
-            </Link>
-            <Link to="/control-manual" className="text-sm font-medium text-slate-500 hover:text-slate-900">
-              Validación manual
+            <Link to="/access-control" className="text-sm font-medium text-slate-500 hover:text-slate-900">
+              ← Control de acceso
             </Link>
             <Link to="/" className="text-sm font-medium text-slate-500 hover:text-slate-900">
-              ← Panel
+              Panel
             </Link>
           </div>
         </div>

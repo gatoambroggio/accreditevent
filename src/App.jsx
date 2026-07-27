@@ -23,6 +23,7 @@ import Users from '@/pages/Users';
 import Audit from '@/pages/Audit';
 import ProviderPortal from '@/pages/ProviderPortal';
 import AccessControl from '@/pages/AccessControl';
+import AccessHub from '@/pages/AccessHub';
 import AccessMonitor from '@/pages/AccessMonitor';
 import AccessStation from '@/pages/AccessStation';
 import AccessQrStation from '@/pages/AccessQrStation';
@@ -90,7 +91,7 @@ const AuthenticatedApp = () => {
         <Route path="/accreditation-facial" element={<AccreditationFacial />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/settings" element={<Settings />} />
-        <Route path="/access-control" element={<AccessControl />} />
+        <Route path="/access-control" element={<AccessHub />} />
         <Route path="/access-monitor" element={<AccessMonitor />} />
         <Route path="/zkteco-devices" element={<ZKTecoDevices />} />
         <Route path="/vehicles" element={<Vehicles />} />

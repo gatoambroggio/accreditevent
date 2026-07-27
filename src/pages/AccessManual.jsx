@@ -12,11 +12,11 @@ export default function AccessManual() {
             <span className="text-lg font-extrabold tracking-tight text-slate-900">Validación manual</span>
           </div>
           <div className="flex items-center gap-4">
-            <Link to="/control-acceso" className="text-sm font-medium text-slate-500 hover:text-slate-900">
-              Identificación facial
+            <Link to="/access-control" className="text-sm font-medium text-slate-500 hover:text-slate-900">
+              ← Control de acceso
             </Link>
             <Link to="/" className="text-sm font-medium text-slate-500 hover:text-slate-900">
-              ← Panel
+              Panel
             </Link>
           </div>
         </div>
