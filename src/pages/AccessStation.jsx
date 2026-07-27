@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { Loader2, CheckCircle2, XCircle, Calendar, Clock, AlertTriangle } from 'lucide-react';
 import FaceCapture from '@/components/FaceCapture';
 import { findBestMatch } from '@/lib/faceRecognition';
+import { ZONES, canAccessZone } from '@/lib/accessZones';
 
 function getEventStatus(event) {
   const now = Date.now();
@@ -29,6 +30,7 @@ export default function AccessStation() {
   const [phase, setPhase] = useState('select');
   const [events, setEvents] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState('');
+  const [selectedZone, setSelectedZone] = useState('general');
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [cycle, setCycle] = useState(0);
@@ -57,6 +59,7 @@ export default function AccessStation() {
     setPhase('select');
     setSelectedEvent(null);
     setSelectedEventId('');
+    setSelectedZone('general');
     setResult(null);
     setVerifying(false);
   };
@@ -119,8 +122,28 @@ export default function AccessStation() {
         return;
       }
 
-      // Log the access
       const me = await base44.auth.me();
+
+      if (!canAccessZone(accred.access_level, selectedZone)) {
+        await base44.entities.AccessLog.create({
+          accreditation_id: accred.id,
+          person_name: accred.person_name,
+          badge_code: accred.badge_code,
+          event_name: accred.event_name,
+          verified_by: me?.full_name || me?.email || 'Sistema',
+          method: 'biometric',
+          zone: selectedZone,
+          result: 'denied',
+          access_level: accred.access_level,
+        });
+        setResult({
+          ok: false,
+          person_name: accred.person_name,
+          message: `Acceso restringido. Esta zona requiere nivel ${selectedZone}.`,
+        });
+        return;
+      }
+
       await base44.entities.AccessLog.create({
         accreditation_id: accred.id,
         person_name: accred.person_name,
@@ -128,6 +151,9 @@ export default function AccessStation() {
         event_name: accred.event_name,
         verified_by: me?.full_name || me?.email || 'Sistema',
         method: 'biometric',
+        zone: selectedZone,
+        result: 'granted',
+        access_level: accred.access_level,
       });
 
       setResult({ ok: true, person_name: accred.person_name, accred });
@@ -228,10 +254,24 @@ export default function AccessStation() {
                     );
                   })}
                 </div>
+                <div className="mt-5">
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-600">Zona de control</label>
+                  <div className="flex flex-wrap gap-2">
+                    {ZONES.map((z) => (
+                      <button
+                        key={z.value}
+                        onClick={() => setSelectedZone(z.value)}
+                        className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${selectedZone === z.value ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                      >
+                        {z.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <button
                   onClick={startStation}
                   disabled={!selectedEventId}
-                  className="mt-6 w-full rounded-lg bg-emerald-700 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50"
+                  className="mt-5 w-full rounded-lg bg-emerald-700 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50"
                 >
                   Iniciar estación de control
                 </button>
@@ -249,7 +289,7 @@ export default function AccessStation() {
             <div className="mx-auto flex max-w-7xl items-center justify-between">
               <div>
                 <p className="text-sm font-bold text-slate-900">{selectedEvent.name}</p>
-                <p className="text-xs text-slate-500">{selectedEvent.venue || 'Sin sede'}</p>
+                <p className="text-xs text-slate-500">{selectedEvent.venue || 'Sin sede'} · Zona: {ZONES.find((z) => z.value === selectedZone)?.label}</p>
               </div>
               {eventStatus === 'ended' ? (
                 <div className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-inset ring-red-200">

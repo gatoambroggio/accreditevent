@@ -30,6 +30,29 @@
       ],
       "default": "biometric",
       "description": "M\u00e9todo de verificaci\u00f3n"
+    },
+    "zone": {
+      "type": "string",
+      "enum": [
+        "general",
+        "backstage",
+        "technical",
+        "vip"
+      ],
+      "description": "Zona de control de acceso"
+    },
+    "result": {
+      "type": "string",
+      "enum": [
+        "granted",
+        "denied"
+      ],
+      "default": "granted",
+      "description": "Resultado del intento de acceso"
+    },
+    "access_level": {
+      "type": "string",
+      "description": "Nivel de acceso de la persona"
     }
   },
   "required": [

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Loader2, CheckCircle2, XCircle, Calendar, AlertCircle, RefreshCw } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Calendar, AlertCircle, RefreshCw, Printer } from 'lucide-react';
 import FaceCapture from '@/components/FaceCapture';
+import BadgePrint from '@/components/BadgePrint';
 import { findBestMatch } from '@/lib/faceRecognition';
 
 const TYPE_PREFIXES = {
@@ -36,6 +37,7 @@ export default function AccreditationFacial() {
   const [cycle, setCycle] = useState(0);
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState(null);
+  const [printAccred, setPrintAccred] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -121,7 +123,7 @@ export default function AccreditationFacial() {
       const allAccreditations = await base44.entities.Accreditation.list('-created_date', 500);
       const badgeCode = generateBadgeCode(personType, allAccreditations.map((a) => a.badge_code));
 
-      await base44.entities.Accreditation.create({
+      const newAccred = await base44.entities.Accreditation.create({
         event_id: selectedEvent.id,
         event_name: selectedEvent.name,
         person_id: personId,
@@ -137,6 +139,7 @@ export default function AccreditationFacial() {
         ok: true,
         person_name: personName,
         badge_code: badgeCode,
+        accred: newAccred,
       });
     } catch (err) {
       setResult({ ok: false, message: err.message || 'Error en el proceso.' });
@@ -232,6 +235,12 @@ export default function AccreditationFacial() {
                     <div className="mt-3 rounded-lg bg-slate-100 px-4 py-2">
                       <code className="text-lg font-bold text-slate-900">{result.badge_code}</code>
                     </div>
+                    <button
+                      onClick={() => setPrintAccred(result.accred)}
+                      className="mt-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                    >
+                      <Printer className="h-4 w-4" /> Imprimir credencial
+                    </button>
                   </>
                 ) : result.alreadyAccredited ? (
                   <>
@@ -272,6 +281,14 @@ export default function AccreditationFacial() {
             )}
           </div>
         </div>
+      )}
+
+      {printAccred && (
+        <BadgePrint
+          accreditation={printAccred}
+          event={selectedEvent}
+          onClose={() => setPrintAccred(null)}
+        />
       )}
     </div>
   );
