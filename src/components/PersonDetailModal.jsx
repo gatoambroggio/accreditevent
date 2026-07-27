@@ -3,16 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { X, Loader2, FileText, ExternalLink, User, UploadCloud } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
 import { Image } from '@/components/ui/image';
-
-const DOC_LABELS = {
-  dni: 'DNI',
-  work_insurance: 'Seguro de trabajo',
-  tax_certificate: 'Certificado fiscal',
-  contract: 'Contrato',
-  other: 'Otro',
-};
-
-const DOC_OPTIONS = Object.entries(DOC_LABELS).map(([value, label]) => ({ value, label }));
+import { useDocumentTypes } from '@/lib/useDocumentTypes';
 
 export default function PersonDetailModal({ person, onClose }) {
   const [docs, setDocs] = useState([]);
@@ -21,6 +12,7 @@ export default function PersonDetailModal({ person, onClose }) {
   const [uploading, setUploading] = useState(false);
   const [docType, setDocType] = useState('dni');
   const [selectedFile, setSelectedFile] = useState(null);
+  const { docTypes } = useDocumentTypes();
 
   const loadDocs = async (personId) => {
     const docData = await base44.entities.Document.filter({ person_id: personId }, '-created_date', 100);
@@ -121,7 +113,7 @@ export default function PersonDetailModal({ person, onClose }) {
                     <FileText className="h-4 w-4" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">{DOC_LABELS[doc.document_type] || doc.document_type}</p>
+                    <p className="text-sm font-semibold text-slate-900">{docTypes.find((t) => t.value === doc.document_type)?.label || doc.document_type}</p>
                     <p className="text-xs text-slate-400">{doc.original_name}</p>
                     {doc.review_note && <p className="mt-0.5 text-xs text-slate-500">Nota: {doc.review_note}</p>}
                   </div>
@@ -149,7 +141,7 @@ export default function PersonDetailModal({ person, onClose }) {
                   onChange={(e) => setDocType(e.target.value)}
                   className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                 >
-                  {DOC_OPTIONS.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
+                  {docTypes.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
                 </select>
                 <label className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50">
                   <UploadCloud className="h-4 w-4" />

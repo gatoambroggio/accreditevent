@@ -12,14 +12,7 @@
     },
     "document_type": {
       "type": "string",
-      "enum": [
-        "dni",
-        "work_insurance",
-        "tax_certificate",
-        "contract",
-        "other"
-      ],
-      "description": "Tipo de documento"
+      "description": "Tipo de documento (coincide con el value de DocumentType)"
     },
     "original_name": {
       "type": "string",
