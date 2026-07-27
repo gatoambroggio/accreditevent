@@ -14,13 +14,13 @@ import {
 } from 'lucide-react';
 import FaceCapture from '@/components/FaceCapture';
 import { compareDescriptors, MATCH_THRESHOLD } from '@/lib/faceRecognition';
-import { canAccessZone } from '@/lib/accessZones';
+import { canAccessAnyZone } from '@/lib/accessZones';
 import { useZones } from '@/lib/useZones';
 
 export default function AccessControl({ standalone = false }) {
   const [events, setEvents] = useState([]);
   const [eventFilter, setEventFilter] = useState('');
-  const [selectedZone, setSelectedZone] = useState('general');
+  const [selectedZones, setSelectedZones] = useState(['general']);
   const [badgeCode, setBadgeCode] = useState('');
   const [found, setFound] = useState(null);
   const [searching, setSearching] = useState(false);
@@ -128,7 +128,8 @@ export default function AccessControl({ standalone = false }) {
 
       if (isMatch) {
         const me = await base44.auth.me();
-        if (!canAccessZone(found.access_level, selectedZone)) {
+        const zoneLabel = selectedZones.map((z) => zones.find((zz) => zz.value === z)?.label || z).join(', ');
+        if (!canAccessAnyZone(found.access_level, selectedZones)) {
           await base44.entities.AccessLog.create({
             accreditation_id: found.id,
             person_name: found.person_name,
@@ -136,11 +137,11 @@ export default function AccessControl({ standalone = false }) {
             event_name: found.event_name,
             verified_by: me?.full_name || me?.email || 'Sistema',
             method: 'biometric',
-            zone: selectedZone,
+            zone: selectedZones.join(', '),
             result: 'denied',
             access_level: found.access_level,
           });
-          setResult({ ok: false, message: `Acceso restringido. Esta zona requiere nivel ${selectedZone}.`, accred: found });
+          setResult({ ok: false, message: `Acceso restringido para la zona: ${zoneLabel}.`, accred: found });
           setFound(null);
           setBadgeCode('');
           await loadRecent();
@@ -153,7 +154,7 @@ export default function AccessControl({ standalone = false }) {
           event_name: found.event_name,
           verified_by: me?.full_name || me?.email || 'Sistema',
           method: 'biometric',
-          zone: selectedZone,
+          zone: selectedZones.join(', '),
           result: 'granted',
           access_level: found.access_level,
         });
@@ -183,7 +184,8 @@ export default function AccessControl({ standalone = false }) {
     setResult(null);
     try {
       const me = await base44.auth.me();
-      if (!canAccessZone(found.access_level, selectedZone)) {
+      const zoneLabel = selectedZones.map((z) => zones.find((zz) => zz.value === z)?.label || z).join(', ');
+      if (!canAccessAnyZone(found.access_level, selectedZones)) {
         await base44.entities.AccessLog.create({
           accreditation_id: found.id,
           person_name: found.person_name,
@@ -191,11 +193,11 @@ export default function AccessControl({ standalone = false }) {
           event_name: found.event_name,
           verified_by: me?.full_name || me?.email || 'Sistema',
           method: 'manual',
-          zone: selectedZone,
+          zone: selectedZones.join(', '),
           result: 'denied',
           access_level: found.access_level,
         });
-        setResult({ ok: false, message: `Acceso restringido. Esta zona requiere nivel ${selectedZone}.`, accred: found });
+        setResult({ ok: false, message: `Acceso restringido para la zona: ${zoneLabel}.`, accred: found });
         setFound(null);
         setBadgeCode('');
         await loadRecent();
@@ -208,7 +210,7 @@ export default function AccessControl({ standalone = false }) {
         event_name: found.event_name,
         verified_by: me?.full_name || me?.email || 'Sistema',
         method: 'manual',
-        zone: selectedZone,
+        zone: selectedZones.join(', '),
         result: 'granted',
         access_level: found.access_level,
       });
@@ -257,14 +259,23 @@ export default function AccessControl({ standalone = false }) {
 
             {/* Zone selector */}
             <div className="mb-5">
-              <label className="mb-1.5 block text-xs font-semibold text-slate-600">Zona de control</label>
-              <select
-                value={selectedZone}
-                onChange={(e) => setSelectedZone(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-              >
-                {zones.map((z) => (<option key={z.value} value={z.value}>{z.label}</option>))}
-              </select>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-600">Zona(s) de control</label>
+              <p className="mb-2 text-xs text-slate-400">Seleccioná una o varias. Se permite el ingreso si la persona tiene acceso a alguna de las seleccionadas.</p>
+              <div className="flex flex-wrap gap-2">
+                {zones.map((z) => {
+                  const active = selectedZones.includes(z.value);
+                  return (
+                    <button
+                      key={z.value}
+                      type="button"
+                      onClick={() => setSelectedZones((prev) => active ? prev.filter((v) => v !== z.value) : [...prev, z.value])}
+                      className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                    >
+                      {z.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Badge search */}
