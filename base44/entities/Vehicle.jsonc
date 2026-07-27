@@ -74,6 +74,11 @@
           }
         },
         {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
           "data.event_ids": {
             "$in": "{{user.data.assigned_event_ids}}"
           }
@@ -98,6 +103,11 @@
         {
           "user_condition": {
             "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
           }
         },
         {
@@ -130,6 +140,11 @@
           }
         },
         {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
           "data.event_ids": {
             "$in": "{{user.data.assigned_event_ids}}"
           }
@@ -154,6 +169,11 @@
         {
           "user_condition": {
             "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
           }
         },
         {
