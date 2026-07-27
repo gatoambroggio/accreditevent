@@ -18,6 +18,14 @@ export default async function(req) {
     );
 
     const now = new Date();
+    // No documents at all = blocked
+    if (docs.length === 0) {
+      return Response.json({
+        has_pending: true,
+        pending_count: 0,
+        pending_statuses: ['no_documents'],
+      });
+    }
     const pending = docs.filter((d) => {
       // Non-approved documents block accreditation
       if (d.status !== 'approved') return true;
