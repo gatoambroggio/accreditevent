@@ -137,13 +137,12 @@ export default function ProviderRegister() {
       }
 
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      await base44.entities.Biometric.create({
+      await base44.functions.invoke('saveProviderBiometric', {
         person_id: personId,
         person_name: form.full_name,
         event_id: form.event_id,
         face_photo_url: file_url,
         face_descriptor: descriptor,
-        status: 'active',
       });
       toast({ title: '¡Rostro registrado!', description: 'Ya podés ingresar al portal.' });
       window.location.href = '/portal';
