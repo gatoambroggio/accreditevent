@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { Loader2, CheckCircle2, XCircle, Calendar, Clock, AlertTriangle } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Calendar, Clock, AlertTriangle, Car, User } from 'lucide-react';
 import QrScanner from '@/components/QrScanner';
 import { canAccessAnyZone } from '@/lib/accessZones';
 import { useZones } from '@/lib/useZones';
@@ -86,6 +86,7 @@ export default function AccessQrStation() {
       const verifier = me?.full_name || me?.email || 'Sistema';
       const zoneLabel = selectedZones.map((z) => zones.find((zz) => zz.value === z)?.label || z).join(', ');
 
+      // 1) Try matching an accreditation (person) by badge_code
       const accreditations = await base44.entities.Accreditation.filter(
         { status: 'active', event_id: selectedEvent.id },
         '-created_date',
@@ -93,24 +94,29 @@ export default function AccessQrStation() {
       );
       const accred = accreditations.find((a) => a.badge_code === code);
 
-      if (!accred) {
-        await base44.entities.AccessLog.create({
-          accreditation_id: 'unknown',
-          person_name: 'Desconocido',
-          badge_code: code,
-          event_name: selectedEvent.name,
-          event_id: selectedEvent.id,
-          verified_by: verifier,
-          method: 'manual',
-          zone: selectedZones.join(', '),
-          result: 'denied',
-          access_level: '',
-        });
-        setResult({ ok: false, message: 'Credencial no válida para este evento.' });
-        return;
-      }
+      if (accred) {
+        if (!canAccessAnyZone(accred.access_level, selectedZones)) {
+          await base44.entities.AccessLog.create({
+            accreditation_id: accred.id,
+            person_name: accred.person_name,
+            badge_code: accred.badge_code,
+            event_name: accred.event_name,
+            event_id: accred.event_id,
+            verified_by: verifier,
+            method: 'manual',
+            zone: selectedZones.join(', '),
+            result: 'denied',
+            access_level: accred.access_level,
+          });
+          setResult({
+            ok: false,
+            person_name: accred.person_name,
+            type: 'person',
+            message: `Acceso restringido para la zona: ${zoneLabel}.`,
+          });
+          return;
+        }
 
-      if (!canAccessAnyZone(accred.access_level, selectedZones)) {
         await base44.entities.AccessLog.create({
           accreditation_id: accred.id,
           person_name: accred.person_name,
@@ -120,31 +126,76 @@ export default function AccessQrStation() {
           verified_by: verifier,
           method: 'manual',
           zone: selectedZones.join(', '),
-          result: 'denied',
+          result: 'granted',
           access_level: accred.access_level,
         });
-        setResult({
-          ok: false,
-          person_name: accred.person_name,
-          message: `Acceso restringido para la zona: ${zoneLabel}.`,
-        });
+
+        setResult({ ok: true, person_name: accred.person_name, type: 'person', accred });
         return;
       }
 
+      // 2) Try matching a vehicle by ID
+      try {
+        const vehicle = await base44.entities.Vehicle.get(code);
+
+        if (vehicle) {
+          const isAssigned = vehicle.event_ids?.includes(selectedEvent.id);
+
+          if (!isAssigned) {
+            await base44.entities.AccessLog.create({
+              accreditation_id: vehicle.id,
+              person_name: vehicle.person_name || '—',
+              badge_code: vehicle.plate || code,
+              event_name: selectedEvent.name,
+              event_id: selectedEvent.id,
+              verified_by: verifier,
+              method: 'manual',
+              zone: selectedZones.join(', '),
+              result: 'denied',
+              access_level: '',
+            });
+            setResult({
+              ok: false,
+              person_name: vehicle.person_name,
+              type: 'vehicle',
+              vehicle,
+              message: 'Vehículo no asignado a este evento.',
+            });
+            return;
+          }
+
+          await base44.entities.AccessLog.create({
+            accreditation_id: vehicle.id,
+            person_name: vehicle.person_name || '—',
+            badge_code: vehicle.plate || code,
+            event_name: selectedEvent.name,
+            event_id: selectedEvent.id,
+            verified_by: verifier,
+            method: 'manual',
+            zone: selectedZones.join(', '),
+            result: 'granted',
+            access_level: '',
+          });
+
+          setResult({ ok: true, person_name: vehicle.person_name, type: 'vehicle', vehicle });
+          return;
+        }
+      } catch {}
+
+      // 3) Neither accreditation nor vehicle found
       await base44.entities.AccessLog.create({
-        accreditation_id: accred.id,
-        person_name: accred.person_name,
-        badge_code: accred.badge_code,
-        event_name: accred.event_name,
-        event_id: accred.event_id,
+        accreditation_id: 'unknown',
+        person_name: 'Desconocido',
+        badge_code: code,
+        event_name: selectedEvent.name,
+        event_id: selectedEvent.id,
         verified_by: verifier,
         method: 'manual',
         zone: selectedZones.join(', '),
-        result: 'granted',
-        access_level: accred.access_level,
+        result: 'denied',
+        access_level: '',
       });
-
-      setResult({ ok: true, person_name: accred.person_name, accred });
+      setResult({ ok: false, message: 'Credencial no válida para este evento.' });
     } catch (err) {
       setResult({ ok: false, message: err.message || 'Error en la verificación.' });
     } finally {
@@ -311,7 +362,7 @@ export default function AccessQrStation() {
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="mb-1 text-xl font-bold text-slate-900">Lectura de credencial QR</h2>
               <p className="mb-5 text-sm text-slate-500">
-                Enfocá el código QR impreso en la credencial para validar el ingreso.
+                Enfocá el código QR para validar el ingreso de personas o vehículos.
               </p>
 
               {(eventStatus === 'upcoming' || eventStatus === 'ended') ? (
@@ -356,8 +407,19 @@ export default function AccessQrStation() {
           <p className="mt-6 text-5xl font-extrabold tracking-tight text-white sm:text-6xl">
             {result.ok ? 'ACEPTADO' : 'DENEGADO'}
           </p>
+          {result.type && (
+            <div className="mt-4 flex items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-sm font-semibold text-white">
+              {result.type === 'vehicle' ? <Car className="h-4 w-4" /> : <User className="h-4 w-4" />}
+              {result.type === 'vehicle' ? 'Vehículo' : 'Persona'}
+            </div>
+          )}
+          {result.vehicle && (
+            <p className="mt-2 text-xl font-bold text-white">
+              {result.vehicle.plate} · {result.vehicle.brand} {result.vehicle.model}
+            </p>
+          )}
           {result.person_name && (
-            <p className="mt-3 text-lg text-white/80">{result.person_name}</p>
+            <p className="mt-2 text-lg text-white/80">{result.person_name}</p>
           )}
           {!result.ok && result.message && (
             <p className="mt-1 max-w-md px-6 text-center text-sm text-white/70">{result.message}</p>
