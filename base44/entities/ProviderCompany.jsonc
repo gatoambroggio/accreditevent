@@ -1,0 +1,105 @@
+{
+  "name": "ProviderCompany",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre de la empresa proveedora"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n o rubro de la empresa"
+    },
+    "logo_url": {
+      "type": "string",
+      "description": "Logo de la empresa"
+    },
+    "contact_phone": {
+      "type": "string",
+      "description": "Tel\u00e9fono de contacto de la empresa"
+    },
+    "contact_email": {
+      "type": "string",
+      "format": "email",
+      "description": "Email de contacto de la empresa"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "rls": {
+    "read": {},
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "productora"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "productora"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "productora"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        }
+      ]
+    }
+  }
+}

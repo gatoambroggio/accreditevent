@@ -24,6 +24,7 @@ import {
   Car,
   SquareParking,
   Building2,
+  Briefcase,
   UserSearch,
   ClipboardList,
 } from 'lucide-react';
@@ -35,6 +36,7 @@ const NAV_ITEMS = [
   { path: '/', label: 'Resumen', icon: LayoutDashboard, minLevel: 0 },
   { path: '/events', label: 'Eventos', icon: CalendarDays, minLevel: 1 },
   { path: '/people', label: 'Personas', icon: Users, minLevel: 1 },
+  { path: '/provider-companies', label: 'Empresas proveedoras', icon: Briefcase, minLevel: 1 },
   { path: '/accreditations', label: 'Acreditaciones', icon: IdCard, minLevel: 0 },
   { path: '/access-levels', label: 'Niveles de acceso', icon: Layers, minLevel: 1 },
   { path: '/accreditation-facial', label: 'Acreditación facial', icon: ScanFace, minLevel: 1 },

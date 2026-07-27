@@ -52,7 +52,7 @@ export default function People() {
       try {
         const [evs, comps] = await Promise.all([
           base44.entities.Event.list('-start_at', 200),
-          base44.entities.Company.list('name', 500),
+          base44.entities.ProviderCompany.list('name', 500),
         ]);
         setEvents(evs);
         setCompanies(comps);
