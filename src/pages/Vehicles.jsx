@@ -36,20 +36,29 @@ export default function Vehicles() {
   const [peopleLoaded, setPeopleLoaded] = useState(false);
   const [showPersonSearch, setShowPersonSearch] = useState(false);
 
-  const visibleItems = useMemo(() => {
-    if (!isProductora) return items;
-    return items.filter((v) => !v.company || v.company === currentUser?.data?.company);
-  }, [items, isProductora, currentUser]);
+  const isEventExpired = (e) => {
+    if (e.status === 'closed') return true;
+    if (!e.end_at) return false;
+    const grace = e.grace_hours || 0;
+    return Date.now() > new Date(e.end_at).getTime() + grace * 3600000;
+  };
+
+  const activeEventIds = useMemo(() => new Set(events.filter((e) => !isEventExpired(e)).map((e) => e.id)), [events]);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
-    if (!q) return visibleItems;
-    return visibleItems.filter((v) => {
+    return items.filter((v) => {
+      if (isProductora && v.company && v.company !== currentUser?.data?.company) return false;
+      if (!q) {
+        const evtIds = v.event_ids || [];
+        if (evtIds.length === 0) return true;
+        return evtIds.some((id) => activeEventIds.has(id));
+      }
       const person = people.find((p) => p.id === v.person_id);
       const personDoc = person?.document || '';
       return `${v.person_name || ''} ${v.brand || ''} ${v.model || ''} ${v.plate || ''} ${personDoc}`.toLowerCase().includes(q);
     });
-  }, [visibleItems, query]);
+  }, [items, activeEventIds, isProductora, currentUser, query]);
 
   const toggleSelect = (id) => {
     setSelected((prev) => {
@@ -162,7 +171,7 @@ export default function Vehicles() {
     { name: 'color', label: 'Color', type: 'text', placeholder: 'Ej: Blanco' },
     {
       name: 'event_ids', label: 'Eventos asignados', type: 'toggle-group',
-      options: events.filter((e) => e.status !== 'closed').map((e) => ({ value: e.id, label: e.name })),
+      options: events.filter((e) => !isEventExpired(e)).map((e) => ({ value: e.id, label: e.name })),
       full: true,
     },
     {
