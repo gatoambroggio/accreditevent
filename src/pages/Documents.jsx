@@ -8,10 +8,10 @@ import DocumentViewer from '@/components/DocumentViewer';
 import { base44 } from '@/api/base44Client';
 import { logAudit } from '@/lib/audit';
 import { useDocumentTypes } from '@/lib/useDocumentTypes';
+import { slugify } from '@/lib/slugify';
 
 const TYPE_FIELDS = [
   { name: 'label', label: 'Nombre', type: 'text', required: true, placeholder: 'Ej: Seguro de trabajo' },
-  { name: 'value', label: 'Identificador (slug)', type: 'text', required: true, placeholder: 'work_insurance', hint: 'Minúsculas, sin espacios ni caracteres especiales.' },
   { name: 'description', label: 'Descripción', type: 'textarea', full: true },
 ];
 
@@ -83,7 +83,7 @@ export default function Documents() {
   };
 
   const handleTypeSubmit = async (data) => {
-    const slug = (data.value || '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    const slug = slugify(data.label);
     const enriched = { ...data, value: slug };
     if (editingType) {
       await base44.entities.DocumentType.update(editingType.id, enriched);

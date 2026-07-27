@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { useCrud } from '@/lib/crud';
 import { Plus, Pencil, Loader2, SquareParking } from 'lucide-react';
 import EntityModal from '@/components/EntityModal';
+import { slugify } from '@/lib/slugify';
 
 const FIELDS = [
   { name: 'label', label: 'Nombre', type: 'text', required: true, placeholder: 'Ej: Estacionamiento VIP' },
-  { name: 'value', label: 'Identificador (slug)', type: 'text', required: true, placeholder: 'vip', hint: 'Minúsculas, sin espacios ni caracteres especiales.' },
   { name: 'description', label: 'Descripción', type: 'textarea', full: true, placeholder: 'Ej: Sector destinado a proveedores VIP' },
 ];
 
@@ -18,7 +18,7 @@ export default function ParkingSectors() {
   const openEdit = (item) => { setEditing(item); setModalOpen(true); };
 
   const handleSubmit = async (data) => {
-    const slug = (data.value || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
+    const slug = slugify(data.label);
     const enriched = { ...data, value: slug };
     if (editing) {
       await update(editing.id, enriched);

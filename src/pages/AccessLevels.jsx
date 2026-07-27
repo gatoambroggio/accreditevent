@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { useCrud } from '@/lib/crud';
 import { Plus, Pencil, Loader2 } from 'lucide-react';
 import EntityModal from '@/components/EntityModal';
+import { slugify } from '@/lib/slugify';
 
 const FIELDS = [
   { name: 'label', label: 'Nombre', type: 'text', required: true, placeholder: 'Ej: Backstage' },
-  { name: 'value', label: 'Identificador (slug)', type: 'text', required: true, placeholder: 'backstage', hint: 'Minúsculas, sin espacios ni caracteres especiales.' },
   { name: 'badge_prefix', label: 'Prefijo de credencial', type: 'text', placeholder: 'PR', hint: '2-3 letras para generar códigos de credencial.' },
   { name: 'description', label: 'Descripción', type: 'textarea', full: true },
 ];
@@ -19,7 +19,7 @@ export default function AccessLevels() {
   const openEdit = (item) => { setEditing(item); setModalOpen(true); };
 
   const handleSubmit = async (data) => {
-    const slug = (data.value || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
+    const slug = slugify(data.label);
     const prefix = (data.badge_prefix || '').toUpperCase().slice(0, 3);
     const enriched = { ...data, value: slug, badge_prefix: prefix };
     if (editing) {
