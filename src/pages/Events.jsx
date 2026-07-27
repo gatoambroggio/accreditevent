@@ -150,7 +150,7 @@ export default function Events() {
     }
     const payload = { ...data, assigned_user_ids: assignedIds };
     let eventId;
-    if (editing) {
+    if (editing?.id) {
       await update(editing.id, payload);
       eventId = editing.id;
     } else {
@@ -253,8 +253,8 @@ export default function Events() {
         fields={fields}
         initialData={editing || {}}
         onSubmit={handleSubmit}
-        onDelete={editing ? handleDelete : null}
-        canDelete={!!editing}
+        onDelete={editing?.id ? handleDelete : null}
+        canDelete={!!editing?.id}
         submitLabel={editing ? 'Guardar cambios' : 'Crear evento'}
       />
     </div>
