@@ -200,6 +200,7 @@ export default function AccessStation() {
         setResult({
           ok: false,
           person_name: accred.person_name,
+          access_level: accred.access_level,
           message: `Acceso restringido para la zona: ${zoneLabel}.`,
         });
         return;
@@ -219,7 +220,7 @@ export default function AccessStation() {
         access_level: accred.access_level,
       });
 
-      setResult({ ok: true, person_name: accred.person_name, accred });
+      setResult({ ok: true, person_name: accred.person_name, access_level: accred.access_level, accred });
     } catch (err) {
       setResult({ ok: false, message: err.message || 'Error en la verificación.' });
     } finally {
@@ -430,6 +431,14 @@ export default function AccessStation() {
           {result.person_name && (
             <p className="mt-3 text-lg text-white/80">{result.person_name}</p>
           )}
+          {result.access_level && (() => {
+            const lvl = zones.find((z) => z.value === result.access_level);
+            return (
+              <p className="mt-1 text-base font-semibold text-white/90">
+                Nivel: {lvl?.label || result.access_level}
+              </p>
+            );
+          })()}
           {!result.ok && result.message && (
             <p className="mt-1 max-w-md px-6 text-center text-sm text-white/70">{result.message}</p>
           )}
