@@ -69,6 +69,7 @@ export default function Vehicles() {
       if (isProductora && v.company && v.company !== currentUser?.data?.company) return false;
       if (statusFilter && v.status !== statusFilter) return false;
       if (!q) {
+        if (v.status === 'approved') return true;
         const evtIds = v.event_ids || [];
         if (evtIds.length === 0) return true;
         return evtIds.some((id) => activeEventIds.has(id));
@@ -212,7 +213,7 @@ export default function Vehicles() {
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="Logística" title="Vehículos">
+      <PageHeader kicker="Logística" title="Vehículos acreditados">
         <button onClick={handleExport} className={btnOutline}>
           <Download className="h-4 w-4" /> Exportar
         </button>
