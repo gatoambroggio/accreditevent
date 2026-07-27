@@ -102,9 +102,22 @@ export default function AccessControl({ standalone = false }) {
     setResult(null);
     try {
       if (!descriptor) {
+        const me = await base44.auth.me();
+        await base44.entities.AccessLog.create({
+          accreditation_id: found.id,
+          person_name: found.person_name,
+          badge_code: found.badge_code,
+          event_name: found.event_name,
+          verified_by: me?.full_name || me?.email || 'Sistema',
+          method: 'biometric',
+          zone: selectedZones.join(', '),
+          result: 'denied',
+          access_level: found.access_level,
+        });
         setResult({ ok: false, message: 'No se detectó un rostro humano en la captura.', accred: found });
         setFound(null);
         setBadgeCode('');
+        await loadRecent();
         return;
       }
 
@@ -116,9 +129,22 @@ export default function AccessControl({ standalone = false }) {
       );
 
       if (bios.length === 0 || !bios[0].face_descriptor) {
+        const me = await base44.auth.me();
+        await base44.entities.AccessLog.create({
+          accreditation_id: found.id,
+          person_name: found.person_name,
+          badge_code: found.badge_code,
+          event_name: found.event_name,
+          verified_by: me?.full_name || me?.email || 'Sistema',
+          method: 'biometric',
+          zone: selectedZones.join(', '),
+          result: 'denied',
+          access_level: found.access_level,
+        });
         setResult({ ok: false, message: 'Sin descriptor facial registrado para esta persona.', accred: found });
         setFound(null);
         setBadgeCode('');
+        await loadRecent();
         return;
       }
 
@@ -163,6 +189,18 @@ export default function AccessControl({ standalone = false }) {
         setBadgeCode('');
         await loadRecent();
       } else {
+        const me = await base44.auth.me();
+        await base44.entities.AccessLog.create({
+          accreditation_id: found.id,
+          person_name: found.person_name,
+          badge_code: found.badge_code,
+          event_name: found.event_name,
+          verified_by: me?.full_name || me?.email || 'Sistema',
+          method: 'biometric',
+          zone: selectedZones.join(', '),
+          result: 'denied',
+          access_level: found.access_level,
+        });
         setResult({
           ok: false,
           message: `El rostro no coincide con el registrado (distancia: ${distance.toFixed(2)}).`,
@@ -170,6 +208,7 @@ export default function AccessControl({ standalone = false }) {
         });
         setFound(null);
         setBadgeCode('');
+        await loadRecent();
       }
     } catch (err) {
       setResult({ ok: false, message: err.message || 'Error en la verificación.' });
@@ -361,7 +400,7 @@ export default function AccessControl({ standalone = false }) {
                       <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 ring-1 ring-inset ring-emerald-200">OK</span>
                     )}
                     <time className="font-mono text-xs text-slate-400">
-                      {new Date(log.created_date).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(log.created_date).toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' })}
                     </time>
                   </div>
                 </div>

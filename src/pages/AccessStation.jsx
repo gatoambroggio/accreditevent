@@ -109,6 +109,18 @@ export default function AccessStation() {
       const { match, distance } = findBestMatch(descriptor, withDescriptors);
 
       if (!match) {
+        const me = await base44.auth.me();
+        await base44.entities.AccessLog.create({
+          accreditation_id: '',
+          person_name: 'Desconocido',
+          badge_code: '',
+          event_name: selectedEvent.name,
+          verified_by: me?.full_name || me?.email || 'Sistema',
+          method: 'biometric',
+          zone: selectedZones.join(', '),
+          result: 'denied',
+          access_level: '',
+        });
         setResult({ ok: false, message: `No se encontró coincidencia facial (distancia: ${distance.toFixed(2)}).` });
         return;
       }
@@ -116,6 +128,18 @@ export default function AccessStation() {
       // Find the active accreditation for this person in this event
       const accred = accreditations.find((a) => a.person_id === match.person_id);
       if (!accred) {
+        const me = await base44.auth.me();
+        await base44.entities.AccessLog.create({
+          accreditation_id: '',
+          person_name: match.person_name || 'Desconocido',
+          badge_code: '',
+          event_name: selectedEvent.name,
+          verified_by: me?.full_name || me?.email || 'Sistema',
+          method: 'biometric',
+          zone: selectedZones.join(', '),
+          result: 'denied',
+          access_level: '',
+        });
         setResult({
           ok: false,
           message: 'Persona identificada pero sin acreditación para este evento.',

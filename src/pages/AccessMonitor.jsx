@@ -56,7 +56,7 @@ export default function AccessMonitor() {
 
   const formatTime = (dateStr) => {
     if (!dateStr) return '';
-    return new Date(dateStr).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return new Date(dateStr).toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit', second: '2-digit' });
   };
 
   if (loading) {
