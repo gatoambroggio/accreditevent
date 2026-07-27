@@ -25,14 +25,6 @@
     },
     "person_type": {
       "type": "string",
-      "enum": [
-        "provider",
-        "technician",
-        "staff",
-        "press",
-        "artist",
-        "guest"
-      ],
       "default": "provider",
       "description": "Tipo de persona"
     },

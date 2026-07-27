@@ -1,32 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Loader2, CheckCircle2, XCircle, Calendar, AlertCircle, RefreshCw, Printer } from 'lucide-react';
 import FaceCapture from '@/components/FaceCapture';
 import BadgePrint from '@/components/BadgePrint';
 import { findBestMatch } from '@/lib/faceRecognition';
-
-const TYPE_PREFIXES = {
-  provider: 'PR',
-  technician: 'TE',
-  staff: 'ST',
-  press: 'PS',
-  artist: 'AR',
-  guest: 'GU',
-};
-
-function generateBadgeCode(personType, existingCodes) {
-  const prefix = TYPE_PREFIXES[personType] || 'GE';
-  const nums = existingCodes
-    .map((code) => {
-      if (!code || !code.startsWith(prefix)) return 0;
-      const rest = code.startsWith(prefix + '-') ? code.slice(prefix.length + 1) : code.slice(prefix.length);
-      const n = parseInt(rest, 10);
-      return isNaN(n) ? 0 : n;
-    })
-    .filter((n) => n > 0);
-  const next = (nums.length > 0 ? Math.max(...nums) : 0) + 1;
-  return `${prefix}-${String(next).padStart(4, '0')}`;
-}
+import { usePersonTypes } from '@/lib/usePersonTypes';
+import { generateBadgeCode } from '@/lib/badgeCode';
 
 export default function AccreditationFacial() {
   const [phase, setPhase] = useState('select');
@@ -38,6 +17,12 @@ export default function AccreditationFacial() {
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState(null);
   const [printAccred, setPrintAccred] = useState(null);
+  const { personTypes } = usePersonTypes();
+  const typePrefixes = useMemo(() => {
+    const map = {};
+    personTypes.forEach((t) => { map[t.value] = t.badge_prefix || 'GE'; });
+    return map;
+  }, [personTypes]);
 
   useEffect(() => {
     (async () => {
@@ -121,7 +106,7 @@ export default function AccreditationFacial() {
       } catch {}
 
       const allAccreditations = await base44.entities.Accreditation.list('-created_date', 500);
-      const badgeCode = generateBadgeCode(personType, allAccreditations.map((a) => a.badge_code));
+      const badgeCode = generateBadgeCode(personType, allAccreditations.map((a) => a.badge_code), typePrefixes);
 
       const newAccred = await base44.entities.Accreditation.create({
         event_id: selectedEvent.id,

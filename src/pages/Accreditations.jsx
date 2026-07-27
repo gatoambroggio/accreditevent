@@ -7,33 +7,18 @@ import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
 import BadgePrint from '@/components/BadgePrint';
 import { useZones } from '@/lib/useZones';
-
-const TYPE_PREFIXES = {
-  provider: 'PR',
-  technician: 'TE',
-  staff: 'ST',
-  press: 'PS',
-  artist: 'AR',
-  guest: 'GU',
-};
-
-function generateBadgeCode(personType, existingCodes) {
-  const prefix = TYPE_PREFIXES[personType] || 'GE';
-  const nums = existingCodes
-    .map((code) => {
-      if (!code || !code.startsWith(prefix)) return 0;
-      const rest = code.startsWith(prefix + '-') ? code.slice(prefix.length + 1) : code.slice(prefix.length);
-      const n = parseInt(rest, 10);
-      return isNaN(n) ? 0 : n;
-    })
-    .filter((n) => n > 0);
-  const next = (nums.length > 0 ? Math.max(...nums) : 0) + 1;
-  return `${prefix}-${String(next).padStart(4, '0')}`;
-}
+import { usePersonTypes } from '@/lib/usePersonTypes';
+import { generateBadgeCode } from '@/lib/badgeCode';
 
 export default function Accreditations() {
   const { items, loading, create, update, remove, reload } = useCrud('Accreditation');
   const { zones } = useZones();
+  const { personTypes } = usePersonTypes();
+  const typePrefixes = useMemo(() => {
+    const map = {};
+    personTypes.forEach((t) => { map[t.value] = t.badge_prefix || 'GE'; });
+    return map;
+  }, [personTypes]);
   const accessLevels = [...zones.map((z) => z.value), 'all-access'];
   const [events, setEvents] = useState([]);
   const [people, setPeople] = useState([]);
@@ -115,7 +100,7 @@ export default function Accreditations() {
       person_type: person?.person_type || '',
     };
     if (!editing) {
-      enriched.badge_code = generateBadgeCode(person?.person_type, items.map((a) => a.badge_code));
+      enriched.badge_code = generateBadgeCode(person?.person_type, items.map((a) => a.badge_code), typePrefixes);
     }
     if (editing) {
       await update(editing.id, enriched);

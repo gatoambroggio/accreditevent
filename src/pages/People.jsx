@@ -2,33 +2,10 @@ import React, { useState, useMemo } from 'react';
 import { useCrud } from '@/lib/crud';
 import { Plus, Pencil, Search, Loader2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { usePersonTypes } from '@/lib/usePersonTypes';
 import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
 import PersonDetailModal from '@/components/PersonDetailModal';
-
-const PERSON_TYPES = ['provider', 'technician', 'staff', 'press', 'artist', 'guest'];
-
-const FIELDS = [
-  { name: 'full_name', label: 'Nombre completo', type: 'text', required: true, full: true },
-  {
-    name: 'person_type', label: 'Tipo', type: 'select', required: true,
-    options: PERSON_TYPES.map((t) => ({ value: t, label: t })),
-  },
-  { name: 'document', label: 'Documento', type: 'text', required: true },
-  { name: 'company', label: 'Empresa', type: 'text', required: true },
-  { name: 'phone', label: 'Teléfono', type: 'phone-ar', required: true, hint: 'Código de área sin 0 y número sin 15' },
-  { name: 'email', label: 'Email', type: 'email', required: true },
-  {
-    name: 'status', label: 'Estado', type: 'select', required: true,
-    options: [
-      { value: 'active', label: 'Activo' },
-      { value: 'inactive', label: 'Inactivo' },
-      { value: 'pending', label: 'Pendiente' },
-    ],
-  },
-  { name: 'notes', label: 'Notas', type: 'textarea', required: true, full: true },
-  { name: '_face', label: 'Registro facial', type: 'face-capture', full: true },
-];
 
 const validatePerson = (data) => {
   const e = {};
@@ -47,6 +24,7 @@ const validatePerson = (data) => {
 
 export default function People() {
   const { items, loading, create, update, remove } = useCrud('Person');
+  const { personTypes } = usePersonTypes();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [query, setQuery] = useState('');
@@ -59,6 +37,28 @@ export default function People() {
       `${p.full_name} ${p.company || ''} ${p.document || ''}`.toLowerCase().includes(q)
     );
   }, [items, query]);
+
+  const fields = useMemo(() => [
+    { name: 'full_name', label: 'Nombre completo', type: 'text', required: true, full: true },
+    {
+      name: 'person_type', label: 'Tipo', type: 'select', required: true,
+      options: personTypes.map((t) => ({ value: t.value, label: t.label })),
+    },
+    { name: 'document', label: 'Documento', type: 'text', required: true },
+    { name: 'company', label: 'Empresa', type: 'text', required: true },
+    { name: 'phone', label: 'Teléfono', type: 'phone-ar', required: true, hint: 'Código de área sin 0 y número sin 15' },
+    { name: 'email', label: 'Email', type: 'email', required: true },
+    {
+      name: 'status', label: 'Estado', type: 'select', required: true,
+      options: [
+        { value: 'active', label: 'Activo' },
+        { value: 'inactive', label: 'Inactivo' },
+        { value: 'pending', label: 'Pendiente' },
+      ],
+    },
+    { name: 'notes', label: 'Notas', type: 'textarea', required: true, full: true },
+    { name: '_face', label: 'Registro facial', type: 'face-capture', full: true },
+  ], [personTypes]);
 
   const openNew = () => { setEditing(null); setModalOpen(true); };
   const openEdit = async (item) => {
@@ -145,7 +145,7 @@ export default function People() {
                       <button onClick={() => setDetailPerson(p)} className="text-left text-sm font-semibold text-slate-900 hover:text-emerald-600">{p.full_name}</button>
                       <p className="text-xs text-slate-400">{p.document || 'Sin documento'}</p>
                     </td>
-                    <td className="px-4 py-3.5 text-sm text-slate-500">{p.person_type}</td>
+                    <td className="px-4 py-3.5 text-sm text-slate-500">{personTypes.find((t) => t.value === p.person_type)?.label || p.person_type}</td>
                     <td className="px-4 py-3.5 text-sm text-slate-500">{p.company || '—'}</td>
                     <td className="px-4 py-3.5 text-sm text-slate-500">{p.phone || p.email || '—'}</td>
                     <td className="px-4 py-3.5"><StatusBadge status={p.status} /></td>
@@ -167,7 +167,7 @@ export default function People() {
         onClose={() => setModalOpen(false)}
         title={editing ? 'Editar persona' : 'Nueva persona'}
         kicker={editing ? 'EDITAR PERSONA' : 'CREAR PERSONA'}
-        fields={FIELDS}
+        fields={fields}
         initialData={editing || {}}
         onSubmit={handleSubmit}
         validate={validatePerson}
