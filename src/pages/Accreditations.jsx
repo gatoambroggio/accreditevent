@@ -120,11 +120,9 @@ export default function Accreditations() {
     }
     // Block assignment if the person has pending/rejected/expired documentation
     if (!editing) {
-      const docs = await base44.entities.Document.filter({ person_id: data.person_id }, '-created_date', 100);
-      const pending = docs.filter((d) => d.status !== 'approved');
-      if (pending.length > 0) {
-        const statuses = [...new Set(pending.map((d) => d.status))];
-        throw new Error(`No se puede asignar: la persona tiene documentación pendiente de aprobación (${statuses.join(', ')}).`);
+      const res = await base44.functions.invoke('checkPersonDocuments', { person_id: data.person_id });
+      if (res.data?.has_pending) {
+        throw new Error(`No se puede asignar: la persona tiene documentación pendiente de aprobación (${res.data.pending_statuses.join(', ')}).`);
       }
     }
     // Denormalize event/person data
