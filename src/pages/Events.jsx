@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useCrud } from '@/lib/crud';
-import { Plus, Pencil, Download } from 'lucide-react';
+import { Plus, Pencil, Download, Link2 } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
 import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
@@ -12,6 +12,7 @@ import SearchInput from '@/components/ui/search-input';
 import FilterSelect from '@/components/ui/filter-select';
 import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
 import { btnPrimary, btnOutline, btnIcon } from '@/components/ui/button-styles';
+import ShareLinkModal from '@/components/ShareLinkModal';
 
 const STATUS_OPTIONS = [
   { value: 'draft', label: 'Borrador' },
@@ -30,6 +31,7 @@ export default function Events() {
   const isProductora = currentUser?.role === 'productora';
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [shareEvent, setShareEvent] = useState(null);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [users, setUsers] = useState([]);
@@ -163,6 +165,10 @@ export default function Events() {
     }
     await syncUserEvents(eventId, assignedIds);
     await logAudit(editing ? 'update' : 'create', 'Event', eventId, `Usuarios: ${assignedIds.length}`);
+    if (!editing) {
+      const created = items.find((e) => e.id === eventId) || { id: eventId, name: data.name };
+      setShareEvent(created);
+    }
   };
 
   const handleDelete = async () => { await remove(editing.id); };
@@ -209,9 +215,18 @@ export default function Events() {
               </Td>
               <Td><StatusBadge status={e.status} /></Td>
               <Td className="text-right">
-                <button onClick={() => openEdit(e)} className={btnIcon}>
-                  <Pencil className="h-3.5 w-3.5" />
-                </button>
+                <div className="flex items-center justify-end gap-1">
+                  <button
+                    onClick={() => setShareEvent(e)}
+                    className="rounded-lg p-2 text-slate-400 transition hover:bg-emerald-50 hover:text-emerald-600"
+                    title="Copiar link de registro"
+                  >
+                    <Link2 className="h-3.5 w-3.5" />
+                  </button>
+                  <button onClick={() => openEdit(e)} className={btnIcon}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </Td>
             </Tr>
           ))}
@@ -230,6 +245,8 @@ export default function Events() {
         canDelete={!!editing?.id}
         submitLabel={editing ? 'Guardar cambios' : 'Crear evento'}
       />
+
+      <ShareLinkModal event={shareEvent} onClose={() => setShareEvent(null)} />
     </div>
   );
 }
