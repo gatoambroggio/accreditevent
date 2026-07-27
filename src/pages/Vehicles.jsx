@@ -138,7 +138,7 @@ export default function Vehicles() {
     const enriched = {
       ...data,
       person_name: person?.full_name || editing?.person_name || '',
-      company: person?.company || editing?.company || '',
+      company: events.find((e) => e.id === selectedEventIds[0])?.company || editing?.company || '',
       plate: (data.plate || '').toUpperCase().trim(),
       event_ids: selectedEventIds,
       event_names: selectedEventIds.map((id) => events.find((e) => e.id === id)?.name).filter(Boolean),

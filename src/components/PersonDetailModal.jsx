@@ -95,7 +95,7 @@ export default function PersonDetailModal({ person, onClose }) {
       ...data,
       person_id: person.id,
       person_name: person.full_name,
-      company: person.company || '',
+      company: events.find((e) => e.id === selectedEventIds[0])?.company || editingVehicle?.company || '',
       plate: (data.plate || '').toUpperCase().trim(),
       event_ids: selectedEventIds,
       event_names: selectedEventIds.map((id) => events.find((e) => e.id === id)?.name).filter(Boolean),
