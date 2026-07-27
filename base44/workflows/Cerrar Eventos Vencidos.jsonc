@@ -1,0 +1,44 @@
+{
+  "name": "Cerrar Eventos Vencidos",
+  "description": "Cierra autom\u00e1ticamente los eventos cuyo per\u00edodo de gracia ya finaliz\u00f3",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "0 * * * *",
+      "one_time_date": null,
+      "timezone": "America/Argentina/Buenos_Aires",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "close_expired_events",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "close_events": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "closeExpiredEvents"
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Cerrar eventos vencidos",
+            "description": "Marca como cerrados los eventos expirados"
+          }
+        }
+      }
+    ]
+  }
+}
