@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Hand, ScanFace, Car, ArrowRight } from 'lucide-react';
+import { Hand, ScanFace, QrCode, Car, ArrowRight } from 'lucide-react';
 
 const STATIONS = [
   {
@@ -14,12 +14,21 @@ const STATIONS = [
   },
   {
     key: 'person',
-    label: 'Control de Personas',
+    label: 'Control de Personas Facial',
     description: 'Identificación facial de personas acreditadas en el evento.',
     icon: ScanFace,
     to: '/control-acceso',
     accent: 'bg-emerald-50 text-emerald-600 ring-emerald-200',
     btn: 'bg-emerald-600 hover:bg-emerald-700',
+  },
+  {
+    key: 'person-qr',
+    label: 'Control de Personas QR',
+    description: 'Validación por QR de credenciales de personas acreditadas.',
+    icon: QrCode,
+    to: '/control-qr?mode=person',
+    accent: 'bg-teal-50 text-teal-600 ring-teal-200',
+    btn: 'bg-teal-600 hover:bg-teal-700',
   },
   {
     key: 'vehicle',
@@ -42,7 +51,7 @@ export default function AccessHub() {
         <p className="mt-1 text-sm text-slate-500">Elegí el tipo de control para iniciar la estación de validación.</p>
       </div>
 
-      <div className="grid gap-5 sm:grid-cols-3">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {STATIONS.map((s) => {
           const Icon = s.icon;
           return (
