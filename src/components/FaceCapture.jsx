@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Camera, RefreshCw, Check, Loader2, X, AlertCircle } from 'lucide-react';
+import { Camera, RefreshCw, Check, Loader2, X, AlertCircle, SwitchCamera } from 'lucide-react';
 import { getFaceDescriptor } from '@/lib/faceRecognition';
 
 export default function FaceCapture({ onCaptured, disabled, label = 'Abrir cámara', autoCapture = false }) {
@@ -10,6 +10,7 @@ export default function FaceCapture({ onCaptured, disabled, label = 'Abrir cáma
   const [starting, setStarting] = useState(false);
   const [detecting, setDetecting] = useState(false);
   const [faceDetected, setFaceDetected] = useState(true);
+  const [facingMode, setFacingMode] = useState('user');
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const descriptorRef = useRef(null);
@@ -21,16 +22,17 @@ export default function FaceCapture({ onCaptured, disabled, label = 'Abrir cáma
     });
   }, []);
 
-  const startCamera = async () => {
+  const startCamera = async (mode = facingMode) => {
     setError('');
     setStarting(true);
     setPhotoUrl(null);
     setPhotoFile(null);
     setFaceDetected(true);
     descriptorRef.current = null;
+    stopCamera();
     try {
       const s = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        video: { facingMode: mode, width: { ideal: 640 }, height: { ideal: 480 } },
         audio: false,
       });
       setStream(s);
@@ -39,6 +41,12 @@ export default function FaceCapture({ onCaptured, disabled, label = 'Abrir cáma
     } finally {
       setStarting(false);
     }
+  };
+
+  const switchCamera = async () => {
+    const next = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(next);
+    await startCamera(next);
   };
 
   useEffect(() => {
@@ -78,8 +86,10 @@ export default function FaceCapture({ onCaptured, disabled, label = 'Abrir cáma
     canvas.width = video.videoWidth || 640;
     canvas.height = video.videoHeight || 480;
     const ctx = canvas.getContext('2d');
-    ctx.translate(canvas.width, 0);
-    ctx.scale(-1, 1);
+    if (facingMode === 'user') {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     setDetecting(true);
@@ -140,10 +150,18 @@ export default function FaceCapture({ onCaptured, disabled, label = 'Abrir cáma
       {stream && !photoUrl && !detecting && (
         <>
           <div className="relative overflow-hidden rounded-xl bg-slate-900">
-            <video ref={videoRef} autoPlay playsInline muted className="w-full" style={{ transform: 'scaleX(-1)' }} />
+            <video ref={videoRef} autoPlay playsInline muted className="w-full" style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }} />
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <div className="h-48 w-36 rounded-full border-2 border-white/40" />
             </div>
+            <button
+              onClick={switchCamera}
+              disabled={disabled || starting}
+              className="absolute right-3 top-3 rounded-lg bg-black/50 p-2 text-white transition hover:bg-black/70 disabled:opacity-50"
+              title="Cambiar cámara"
+            >
+              <SwitchCamera className="h-5 w-5" />
+            </button>
           </div>
           {autoCapture ? (
             <p className="mt-3 text-center text-sm text-slate-500">Capturando automáticamente…</p>
