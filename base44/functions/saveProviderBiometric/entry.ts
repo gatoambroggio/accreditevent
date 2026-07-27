@@ -18,12 +18,13 @@ export default async function(req) {
       await base44.asServiceRole.entities.Biometric.update(b.id, { status: 'revoked' });
     }
 
-    const biometric = await base44.asServiceRole.entities.Biometric.create({
+    // Create using user context so created_by_id = user (enables provider RLS read)
+    const biometric = await base44.entities.Biometric.create({
       person_id,
       person_name,
       event_id,
       face_photo_url,
-      face_descriptor,
+      face_descriptor: face_descriptor || [],
       status: 'active',
     });
 

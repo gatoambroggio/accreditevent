@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Fingerprint, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Fingerprint, Loader2, CheckCircle2, AlertCircle, XCircle } from 'lucide-react';
 import FaceCapture from '@/components/FaceCapture';
+import { Image } from '@/components/ui/image';
 
 export default function PersonBiometricCard({ person }) {
   const [biometric, setBiometric] = useState(null);
@@ -28,7 +29,7 @@ export default function PersonBiometricCard({ person }) {
     load();
   }, [person.id]);
 
-  const handleCaptured = async (file) => {
+  const handleCaptured = async (file, descriptor) => {
     setSaving(true);
     setError('');
     try {
@@ -42,6 +43,7 @@ export default function PersonBiometricCard({ person }) {
         person_id: person.id,
         person_name: person.full_name,
         face_photo_url: file_url,
+        face_descriptor: descriptor || [],
         status: 'active',
       });
 
@@ -80,11 +82,35 @@ export default function PersonBiometricCard({ person }) {
       </h3>
 
       {biometric && !saving && (
-        <div className="mb-4 flex items-center gap-3 rounded-lg bg-emerald-50 px-4 py-3 ring-1 ring-emerald-200">
-          <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+        <div className="mb-4 flex items-start gap-4 rounded-lg bg-emerald-50 px-4 py-3 ring-1 ring-emerald-200">
+          {biometric.face_photo_url && (
+            <Image
+              src={biometric.face_photo_url}
+              alt="Rostro registrado"
+              fittingType="cover"
+              className="h-16 w-16 shrink-0 rounded-lg object-cover ring-2 ring-emerald-300"
+            />
+          )}
           <div className="flex-1">
-            <p className="text-sm font-semibold text-emerald-800">Rostro registrado</p>
-            <p className="text-xs text-emerald-600">Ya podés usar la cámara para ingresar a eventos.</p>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+              <p className="text-sm font-semibold text-emerald-800">Rostro registrado</p>
+            </div>
+            <p className="mt-0.5 text-xs text-emerald-600">
+              {biometric.face_descriptor && biometric.face_descriptor.length > 0
+                ? 'Reconocimiento facial activo. Ya podés usar la cámara para ingresar a eventos.'
+                : 'Foto guardada. Pendiente activación de reconocimiento facial.'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {!biometric && !saving && (
+        <div className="mb-4 flex items-center gap-3 rounded-lg bg-amber-50 px-4 py-3 ring-1 ring-amber-200">
+          <XCircle className="h-5 w-5 text-amber-600" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-amber-800">Biometría no registrada</p>
+            <p className="text-xs text-amber-600">Registrá tu rostro para usar el ingreso facial a eventos.</p>
           </div>
         </div>
       )}
