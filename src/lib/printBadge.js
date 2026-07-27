@@ -17,8 +17,8 @@ export function printBadges() {
       @page { size: A5 landscape; margin: 0; }
       body > *:not(#print-portal) { display: none !important; }
       #print-portal { display: block !important; }
-      #print-portal .badge-batch-print { display: block !important; }
-      #print-portal .badge-print { margin: 0 !important; box-shadow: none !important; position: static !important; page-break-after: always; break-after: page; }
+      #print-portal .badge-batch-print { display: block !important; padding: 0 !important; gap: 0 !important; margin: 0 !important; }
+      #print-portal .badge-print { margin: 0 !important; box-shadow: none !important; position: static !important; page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid; }
       #print-portal .badge-print:last-child { page-break-after: auto; break-after: auto; }
     }
   `;
