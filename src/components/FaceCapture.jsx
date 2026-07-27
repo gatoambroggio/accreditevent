@@ -10,7 +10,9 @@ export default function FaceCapture({ onCaptured, disabled, label = 'Abrir cáma
   const [starting, setStarting] = useState(false);
   const [detecting, setDetecting] = useState(false);
   const [faceDetected, setFaceDetected] = useState(true);
-  const [facingMode, setFacingMode] = useState('user');
+  const [facingMode, setFacingMode] = useState(() => {
+    try { return localStorage.getItem('facecam_facing') || 'user'; } catch { return 'user'; }
+  });
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const descriptorRef = useRef(null);
@@ -46,6 +48,7 @@ export default function FaceCapture({ onCaptured, disabled, label = 'Abrir cáma
   const switchCamera = async () => {
     const next = facingMode === 'user' ? 'environment' : 'user';
     setFacingMode(next);
+    try { localStorage.setItem('facecam_facing', next); } catch {}
     await startCamera(next);
   };
 
