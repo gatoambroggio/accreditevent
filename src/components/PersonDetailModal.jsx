@@ -11,7 +11,7 @@ export default function PersonDetailModal({ person, onClose }) {
   const [bio, setBio] = useState(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [docType, setDocType] = useState('dni');
+  const [docType, setDocType] = useState('work_insurance');
   const [selectedFile, setSelectedFile] = useState(null);
   const [viewingDoc, setViewingDoc] = useState(null);
   const { docTypes } = useDocumentTypes();
@@ -52,7 +52,7 @@ export default function PersonDetailModal({ person, onClose }) {
         status: 'pending',
       });
       setSelectedFile(null);
-      setDocType('dni');
+      setDocType('work_insurance');
       await loadDocs(person.id);
     } catch (err) {
       alert('Error al subir el documento: ' + (err.message || err));
