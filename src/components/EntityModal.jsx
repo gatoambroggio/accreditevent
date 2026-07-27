@@ -15,27 +15,42 @@ export default function EntityModal({
   canDelete = false,
   submitLabel = 'Guardar',
   topContent,
+  validate,
 }) {
   const [data, setData] = useState({});
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
     if (open) {
       setData(initialData || {});
       setError('');
+      setErrors({});
     }
   }, [open, initialData]);
 
   if (!open) return null;
 
-  const setField = (name, value) => setData((d) => ({ ...d, [name]: value }));
+  const setField = (name, value) => {
+    setData((d) => ({ ...d, [name]: value }));
+    setErrors((e) => ({ ...e, [name]: undefined }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
     setError('');
+    if (validate) {
+      const validationErrors = validate(data);
+      if (Object.keys(validationErrors).length > 0) {
+        setErrors(validationErrors);
+        setSaving(false);
+        return;
+      }
+    }
+    setErrors({});
     try {
       await onSubmit(data);
       onClose();
@@ -62,13 +77,18 @@ export default function EntityModal({
 
   const renderField = (f) => {
     const value = data[f.name] ?? f.defaultValue ?? '';
+    const fieldError = errors[f.name];
     const common = {
       id: f.name,
       value: f.type === 'checkbox' ? undefined : value,
       checked: f.type === 'checkbox' ? !!value : undefined,
       onChange: (e) => setField(f.name, f.type === 'checkbox' ? e.target.checked : e.target.value),
       required: f.required,
-      className: 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20',
+      className: `w-full rounded-lg border px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:ring-2 ${
+        fieldError
+          ? 'border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-500/20'
+          : 'border-slate-200 bg-white focus:border-emerald-500 focus:ring-emerald-500/20'
+      }`,
     };
 
     if (f.type === 'select') {
@@ -224,6 +244,38 @@ export default function EntityModal({
       );
     }
 
+    if (f.type === 'phone-ar') {
+      const value = data[f.name] ?? '';
+      const displayValue = value.startsWith('54') ? value.slice(2) : value;
+      return (
+        <label key={f.name} className="block">
+          <span className="mb-1.5 block text-xs font-semibold text-slate-600">{f.label}{f.required && ' *'}</span>
+          <div className="flex">
+            <span className={`inline-flex items-center rounded-l-lg border border-r-0 px-3 py-2.5 text-sm font-semibold text-slate-600 ${
+              errors[f.name] ? 'border-red-400 bg-red-50' : 'border-slate-200 bg-slate-50'
+            }`}>+54</span>
+            <input
+              type="tel"
+              value={displayValue}
+              onChange={(e) => {
+                let cleaned = e.target.value.replace(/\D/g, '');
+                if (cleaned.startsWith('0')) cleaned = cleaned.slice(1);
+                if (cleaned.startsWith('15')) cleaned = cleaned.slice(2);
+                setField(f.name, '54' + cleaned);
+              }}
+              placeholder="Ej: 11 12345678"
+              required={f.required}
+              className={`w-full rounded-r-lg border px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:ring-2 ${
+                errors[f.name]
+                  ? 'border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-500/20'
+                  : 'border-slate-200 bg-white focus:border-emerald-500 focus:ring-emerald-500/20'
+              }`}
+            />
+          </div>
+        </label>
+      );
+    }
+
     return (
       <label key={f.name} className="block">
         <span className="mb-1.5 block text-xs font-semibold text-slate-600">{f.label}{f.required && ' *'}</span>
@@ -250,6 +302,11 @@ export default function EntityModal({
             {fields.map((f) => (
               <div key={f.name} className={f.full ? 'sm:col-span-2' : ''}>
                 {renderField(f)}
+                {errors[f.name] ? (
+                  <p className="mt-1 text-xs font-medium text-red-600">{errors[f.name]}</p>
+                ) : f.hint ? (
+                  <p className="mt-1 text-xs text-slate-400">{f.hint}</p>
+                ) : null}
               </div>
             ))}
           </div>

@@ -11,23 +11,38 @@ const PERSON_TYPES = ['provider', 'technician', 'staff', 'press', 'artist', 'gue
 const FIELDS = [
   { name: 'full_name', label: 'Nombre completo', type: 'text', required: true, full: true },
   {
-    name: 'person_type', label: 'Tipo', type: 'select',
+    name: 'person_type', label: 'Tipo', type: 'select', required: true,
     options: PERSON_TYPES.map((t) => ({ value: t, label: t })),
   },
-  { name: 'document', label: 'Documento', type: 'text' },
-  { name: 'company', label: 'Empresa', type: 'text' },
-  { name: 'phone', label: 'Teléfono', type: 'tel' },
-  { name: 'email', label: 'Email', type: 'email' },
+  { name: 'document', label: 'Documento', type: 'text', required: true },
+  { name: 'company', label: 'Empresa', type: 'text', required: true },
+  { name: 'phone', label: 'Teléfono', type: 'phone-ar', required: true, hint: 'Código de área sin 0 y número sin 15' },
+  { name: 'email', label: 'Email', type: 'email', required: true },
   {
-    name: 'status', label: 'Estado', type: 'select',
+    name: 'status', label: 'Estado', type: 'select', required: true,
     options: [
       { value: 'active', label: 'Activo' },
       { value: 'inactive', label: 'Inactivo' },
       { value: 'pending', label: 'Pendiente' },
     ],
   },
-  { name: 'notes', label: 'Notas', type: 'textarea', full: true },
+  { name: 'notes', label: 'Notas', type: 'textarea', required: true, full: true },
 ];
+
+const validatePerson = (data) => {
+  const e = {};
+  if (!data.full_name?.trim()) e.full_name = 'El nombre es obligatorio';
+  if (!data.person_type) e.person_type = 'Seleccioná un tipo';
+  if (!data.document?.trim()) e.document = 'El documento es obligatorio';
+  if (!data.company?.trim()) e.company = 'La empresa es obligatoria';
+  if (!data.phone?.trim()) e.phone = 'El teléfono es obligatorio';
+  else if (data.phone.replace(/\D/g, '').length < 12) e.phone = 'Teléfono incompleto (código de área + número)';
+  if (!data.email?.trim()) e.email = 'El email es obligatorio';
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e.email = 'Email inválido';
+  if (!data.status) e.status = 'Seleccioná un estado';
+  if (!data.notes?.trim()) e.notes = 'Las notas son obligatorias';
+  return e;
+};
 
 export default function People() {
   const { items, loading, create, update, remove } = useCrud('Person');
@@ -133,6 +148,7 @@ export default function People() {
         fields={FIELDS}
         initialData={editing || {}}
         onSubmit={handleSubmit}
+        validate={validatePerson}
         onDelete={editing ? handleDelete : null}
         canDelete={!!editing}
         submitLabel={editing ? 'Guardar cambios' : 'Crear persona'}
