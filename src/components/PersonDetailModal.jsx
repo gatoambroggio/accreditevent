@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { X, Loader2, FileText, ExternalLink, User } from 'lucide-react';
+import { X, Loader2, FileText, ExternalLink, User, UploadCloud } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
 import { Image } from '@/components/ui/image';
 
@@ -12,10 +12,20 @@ const DOC_LABELS = {
   other: 'Otro',
 };
 
+const DOC_OPTIONS = Object.entries(DOC_LABELS).map(([value, label]) => ({ value, label }));
+
 export default function PersonDetailModal({ person, onClose }) {
   const [docs, setDocs] = useState([]);
   const [bio, setBio] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [docType, setDocType] = useState('dni');
+  const [selectedFile, setSelectedFile] = useState(null);
+
+  const loadDocs = async (personId) => {
+    const docData = await base44.entities.Document.filter({ person_id: personId }, '-created_date', 100);
+    setDocs(docData);
+  };
 
   useEffect(() => {
     if (!person) return;
@@ -31,6 +41,31 @@ export default function PersonDetailModal({ person, onClose }) {
       setLoading(false);
     })();
   }, [person]);
+
+  const handleUpload = async () => {
+    if (!selectedFile || !docType) return;
+    setUploading(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file: selectedFile });
+      await base44.entities.Document.create({
+        person_id: person.id,
+        person_name: person.full_name,
+        document_type: docType,
+        original_name: selectedFile.name,
+        file_url,
+        mime_type: selectedFile.type,
+        size: selectedFile.size,
+        status: 'pending',
+      });
+      setSelectedFile(null);
+      setDocType('dni');
+      await loadDocs(person.id);
+    } catch (err) {
+      alert('Error al subir el documento: ' + (err.message || err));
+    } finally {
+      setUploading(false);
+    }
+  };
 
   if (!person) return null;
 
@@ -103,6 +138,39 @@ export default function PersonDetailModal({ person, onClose }) {
             ))
           )}
           </div>
+
+          {/* Upload from backend */}
+          {!loading && (
+            <div className="mt-4 rounded-lg border border-dashed border-slate-300 bg-slate-50/50 p-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Subir documentación</p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <select
+                  value={docType}
+                  onChange={(e) => setDocType(e.target.value)}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                >
+                  {DOC_OPTIONS.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
+                </select>
+                <label className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50">
+                  <UploadCloud className="h-4 w-4" />
+                  {selectedFile ? selectedFile.name : 'Elegir archivo…'}
+                  <input
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                  />
+                </label>
+                <button
+                  onClick={handleUpload}
+                  disabled={!selectedFile || uploading}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:opacity-50"
+                >
+                  {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
+                  Subir
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
