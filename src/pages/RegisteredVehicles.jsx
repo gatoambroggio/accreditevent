@@ -1,0 +1,158 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { base44 } from '@/api/base44Client';
+import { Download, Car, CarFront } from 'lucide-react';
+import PageHeader from '@/components/ui/page-header';
+import SearchInput from '@/components/ui/search-input';
+import FilterSelect from '@/components/ui/filter-select';
+import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
+import StatusBadge from '@/components/StatusBadge';
+import { exportToExcel } from '@/lib/exportUtils';
+import { parseServerDate } from '@/lib/formatDate';
+
+export default function RegisteredVehicles() {
+  const [vehicles, setVehicles] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
+  const [eventFilter, setEventFilter] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [vehs, evs] = await Promise.all([
+          base44.entities.Vehicle.list('-created_date', 500),
+          base44.entities.Event.list('-created_date', 100),
+        ]);
+        setVehicles(vehs);
+        setEvents(evs);
+      } catch {}
+      setLoading(false);
+    })();
+  }, []);
+
+  const filtered = useMemo(() => {
+    let list = [...vehicles];
+    if (eventFilter) list = list.filter((v) => v.event_ids?.includes(eventFilter));
+    const q = query.toLowerCase().trim();
+    if (q) {
+      list = list.filter((v) =>
+        `${v.person_name} ${v.plate} ${v.brand} ${v.model} ${v.color}`.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [vehicles, eventFilter, query]);
+
+  const stats = useMemo(() => ({
+    total: filtered.length,
+    approved: filtered.filter((v) => v.status === 'approved').length,
+  }), [filtered]);
+
+  const handleExport = () => {
+    exportToExcel(
+      ['Titular', 'Marca', 'Modelo', 'Patente', 'Color', 'Sector', 'Eventos', 'Estado', 'Registrado'],
+      filtered.map((v) => [
+        v.person_name || '',
+        v.brand || '',
+        v.model || '',
+        v.plate || '',
+        v.color || '',
+        v.parking_sector || '',
+        (v.event_names || []).join(', '),
+        v.status || '',
+        v.created_date ? parseServerDate(v.created_date).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }) : '',
+      ]),
+      'vehiculos_registrados'
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      <PageHeader kicker="Histórico" title="Vehículos registrados">
+        <button
+          onClick={handleExport}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+        >
+          <Download className="h-4 w-4" /> Exportar
+        </button>
+      </PageHeader>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
+              <Car className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-2xl font-extrabold text-slate-900">{stats.total}</p>
+              <p className="text-xs text-slate-500">Vehículos registrados</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
+              <CarFront className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-2xl font-extrabold text-slate-900">{stats.approved}</p>
+              <p className="text-xs text-slate-500">Autorizados</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-4">
+        <SearchInput
+          value={query}
+          onChange={setQuery}
+          placeholder="Patente, titular, marca…"
+        />
+        <FilterSelect
+          value={eventFilter}
+          onChange={setEventFilter}
+          options={events.map((e) => ({ value: e.id, label: e.name }))}
+          placeholder="Todos los eventos"
+        />
+      </div>
+
+      <DataTable
+        loading={loading}
+        isEmpty={filtered.length === 0}
+        emptyIcon={Car}
+        emptyMessage="No hay vehículos registrados."
+        tableClassName="min-w-[800px]"
+      >
+        <thead>
+          <tr className="border-b border-slate-100 bg-slate-50">
+            <Th>Titular</Th>
+            <Th>Vehículo</Th>
+            <Th>Patente</Th>
+            <Th>Color</Th>
+            <Th>Sector</Th>
+            <Th>Eventos</Th>
+            <Th>Estado</Th>
+            <Th>Registrado</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {filtered.map((v) => (
+            <Tr key={v.id}>
+              <Td className="text-sm font-semibold text-slate-900">{v.person_name || '—'}</Td>
+              <Td className="text-sm text-slate-600">{v.brand} {v.model}</Td>
+              <Td><code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700">{v.plate || '—'}</code></Td>
+              <Td className="text-sm text-slate-600">{v.color || '—'}</Td>
+              <Td className="text-sm text-slate-600">{v.parking_sector || '—'}</Td>
+              <Td className="text-xs text-slate-500">
+                {(v.event_names || []).join(', ') || '—'}
+              </Td>
+              <Td><StatusBadge status={v.status} /></Td>
+              <Td className="text-xs text-slate-400">
+                {v.created_date ? parseServerDate(v.created_date).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }) : '—'}
+              </Td>
+            </Tr>
+          ))}
+        </tbody>
+      </DataTable>
+    </div>
+  );
+}

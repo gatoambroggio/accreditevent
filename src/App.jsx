@@ -37,6 +37,8 @@ import ZKTecoDevices from '@/pages/ZKTecoDevices';
 import Vehicles from '@/pages/Vehicles';
 import ParkingSectors from '@/pages/ParkingSectors';
 import Companies from '@/pages/Companies';
+import RegisteredPeople from '@/pages/RegisteredPeople';
+import RegisteredVehicles from '@/pages/RegisteredVehicles';
 
 const AUTH_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password', '/provider-register'];
 
@@ -76,7 +78,7 @@ const AuthenticatedApp = () => {
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/registro/:company" element={<ProviderRegister />} />
+      <Route path="/registro/:eventId" element={<ProviderRegister />} />
       <Route path="/provider-register" element={<ProviderRegister />} />
       <Route element={<AppLayout />}>
         <Route path="/" element={<Home />} />
@@ -97,6 +99,8 @@ const AuthenticatedApp = () => {
         <Route path="/vehicles" element={<Vehicles />} />
         <Route path="/parking-sectors" element={<ParkingSectors />} />
         <Route path="/companies" element={<Companies />} />
+        <Route path="/registered-people" element={<RegisteredPeople />} />
+        <Route path="/registered-vehicles" element={<RegisteredVehicles />} />
       </Route>
       <Route path="/portal" element={<ProviderPortal />} />
       <Route path="/control-acceso" element={<AccessStation />} />

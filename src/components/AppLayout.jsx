@@ -24,6 +24,8 @@ import {
   Car,
   SquareParking,
   Building2,
+  UserSearch,
+  ClipboardList,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 
@@ -42,6 +44,8 @@ const NAV_ITEMS = [
   { path: '/reports', label: 'Reportes', icon: BarChart3, minLevel: 1 },
   { path: '/messages', label: 'Mensajes', icon: MessageSquare, minLevel: 1 },
   { path: '/documents', label: 'Documentos', icon: FileText, minLevel: 1 },
+  { path: '/registered-people', label: 'Personas registradas', icon: UserSearch, minLevel: 1 },
+  { path: '/registered-vehicles', label: 'Vehículos registrados', icon: ClipboardList, minLevel: 1 },
   { path: '/vehicles', label: 'Vehículos', icon: Car, minLevel: 1 },
   { path: '/parking-sectors', label: 'Estacionamiento', icon: SquareParking, minLevel: 1 },
   { path: '/companies', label: 'Empresas', icon: Building2, minLevel: 2 },

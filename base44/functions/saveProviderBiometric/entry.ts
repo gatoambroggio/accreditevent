@@ -13,6 +13,15 @@ export default async function(req) {
       return Response.json({ error: 'Faltan datos requeridos' }, { status: 400 });
     }
 
+    // Look up the event to get the productora company for RLS
+    let company = '';
+    if (event_id) {
+      try {
+        const event = await base44.asServiceRole.entities.Event.get(event_id);
+        company = event?.company || '';
+      } catch {}
+    }
+
     const existing = await base44.asServiceRole.entities.Biometric.filter({ person_id, status: 'active' });
     for (const b of existing) {
       await base44.asServiceRole.entities.Biometric.update(b.id, { status: 'revoked' });
@@ -23,6 +32,7 @@ export default async function(req) {
       person_id,
       person_name,
       event_id,
+      company,
       face_photo_url,
       face_descriptor: face_descriptor || [],
       status: 'active',

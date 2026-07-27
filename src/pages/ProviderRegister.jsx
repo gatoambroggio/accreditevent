@@ -23,10 +23,10 @@ import {
 import { toast } from '@/components/ui/use-toast';
 
 export default function ProviderRegister() {
-  const { company } = useParams();
+  const { eventId } = useParams();
   const [step, setStep] = useState(1);
-  const [events, setEvents] = useState([]);
-  const [loadingEvents, setLoadingEvents] = useState(true);
+  const [event, setEvent] = useState(null);
+  const [loadingEvent, setLoadingEvent] = useState(true);
   const [form, setForm] = useState({
     email: '',
     password: '',
@@ -35,26 +35,26 @@ export default function ProviderRegister() {
     document: '',
     company: '',
     phone: '',
-    event_id: '',
+    event_id: eventId || '',
   });
   const [otpCode, setOtpCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [personId, setPersonId] = useState(null);
-  const [companyName, setCompanyName] = useState('');
 
   useEffect(() => {
     (async () => {
-      if (!company) { setLoadingEvents(false); return; }
+      if (!eventId) { setLoadingEvent(false); return; }
       try {
-        const res = await base44.functions.invoke('getCompanyEvents', { company });
-        setEvents(res.data?.events || []);
-        setCompanyName(res.data?.company_name || company);
+        const res = await base44.functions.invoke('getCompanyEvents', { event_id: eventId });
+        if (res.data?.events?.length > 0) {
+          setEvent(res.data.events[0]);
+        }
       } catch {}
-      setLoadingEvents(false);
+      setLoadingEvent(false);
     })();
-  }, [company]);
+  }, [eventId]);
 
   const setField = (name, value) => setForm((f) => ({ ...f, [name]: value }));
 
@@ -62,7 +62,7 @@ export default function ProviderRegister() {
     e.preventDefault();
     setError('');
     if (!form.event_id) {
-      setError('Seleccioná el evento al que te querés inscribir.');
+      setError('No se pudo determinar el evento. Usá el link de registro que te envió el organizador.');
       return;
     }
     if (!/^\d{7,8}$/.test(form.document)) {
@@ -89,8 +89,6 @@ export default function ProviderRegister() {
       } catch (regErr) {
         const msg = (regErr.message || '').toLowerCase();
         if (msg.includes('already exists')) {
-          // User account exists (e.g. person was deleted but account remains)
-          // Try logging in with the same credentials, then recreate provider profile
           await base44.auth.loginViaEmailPassword(form.email, form.password);
           const res = await base44.functions.invoke('providerSetup', {
             full_name: form.full_name,
@@ -282,7 +280,7 @@ export default function ProviderRegister() {
     <AuthLayout
       icon={UserPlus}
       title="Registro de proveedor"
-      subtitle={companyName ? `Inscripción para ${companyName}` : 'Creá tu cuenta para gestionar acreditaciones'}
+      subtitle={event ? `Inscripción para: ${event.name}` : 'Creá tu cuenta para gestionar acreditaciones'}
       footer={
         <>
           ¿Ya tenés cuenta?{' '}
@@ -296,35 +294,26 @@ export default function ProviderRegister() {
         <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>
       )}
 
-      {loadingEvents ? (
+      {loadingEvent ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="w-6 h-6 animate-spin text-primary" />
         </div>
-      ) : events.length === 0 ? (
+      ) : !form.event_id ? (
         <div className="mb-4 p-4 rounded-lg bg-amber-50 text-amber-700 text-sm flex items-start gap-2">
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-          <span>No hay eventos disponibles para esta productora. Contactate con el organizador.</span>
+          <span>Este link de registro no es válido. Contactate con el organizador del evento.</span>
         </div>
       ) : (
         <form onSubmit={handleRegister} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="event_id">Evento</Label>
-            <div className="relative">
-              <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <select
-                id="event_id"
-                value={form.event_id}
-                onChange={(e) => setField('event_id', e.target.value)}
-                className="w-full pl-10 h-12 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-                required
-              >
-                <option value="">Seleccionar evento…</option>
-                {events.map((ev) => (
-                  <option key={ev.id} value={ev.id}>{ev.name}</option>
-                ))}
-              </select>
+          {event && (
+            <div className="mb-2 flex items-center gap-3 rounded-lg bg-emerald-50 px-4 py-3 ring-1 ring-emerald-100">
+              <CalendarDays className="h-5 w-5 shrink-0 text-emerald-600" />
+              <div>
+                <p className="text-sm font-bold text-emerald-800">{event.name}</p>
+                {event.venue && <p className="text-xs text-emerald-600">{event.venue}</p>}
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="full_name">Nombre completo</Label>
