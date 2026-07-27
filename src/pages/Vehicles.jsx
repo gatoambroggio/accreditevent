@@ -4,6 +4,7 @@ import { Plus, Pencil, Search, Loader2, Download, Car, Printer } from 'lucide-re
 import { exportToExcel } from '@/lib/exportUtils';
 import EntityModal from '@/components/EntityModal';
 import VehicleBadgePrint from '@/components/VehicleBadgePrint';
+import BatchVehicleBadgePrint from '@/components/BatchVehicleBadgePrint';
 import { useParkingSectors } from '@/lib/useParkingSectors';
 import { base44 } from '@/api/base44Client';
 
@@ -23,6 +24,8 @@ export default function Vehicles() {
   const [query, setQuery] = useState('');
   const [people, setPeople] = useState([]);
   const [printingVehicle, setPrintingVehicle] = useState(null);
+  const [selected, setSelected] = useState(new Set());
+  const [batchOpen, setBatchOpen] = useState(false);
   const [settings, setSettings] = useState(null);
   const [events, setEvents] = useState([]);
   const { sectors } = useParkingSectors();
@@ -39,6 +42,26 @@ export default function Vehicles() {
       return `${v.person_name || ''} ${v.brand || ''} ${v.model || ''} ${v.plate || ''} ${personDoc}`.toLowerCase().includes(q);
     });
   }, [items, query]);
+
+  const toggleSelect = (id) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelected((prev) => {
+      if (prev.size === filtered.length) return new Set();
+      return new Set(filtered.map((v) => v.id));
+    });
+  };
+
+  const handleBatchPrint = () => {
+    if (selected.size === 0) return;
+    setBatchOpen(true);
+  };
 
   const handleExport = () => {
     exportToExcel(
@@ -153,6 +176,10 @@ export default function Vehicles() {
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
             <Download className="h-4 w-4" /> Exportar
           </button>
+          <button onClick={handleBatchPrint} disabled={selected.size === 0}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">
+            <Printer className="h-4 w-4" /> Imprimir ({selected.size})
+          </button>
           <button onClick={openNew}
             className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800">
             <Plus className="h-4 w-4" /> Nuevo vehículo
@@ -183,6 +210,14 @@ export default function Vehicles() {
             <table className="w-full min-w-[820px] text-left">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
+                  <th className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selected.size === filtered.length && filtered.length > 0}
+                      onChange={toggleSelectAll}
+                      className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                    />
+                  </th>
                   <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Persona</th>
                   <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Vehículo</th>
                   <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Patente</th>
@@ -195,6 +230,14 @@ export default function Vehicles() {
               <tbody>
                 {filtered.map((v) => (
                   <tr key={v.id} className="border-b border-slate-50 transition hover:bg-slate-50/50">
+                    <td className="px-4 py-3.5">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(v.id)}
+                        onChange={() => toggleSelect(v.id)}
+                        className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                      />
+                    </td>
                     <td className="px-4 py-3.5 text-sm font-semibold text-slate-900">{v.person_name || '—'}</td>
                     <td className="px-4 py-3.5 text-sm text-slate-600">{v.brand} {v.model}</td>
                     <td className="px-4 py-3.5">
@@ -248,6 +291,16 @@ export default function Vehicles() {
           events={events.filter((e) => printingVehicle.event_ids?.includes(e.id))}
           parkingSectors={sectors}
           onClose={() => setPrintingVehicle(null)}
+        />
+      )}
+
+      {batchOpen && (
+        <BatchVehicleBadgePrint
+          vehicles={filtered.filter((v) => selected.has(v.id))}
+          settings={settings}
+          events={events}
+          sectors={sectors}
+          onClose={() => setBatchOpen(false)}
         />
       )}
     </div>
