@@ -247,6 +247,28 @@ export default function EntityModal({
       );
     }
 
+    if (f.type === 'dni') {
+      return (
+        <label key={f.name} className="block">
+          <span className="mb-1.5 block text-xs font-semibold text-slate-600">{f.label}{f.required && ' *'}</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={value.replace(/\D/g, '')}
+            onChange={(e) => setField(f.name, e.target.value.replace(/\D/g, ''))}
+            placeholder={f.placeholder || 'Ej: 12345678'}
+            required={f.required}
+            maxLength={8}
+            className={`w-full rounded-lg border px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:ring-2 ${
+              fieldError
+                ? 'border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-500/20'
+                : 'border-slate-200 bg-white focus:border-emerald-500 focus:ring-emerald-500/20'
+            }`}
+          />
+        </label>
+      );
+    }
+
     if (f.type === 'phone-ar') {
       const value = data[f.name] ?? '';
       const displayValue = value.startsWith('54') ? value.slice(2) : value;

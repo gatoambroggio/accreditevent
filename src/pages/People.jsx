@@ -12,6 +12,7 @@ const validatePerson = (data) => {
   if (!data.full_name?.trim()) e.full_name = 'El nombre es obligatorio';
   if (!data.person_type) e.person_type = 'Seleccioná un tipo';
   if (!data.document?.trim()) e.document = 'El documento es obligatorio';
+  else if (!/^\d{7,8}$/.test(data.document.trim())) e.document = 'Debe tener 7 u 8 dígitos numéricos';
   if (!data.company?.trim()) e.company = 'La empresa es obligatoria';
   if (!data.phone?.trim()) e.phone = 'El teléfono es obligatorio';
   else if (data.phone.replace(/\D/g, '').length < 12) e.phone = 'Teléfono incompleto (código de área + número)';
@@ -43,7 +44,7 @@ export default function People() {
       name: 'person_type', label: 'Tipo', type: 'select', required: true,
       options: personTypes.map((t) => ({ value: t.value, label: t.label })),
     },
-    { name: 'document', label: 'Documento', type: 'text', required: true, placeholder: 'Ej: 12345678' },
+    { name: 'document', label: 'Documento', type: 'dni', required: true, placeholder: 'Ej: 12345678' },
     { name: 'company', label: 'Empresa', type: 'text', required: true, placeholder: 'Ej: Producciones S.A.' },
     { name: 'phone', label: 'Teléfono', type: 'phone-ar', required: true, hint: 'Código de área sin 0 y número sin 15. Ej: 11 12345678' },
     { name: 'email', label: 'Email', type: 'email', required: true, placeholder: 'Ej: juan@empresa.com' },

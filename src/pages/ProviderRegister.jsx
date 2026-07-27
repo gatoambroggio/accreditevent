@@ -43,6 +43,14 @@ export default function ProviderRegister() {
   const handleRegister = async (e) => {
     e.preventDefault();
     setError('');
+    if (!/^\d{7,8}$/.test(form.document)) {
+      setError('El documento debe tener 7 u 8 dígitos numéricos.');
+      return;
+    }
+    if (form.phone.replace(/\D/g, '').length < 12) {
+      setError('El teléfono está incompleto. Ingresá código de área sin 0 y número sin 15.');
+      return;
+    }
     if (form.password !== form.confirmPassword) {
       setError('Las contraseñas no coinciden.');
       return;
@@ -257,24 +265,34 @@ export default function ProviderRegister() {
               <IdCard className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 id="document"
+                type="text"
+                inputMode="numeric"
                 placeholder="12345678"
                 value={form.document}
-                onChange={(e) => setField('document', e.target.value)}
+                onChange={(e) => setField('document', e.target.value.replace(/\D/g, ''))}
                 className="pl-10 h-12"
+                maxLength={8}
                 required
               />
             </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="phone">Teléfono</Label>
-            <div className="relative">
-              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <div className="flex">
+              <span className="inline-flex items-center rounded-l-lg border border-r-0 border-input bg-muted px-3 h-12 text-sm font-semibold text-muted-foreground">+54</span>
               <Input
                 id="phone"
-                placeholder="+54 11 12345678"
-                value={form.phone}
-                onChange={(e) => setField('phone', e.target.value)}
-                className="pl-10 h-12"
+                type="tel"
+                inputMode="numeric"
+                placeholder="11 12345678"
+                value={form.phone.startsWith('54') ? form.phone.slice(2) : form.phone}
+                onChange={(e) => {
+                  let cleaned = e.target.value.replace(/\D/g, '');
+                  if (cleaned.startsWith('0')) cleaned = cleaned.slice(1);
+                  if (cleaned.startsWith('15')) cleaned = cleaned.slice(2);
+                  setField('phone', '54' + cleaned);
+                }}
+                className="rounded-l-none h-12"
                 required
               />
             </div>
