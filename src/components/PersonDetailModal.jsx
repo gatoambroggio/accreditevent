@@ -76,7 +76,7 @@ export default function PersonDetailModal({ person, onClose }) {
     { name: 'color', label: 'Color', type: 'text', placeholder: 'Ej: Blanco' },
     {
       name: 'event_ids', label: 'Eventos asignados', type: 'toggle-group',
-      options: events.map((e) => ({ value: e.id, label: e.name })),
+      options: events.filter((e) => e.status !== 'closed').map((e) => ({ value: e.id, label: e.name })),
       full: true,
     },
     {
