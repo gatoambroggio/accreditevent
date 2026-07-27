@@ -114,8 +114,8 @@ export default function Accreditations() {
       // Send pickup notifications (email + WhatsApp)
       if (evt?.pickup_address) {
         const mapsUrl = evt.pickup_lat && evt.pickup_lng
-          ? `https://www.google.com/maps/search/?api=1&query=${evt.pickup_lat},${evt.pickup_lng}`
-          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(evt.pickup_address)}`;
+          ? `https://www.google.com/maps?q=${evt.pickup_lat},${evt.pickup_lng}`
+          : `https://www.google.com/maps?q=${encodeURIComponent(evt.pickup_address)}`;
         const pickupDate = evt.pickup_date
           ? new Date(evt.pickup_date + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
           : 'a confirmar';
@@ -126,23 +126,52 @@ export default function Accreditations() {
         // Email (only reaches registered app users)
         if (person?.email) {
           try {
+            const htmlBody = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background-color:#f0fdf4;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0fdf4;padding:32px 16px;">
+<tr><td align="center">
+<table width="560" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
+<tr><td style="background:linear-gradient(135deg,#047857,#065f46);padding:32px 40px;text-align:center;">
+<h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:800;letter-spacing:-0.5px;">AccreditEvent</h1>
+<p style="margin:8px 0 0;color:#a7f3d0;font-size:12px;text-transform:uppercase;letter-spacing:2px;">Tu acreditación está lista</p>
+</td></tr>
+<tr><td style="padding:36px 40px;">
+<p style="margin:0 0 20px;color:#0f172a;font-size:16px;line-height:1.6;">Hola <strong>${person.full_name}</strong>,</p>
+<p style="margin:0 0 28px;color:#475569;font-size:15px;line-height:1.6;">Tu acreditación para <strong style="color:#047857;">${evt.name}</strong> ya está lista. Estos son los datos para el retiro:</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0fdf4;border-radius:12px;border:1px solid #bbf7d0;margin-bottom:28px;">
+<tr><td style="padding:24px;">
+<p style="margin:0 0 6px;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;">📅 Fecha de retiro</p>
+<p style="margin:0 0 20px;color:#0f172a;font-size:15px;font-weight:700;">${pickupDate}</p>
+<p style="margin:0 0 6px;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;">🕐 Horario</p>
+<p style="margin:0 0 20px;color:#0f172a;font-size:15px;font-weight:700;">${pickupTime}</p>
+<p style="margin:0 0 6px;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;">📍 Dirección</p>
+<p style="margin:0;color:#0f172a;font-size:15px;font-weight:700;">${evt.pickup_address}</p>
+</td></tr>
+</table>
+<table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+<a href="${mapsUrl}" style="display:inline-block;background:#047857;color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:10px;font-size:15px;font-weight:700;">🗺️ Ver ubicación en Google Maps</a>
+</td></tr></table>
+<p style="margin:28px 0 0;color:#475569;font-size:14px;line-height:1.6;">¡Te esperamos!</p>
+</td></tr>
+<tr><td style="background-color:#f8fafc;padding:20px 40px;border-top:1px solid #e2e8f0;">
+<p style="margin:0;color:#94a3b8;font-size:12px;text-align:center;">AccreditEvent · Sistema de acreditación de eventos</p>
+</td></tr>
+</table>
+</td></tr>
+</table></body></html>`;
             await base44.integrations.Core.SendEmail({
               to: person.email,
               subject: `Tu acreditación para ${evt.name} está lista`,
-              body:
-                `Hola ${person.full_name},\n\n` +
-                `Tu acreditación para "${evt.name}" ya está lista.\n\n` +
-                `Podés retirarla el día ${pickupDate}, en el horario de ${pickupTime}.\n\n` +
-                `Dirección de retiro: ${evt.pickup_address}\n` +
-                `Ver ubicación en el mapa: ${mapsUrl}\n\n` +
-                `Te esperamos.\n\nAccreditEvent`,
+              body: htmlBody,
             });
           } catch {}
         }
 
         // WhatsApp (opens chat with pre-filled message)
         if (person?.phone) {
-          const cleanPhone = person.phone.replace(/\D/g, '');
+          let cleanPhone = person.phone.replace(/\D/g, '');
+          if (!cleanPhone.startsWith('54')) {
+            cleanPhone = '54' + cleanPhone.replace(/^0/, '');
+          }
           const waMessage = encodeURIComponent(
             `Hola ${person.full_name},\n\n` +
             `Tu acreditación para "${evt.name}" ya está lista.\n\n` +
@@ -151,7 +180,13 @@ export default function Accreditations() {
             `Ver ubicación en el mapa: ${mapsUrl}\n\n` +
             `Te esperamos.\n\nAccreditEvent`
           );
-          window.open(`https://wa.me/${cleanPhone}?text=${waMessage}`, '_blank');
+          const waLink = document.createElement('a');
+          waLink.href = `https://wa.me/${cleanPhone}?text=${waMessage}`;
+          waLink.target = '_blank';
+          waLink.rel = 'noopener noreferrer';
+          document.body.appendChild(waLink);
+          waLink.click();
+          document.body.removeChild(waLink);
         }
       }
     }
