@@ -20,7 +20,7 @@ export default function Accreditations() {
     personTypes.forEach((t) => { map[t.value] = t.badge_prefix || 'GE'; });
     return map;
   }, [personTypes]);
-  const accessLevels = zones.map((z) => z.value);
+  const accessLevels = [...new Set(zones.map((z) => z.value))];
   const [events, setEvents] = useState([]);
   const [people, setPeople] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
