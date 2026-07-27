@@ -148,10 +148,12 @@ export default function ProviderPortal() {
       await base44.entities.Vehicle.create({
         person_id: person.id,
         person_name: person.full_name,
+        company: person.productora || person.company || '',
         brand: e.target.elements.brand.value.trim(),
         model: e.target.elements.model.value.trim(),
         plate: e.target.elements.plate.value.toUpperCase().trim(),
         color: e.target.elements.color.value.trim(),
+        event_ids: person.event_id ? [person.event_id] : [],
       });
       await logAudit('vehicle-create', 'Vehicle', '', e.target.elements.plate.value);
       e.target.reset();
