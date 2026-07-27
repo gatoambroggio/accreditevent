@@ -25,8 +25,8 @@ export default function VehicleBadgePrint({ vehicle, settings, events = [], park
   const dateText = eventDates.length > 1 ? `${eventDates[0]} - ${eventDates[eventDates.length - 1]}` : eventDates[0];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-sm sm:p-6">
-      <div className="my-8 w-full max-w-2xl">
+    <div className="badge-overlay fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-sm sm:p-6">
+      <div className="badge-wrapper my-8 w-full max-w-2xl">
         <div className="no-print mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold text-white">Credencial de vehículo</h2>
           <div className="flex gap-2">

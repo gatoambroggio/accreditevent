@@ -8,8 +8,8 @@ export default function BadgePrint({ accreditation, event, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-sm sm:p-6">
-      <div className="my-8 w-full max-w-sm">
+    <div className="badge-overlay fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-sm sm:p-6">
+      <div className="badge-wrapper my-8 w-full max-w-sm">
         <div className="no-print mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold text-white">Credencial</h2>
           <div className="flex gap-2">
