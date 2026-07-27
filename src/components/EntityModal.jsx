@@ -243,6 +243,16 @@ export default function EntityModal({
       );
     }
 
+    if (f.type === 'date') {
+      const val = value ? String(value).slice(0, 10) : '';
+      return (
+        <label key={f.name} className="block">
+          <span className="mb-1.5 block text-xs font-semibold text-slate-600">{f.label}{f.required && ' *'}</span>
+          <input type="date" {...common} value={val} />
+        </label>
+      );
+    }
+
     if (f.type === 'datetime-local') {
       const val = value ? String(value).slice(0, 16) : '';
       return (
