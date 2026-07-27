@@ -14,6 +14,10 @@
       "type": "string",
       "description": "Logo del evento para credenciales"
     },
+    "company": {
+      "type": "string",
+      "description": "Empresa a la que pertenece el evento"
+    },
     "start_at": {
       "type": "string",
       "format": "date-time",
@@ -79,9 +83,16 @@
     "read": {
       "$or": [
         {
-          "user_condition": {
-            "role": "productora"
-          }
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
         },
         {
           "user_condition": {
@@ -108,9 +119,16 @@
     "create": {
       "$or": [
         {
-          "user_condition": {
-            "role": "productora"
-          }
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
         },
         {
           "user_condition": {
@@ -132,9 +150,16 @@
     "update": {
       "$or": [
         {
-          "user_condition": {
-            "role": "productora"
-          }
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
         },
         {
           "user_condition": {
@@ -161,9 +186,16 @@
     "delete": {
       "$or": [
         {
-          "user_condition": {
-            "role": "productora"
-          }
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
         },
         {
           "user_condition": {

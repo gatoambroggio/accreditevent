@@ -5,6 +5,7 @@ import { exportToExcel } from '@/lib/exportUtils';
 import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { logAudit } from '@/lib/audit';
 
 function fmtDate(d) {
@@ -14,6 +15,8 @@ function fmtDate(d) {
 
 export default function Events() {
   const { items, loading, create, update, remove } = useCrud('Event');
+  const { user: currentUser } = useAuth();
+  const isProductora = currentUser?.role === 'productora';
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [query, setQuery] = useState('');
@@ -29,30 +32,38 @@ export default function Events() {
     })();
   }, []);
 
-  const fields = useMemo(() => [
-    { name: 'name', label: 'Nombre del evento', type: 'text', required: true, full: true },
-    { name: 'venue', label: 'Sede', type: 'text' },
-    { name: 'logo_url', label: 'Logo del evento', type: 'image-upload', full: true },
-    { name: 'start_at', label: 'Inicio', type: 'datetime-local' },
-    { name: 'end_at', label: 'Fin', type: 'datetime-local' },
-    { name: 'grace_hours', label: 'Horas extra post-evento', type: 'number' },
-    { name: 'pickup_date', label: 'Fecha de retiro', type: 'date' },
-    { name: 'pickup_start_time', label: 'Retiro desde', type: 'time' },
-    { name: 'pickup_end_time', label: 'Retiro hasta', type: 'time' },
-    { name: 'pickup_address', label: 'Dirección de retiro', type: 'address', full: true, placeholder: 'Buscar dirección…' },
-    {
-      name: 'assigned_user_ids', label: 'Usuarios asignados', type: 'toggle-group', full: true,
-      options: users.map((u) => ({ value: u.id, label: u.full_name || u.email })),
-    },
-    {
-      name: 'status', label: 'Estado', type: 'select',
-      options: [
-        { value: 'draft', label: 'Borrador' },
-        { value: 'active', label: 'Activo' },
-        { value: 'closed', label: 'Cerrado' },
-      ],
-    },
-  ], [users]);
+  const fields = useMemo(() => {
+    const baseFields = [
+      { name: 'name', label: 'Nombre del evento', type: 'text', required: true, full: true },
+      { name: 'venue', label: 'Sede', type: 'text' },
+      { name: 'logo_url', label: 'Logo del evento', type: 'image-upload', full: true },
+    ];
+    if (!isProductora) {
+      baseFields.push({ name: 'company', label: 'Empresa', type: 'text', placeholder: 'Ej: Producciones SA', full: true, hint: 'Los usuarios con rol productora de esta empresa verán automáticamente este evento' });
+    }
+    baseFields.push(
+      { name: 'start_at', label: 'Inicio', type: 'datetime-local' },
+      { name: 'end_at', label: 'Fin', type: 'datetime-local' },
+      { name: 'grace_hours', label: 'Horas extra post-evento', type: 'number' },
+      { name: 'pickup_date', label: 'Fecha de retiro', type: 'date' },
+      { name: 'pickup_start_time', label: 'Retiro desde', type: 'time' },
+      { name: 'pickup_end_time', label: 'Retiro hasta', type: 'time' },
+      { name: 'pickup_address', label: 'Dirección de retiro', type: 'address', full: true, placeholder: 'Buscar dirección…' },
+      {
+        name: 'assigned_user_ids', label: 'Usuarios asignados', type: 'toggle-group', full: true,
+        options: users.map((u) => ({ value: u.id, label: u.full_name || u.email })),
+      },
+      {
+        name: 'status', label: 'Estado', type: 'select',
+        options: [
+          { value: 'draft', label: 'Borrador' },
+          { value: 'active', label: 'Activo' },
+          { value: 'closed', label: 'Cerrado' },
+        ],
+      },
+    );
+    return baseFields;
+  }, [users, isProductora]);
 
   const filtered = useMemo(() => {
     let result = items;
@@ -81,7 +92,7 @@ export default function Events() {
     );
   };
 
-  const openNew = () => { setEditing(null); setModalOpen(true); };
+  const openNew = () => { setEditing(isProductora ? { company: currentUser.company } : null); setModalOpen(true); };
   const openEdit = (item) => { setEditing(item); setModalOpen(true); };
 
   const syncUserEvents = async (eventId, newAssignedIds) => {
@@ -116,9 +127,18 @@ export default function Events() {
         }
       } catch {}
     }
+    if (isProductora) {
+      data.company = currentUser.company;
+    }
     const assignedIds = data.assigned_user_ids
       ? String(data.assigned_user_ids).split(',').filter(Boolean)
       : [];
+    if (data.company) {
+      const companyProductoras = users.filter((u) => u.role === 'productora' && u.company === data.company);
+      for (const pu of companyProductoras) {
+        if (!assignedIds.includes(pu.id)) assignedIds.push(pu.id);
+      }
+    }
     const payload = { ...data, assigned_user_ids: assignedIds };
     let eventId;
     if (editing) {
@@ -186,6 +206,7 @@ export default function Events() {
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
                   <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Evento</th>
+                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Empresa</th>
                   <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Sede</th>
                   <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Fechas</th>
                   <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Estado</th>
@@ -196,6 +217,7 @@ export default function Events() {
                 {filtered.map((e) => (
                   <tr key={e.id} className="border-b border-slate-50 transition hover:bg-slate-50/50">
                     <td className="px-4 py-3.5 text-sm font-semibold text-slate-900">{e.name}</td>
+                    <td className="px-4 py-3.5 text-sm text-slate-500">{e.company || '—'}</td>
                     <td className="px-4 py-3.5 text-sm text-slate-500">{e.venue || '—'}</td>
                     <td className="px-4 py-3.5 text-sm text-slate-500">
                       {fmtDate(e.start_at)}{e.end_at ? ` — ${fmtDate(e.end_at)}` : ''}
