@@ -33,15 +33,25 @@ export default function Vehicles() {
   const [peopleLoaded, setPeopleLoaded] = useState(false);
   const [showPersonSearch, setShowPersonSearch] = useState(false);
 
+  const activeEventIds = useMemo(() => new Set(events.filter((e) => e.status !== 'closed').map((e) => e.id)), [events]);
+
+  const visibleItems = useMemo(() => {
+    return items.filter((v) => {
+      const evtIds = v.event_ids || [];
+      if (evtIds.length === 0) return true;
+      return evtIds.some((id) => activeEventIds.has(id));
+    });
+  }, [items, activeEventIds]);
+
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
-    if (!q) return items;
-    return items.filter((v) => {
+    if (!q) return visibleItems;
+    return visibleItems.filter((v) => {
       const person = people.find((p) => p.id === v.person_id);
       const personDoc = person?.document || '';
       return `${v.person_name || ''} ${v.brand || ''} ${v.model || ''} ${v.plate || ''} ${personDoc}`.toLowerCase().includes(q);
     });
-  }, [items, query]);
+  }, [visibleItems, query]);
 
   const toggleSelect = (id) => {
     setSelected((prev) => {
