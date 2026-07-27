@@ -12,7 +12,7 @@
     },
     "badge_code": {
       "type": "string",
-      "description": "C\u00f3digo de credencial (denormalizado)"
+      "description": "C\u00f3digo de credencial o patente (denormalizado)"
     },
     "event_id": {
       "type": "string",
@@ -35,6 +35,15 @@
       "default": "biometric",
       "description": "M\u00e9todo de verificaci\u00f3n"
     },
+    "resource_type": {
+      "type": "string",
+      "enum": [
+        "person",
+        "vehicle"
+      ],
+      "default": "person",
+      "description": "Tipo de recurso validado (persona o veh\u00edculo)"
+    },
     "zone": {
       "type": "string",
       "description": "Zona(s) de control de acceso (separadas por coma)"
@@ -50,7 +59,7 @@
     },
     "access_level": {
       "type": "string",
-      "description": "Nivel de acceso de la persona"
+      "description": "Nivel de acceso de la persona o sector del veh\u00edculo"
     }
   },
   "required": [
