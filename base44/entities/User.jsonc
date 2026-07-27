@@ -11,6 +11,13 @@
         "provider"
       ],
       "default": "provider"
+    },
+    "assigned_event_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs de eventos a los que el usuario tiene acceso"
     }
   },
   "required": [

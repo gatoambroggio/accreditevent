@@ -122,6 +122,7 @@ export default async function(req) {
             person_name: accred?.person_name || `Usuario ${userId}`,
             badge_code: userId,
             event_name: accred?.event_name || device.event_name || '',
+            event_id: accred?.event_id || device.event_id || '',
             verified_by: `ZKTeco ${device.name}`,
             method: 'biometric',
             zone: device.zone || '',

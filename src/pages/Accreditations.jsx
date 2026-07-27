@@ -126,6 +126,7 @@ export default function Accreditations() {
       event_name: evt?.name || '',
       person_name: person?.full_name || '',
       person_type: person?.person_type || '',
+      person_email: person?.email || '',
     };
     if (!editing) {
       enriched.badge_code = generateBadgeCode(person?.person_type, items.map((a) => a.badge_code), typePrefixes);

@@ -1,30 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useCrud } from '@/lib/crud';
 import { Plus, Pencil, Loader2, Search, Download } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
 import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
-
-const FIELDS = [
-  { name: 'name', label: 'Nombre del evento', type: 'text', required: true, full: true },
-  { name: 'venue', label: 'Sede', type: 'text' },
-  { name: 'logo_url', label: 'Logo del evento', type: 'image-upload', full: true },
-  { name: 'start_at', label: 'Inicio', type: 'datetime-local' },
-  { name: 'end_at', label: 'Fin', type: 'datetime-local' },
-  { name: 'grace_hours', label: 'Horas extra post-evento', type: 'number' },
-  { name: 'pickup_date', label: 'Fecha de retiro', type: 'date' },
-  { name: 'pickup_start_time', label: 'Retiro desde', type: 'time' },
-  { name: 'pickup_end_time', label: 'Retiro hasta', type: 'time' },
-  { name: 'pickup_address', label: 'Dirección de retiro', type: 'address', full: true, placeholder: 'Buscar dirección…' },
-  {
-    name: 'status', label: 'Estado', type: 'select',
-    options: [
-      { value: 'draft', label: 'Borrador' },
-      { value: 'active', label: 'Activo' },
-      { value: 'closed', label: 'Cerrado' },
-    ],
-  },
-];
+import { base44 } from '@/api/base44Client';
+import { logAudit } from '@/lib/audit';
 
 function fmtDate(d) {
   if (!d) return '—';
@@ -37,6 +18,41 @@ export default function Events() {
   const [editing, setEditing] = useState(null);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [users, setUsers] = useState([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await base44.entities.User.list('-created_date', 200);
+        setUsers(data.filter((u) => u.role !== 'provider' && u.role !== 'superadmin'));
+      } catch {}
+    })();
+  }, []);
+
+  const fields = useMemo(() => [
+    { name: 'name', label: 'Nombre del evento', type: 'text', required: true, full: true },
+    { name: 'venue', label: 'Sede', type: 'text' },
+    { name: 'logo_url', label: 'Logo del evento', type: 'image-upload', full: true },
+    { name: 'start_at', label: 'Inicio', type: 'datetime-local' },
+    { name: 'end_at', label: 'Fin', type: 'datetime-local' },
+    { name: 'grace_hours', label: 'Horas extra post-evento', type: 'number' },
+    { name: 'pickup_date', label: 'Fecha de retiro', type: 'date' },
+    { name: 'pickup_start_time', label: 'Retiro desde', type: 'time' },
+    { name: 'pickup_end_time', label: 'Retiro hasta', type: 'time' },
+    { name: 'pickup_address', label: 'Dirección de retiro', type: 'address', full: true, placeholder: 'Buscar dirección…' },
+    {
+      name: 'assigned_user_ids', label: 'Usuarios asignados', type: 'toggle-group', full: true,
+      options: users.map((u) => ({ value: u.id, label: u.full_name || u.email })),
+    },
+    {
+      name: 'status', label: 'Estado', type: 'select',
+      options: [
+        { value: 'draft', label: 'Borrador' },
+        { value: 'active', label: 'Activo' },
+        { value: 'closed', label: 'Cerrado' },
+      ],
+    },
+  ], [users]);
 
   const filtered = useMemo(() => {
     let result = items;
@@ -68,6 +84,25 @@ export default function Events() {
   const openNew = () => { setEditing(null); setModalOpen(true); };
   const openEdit = (item) => { setEditing(item); setModalOpen(true); };
 
+  const syncUserEvents = async (eventId, newAssignedIds) => {
+    const prevIds = editing?.assigned_user_ids || [];
+    const added = newAssignedIds.filter((id) => !prevIds.includes(id));
+    const removed = prevIds.filter((id) => !newAssignedIds.includes(id));
+    for (const uid of [...added, ...removed]) {
+      const u = users.find((x) => x.id === uid);
+      if (!u) continue;
+      let eventIds = u.assigned_event_ids || [];
+      if (added.includes(uid)) {
+        if (!eventIds.includes(eventId)) eventIds = [...eventIds, eventId];
+      } else {
+        eventIds = eventIds.filter((eid) => eid !== eventId);
+      }
+      try {
+        await base44.entities.User.update(uid, { assigned_event_ids: eventIds });
+      } catch {}
+    }
+  };
+
   const handleSubmit = async (data) => {
     if (data.pickup_address && (!data.pickup_lat || !data.pickup_lng)) {
       try {
@@ -81,8 +116,20 @@ export default function Events() {
         }
       } catch {}
     }
-    if (editing) await update(editing.id, data);
-    else await create(data);
+    const assignedIds = data.assigned_user_ids
+      ? String(data.assigned_user_ids).split(',').filter(Boolean)
+      : [];
+    const payload = { ...data, assigned_user_ids: assignedIds };
+    let eventId;
+    if (editing) {
+      await update(editing.id, payload);
+      eventId = editing.id;
+    } else {
+      const created = await create(payload);
+      eventId = created.id;
+    }
+    await syncUserEvents(eventId, assignedIds);
+    await logAudit(editing ? 'update' : 'create', 'Event', eventId, `Usuarios: ${assignedIds.length}`);
   };
 
   const handleDelete = async () => { await remove(editing.id); };
@@ -172,7 +219,7 @@ export default function Events() {
         onClose={() => setModalOpen(false)}
         title={editing ? 'Editar evento' : 'Nuevo evento'}
         kicker={editing ? 'EDITAR EVENTO' : 'CREAR EVENTO'}
-        fields={FIELDS}
+        fields={fields}
         initialData={editing || {}}
         onSubmit={handleSubmit}
         onDelete={editing ? handleDelete : null}

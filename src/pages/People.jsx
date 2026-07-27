@@ -32,6 +32,16 @@ export default function People() {
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [detailPerson, setDetailPerson] = useState(null);
+  const [events, setEvents] = useState([]);
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const data = await base44.entities.Event.list('-start_at', 200);
+        setEvents(data);
+      } catch {}
+    })();
+  }, []);
 
   const filtered = useMemo(() => {
     let result = items;
@@ -66,6 +76,10 @@ export default function People() {
   const fields = useMemo(() => [
     { name: 'full_name', label: 'Nombre completo', type: 'text', required: true, full: true, placeholder: 'Ej: Juan Pérez' },
     {
+      name: 'event_id', label: 'Evento', type: 'select', required: true,
+      options: events.map((e) => ({ value: e.id, label: e.name })),
+    },
+    {
       name: 'person_type', label: 'Tipo', type: 'select', required: true,
       options: personTypes.map((t) => ({ value: t.value, label: t.label })),
     },
@@ -83,7 +97,7 @@ export default function People() {
     },
     { name: 'notes', label: 'Notas', type: 'textarea', full: true, placeholder: 'Ej: Responsable de montaje audiovisual' },
     { name: '_face', label: 'Registro facial', type: 'face-capture', full: true },
-  ], [personTypes]);
+  ], [personTypes, events]);
 
   const openNew = () => { setEditing(null); setModalOpen(true); };
   const openEdit = async (item) => {
@@ -114,6 +128,7 @@ export default function People() {
       await base44.entities.Biometric.create({
         person_id: personId,
         person_name: personData.full_name,
+        event_id: personData.event_id,
         face_photo_url,
         face_descriptor,
         status: 'active',

@@ -100,9 +100,11 @@ export default function AccreditationFacial() {
       }
 
       let personType = 'guest';
+      let personEmail = '';
       try {
         const person = await base44.entities.Person.get(personId);
         if (person?.person_type) personType = person.person_type;
+        if (person?.email) personEmail = person.email;
       } catch {}
 
       const allAccreditations = await base44.entities.Accreditation.list('-created_date', 500);
@@ -114,6 +116,7 @@ export default function AccreditationFacial() {
         person_id: personId,
         person_name: personName,
         person_type: personType,
+        person_email: personEmail,
         badge_code: badgeCode,
         access_level: 'general',
         status: 'active',

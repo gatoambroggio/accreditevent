@@ -105,6 +105,7 @@ export default function PersonDetailModal({ person, onClose }) {
       await base44.entities.Document.create({
         person_id: person.id,
         person_name: person.full_name,
+        event_id: person.event_id,
         document_type: docType,
         original_name: selectedFile.name,
         file_url,
