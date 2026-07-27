@@ -14,6 +14,10 @@
       "type": "string",
       "description": "Evento al que pertenece el documento"
     },
+    "company": {
+      "type": "string",
+      "description": "Empresa del evento (denormalizado para RLS)"
+    },
     "document_type": {
       "type": "string",
       "description": "Tipo de documento (coincide con el value de DocumentType)"
@@ -94,6 +98,18 @@
           }
         },
         {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
           "data.event_id": {
             "$in": "{{user.data.assigned_event_ids}}"
           }
@@ -119,6 +135,18 @@
           "user_condition": {
             "role": "coordinator"
           }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
         },
         {
           "data.event_id": {
@@ -150,6 +178,18 @@
           }
         },
         {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
           "data.event_id": {
             "$in": "{{user.data.assigned_event_ids}}"
           }
@@ -175,6 +215,18 @@
           "user_condition": {
             "role": "coordinator"
           }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
         },
         {
           "data.event_id": {
