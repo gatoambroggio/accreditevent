@@ -41,7 +41,7 @@ const AUTH_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, authChecked } = useAuth();
   const location = useLocation();
-  const isAuthRoute = AUTH_ROUTES.includes(location.pathname);
+  const isAuthRoute = AUTH_ROUTES.includes(location.pathname) || location.pathname.startsWith('/registro');
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
