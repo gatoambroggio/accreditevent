@@ -84,12 +84,29 @@ export default function People() {
     );
   };
 
-  const fields = useMemo(() => [
-    { name: 'full_name', label: 'Nombre completo', type: 'text', required: true, full: true, placeholder: 'Ej: Juan Pérez' },
-    {
-      name: 'event_id', label: 'Evento', type: 'select', required: true,
-      options: events.map((e) => ({ value: e.id, label: e.name })),
-    },
+  const fields = useMemo(() => {
+    const activeEvents = events.filter((e) => {
+      if (e.status === 'closed') return false;
+      // Exclude events past their end + grace period
+      if (e.end_at) {
+        const end = new Date(e.end_at);
+        const graceMs = (e.grace_hours || 0) * 3600 * 1000;
+        if (end.getTime() + graceMs < Date.now()) return false;
+      }
+      return true;
+    });
+    // When editing, keep the currently assigned event visible even if expired
+    const editingEventId = editing?.event_id;
+    if (editingEventId && !activeEvents.find((e) => e.id === editingEventId)) {
+      const current = events.find((e) => e.id === editingEventId);
+      if (current) activeEvents.push(current);
+    }
+    return [
+      { name: 'full_name', label: 'Nombre completo', type: 'text', required: true, full: true, placeholder: 'Ej: Juan Pérez' },
+      {
+        name: 'event_id', label: 'Evento', type: 'select', required: true,
+        options: activeEvents.map((e) => ({ value: e.id, label: e.name })),
+      },
     {
       name: 'person_type', label: 'Tipo', type: 'select', required: true,
       options: personTypes.map((t) => ({ value: t.value, label: t.label })),
@@ -99,9 +116,10 @@ export default function People() {
     { name: 'phone', label: 'Teléfono', type: 'phone-ar', required: true, hint: 'Código de área sin 0 y número sin 15. Ej: 11 12345678' },
     { name: 'email', label: 'Email', type: 'email', required: true, placeholder: 'Ej: juan@empresa.com' },
     { name: 'status', label: 'Estado', type: 'select', required: true, options: STATUS_OPTIONS },
-    { name: 'notes', label: 'Notas', type: 'textarea', full: true, placeholder: 'Ej: Responsable de montaje audiovisual' },
-    { name: '_face', label: 'Registro facial', type: 'face-capture', full: true },
-  ], [personTypes, events]);
+      { name: 'notes', label: 'Notas', type: 'textarea', full: true, placeholder: 'Ej: Responsable de montaje audiovisual' },
+      { name: '_face', label: 'Registro facial', type: 'face-capture', full: true },
+    ];
+  }, [personTypes, events, editing]);
 
   const openNew = () => { setEditing(null); setModalOpen(true); };
   const openEdit = async (item) => {
