@@ -42,14 +42,20 @@ export default function People() {
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [companyFilter, setCompanyFilter] = useState('');
   const [detailPerson, setDetailPerson] = useState(null);
   const [events, setEvents] = useState([]);
+  const [companies, setCompanies] = useState([]);
 
   React.useEffect(() => {
     (async () => {
       try {
-        const data = await base44.entities.Event.list('-start_at', 200);
-        setEvents(data);
+        const [evs, comps] = await Promise.all([
+          base44.entities.Event.list('-start_at', 200),
+          base44.entities.Company.list('name', 500),
+        ]);
+        setEvents(evs);
+        setCompanies(comps);
       } catch {}
     })();
   }, []);
@@ -64,8 +70,9 @@ export default function People() {
     }
     if (typeFilter) result = result.filter((p) => p.person_type === typeFilter);
     if (statusFilter) result = result.filter((p) => p.status === statusFilter);
+    if (companyFilter) result = result.filter((p) => p.company === companyFilter);
     return result;
-  }, [items, query, typeFilter, statusFilter]);
+  }, [items, query, typeFilter, statusFilter, companyFilter]);
 
   const handleExport = () => {
     exportToExcel(
@@ -112,14 +119,18 @@ export default function People() {
       options: personTypes.map((t) => ({ value: t.value, label: t.label })),
     },
     { name: 'document', label: 'Documento', type: 'dni', required: true, placeholder: 'Ej: 12345678' },
-    { name: 'company', label: 'Empresa', type: 'text', required: true, placeholder: 'Ej: Producciones S.A.' },
+    {
+      name: 'company', label: 'Empresa', type: 'searchable-select', required: true,
+      options: companies.map((c) => ({ value: c.name, label: c.name })),
+      placeholder: 'Buscar empresa…',
+    },
     { name: 'phone', label: 'Teléfono', type: 'phone-ar', required: true, hint: 'Código de área sin 0 y número sin 15. Ej: 11 12345678' },
     { name: 'email', label: 'Email', type: 'email', required: true, placeholder: 'Ej: juan@empresa.com' },
     { name: 'status', label: 'Estado', type: 'select', required: true, options: STATUS_OPTIONS },
       { name: 'notes', label: 'Notas', type: 'textarea', full: true, placeholder: 'Ej: Responsable de montaje audiovisual' },
       { name: '_face', label: 'Registro facial', type: 'face-capture', full: true },
     ];
-  }, [personTypes, events, editing]);
+  }, [personTypes, events, editing, companies]);
 
   const openNew = () => { setEditing(null); setModalOpen(true); };
   const openEdit = async (item) => {
@@ -173,6 +184,7 @@ export default function People() {
       <div className="flex flex-wrap items-center gap-3">
         <SearchInput value={query} onChange={setQuery} placeholder="Buscar por nombre, empresa o documento…" />
         <FilterSelect value={typeFilter} onChange={setTypeFilter} options={personTypes.map((t) => ({ value: t.value, label: t.label }))} placeholder="Todos los tipos" />
+        <FilterSelect value={companyFilter} onChange={setCompanyFilter} options={companies.map((c) => ({ value: c.name, label: c.name }))} placeholder="Todas las empresas" />
         <FilterSelect value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} placeholder="Todos los estados" />
       </div>
 
