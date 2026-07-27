@@ -7,6 +7,7 @@ import BiometricButton from '@/components/BiometricButton';
 import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
 import BadgePrint from '@/components/BadgePrint';
+import BatchBadgePrint from '@/components/BatchBadgePrint';
 import { useZones } from '@/lib/useZones';
 import { usePersonTypes } from '@/lib/usePersonTypes';
 import { generateBadgeCode } from '@/lib/badgeCode';
@@ -29,6 +30,8 @@ export default function Accreditations() {
   const [statusFilter, setStatusFilter] = useState('');
   const [query, setQuery] = useState('');
   const [badgeAccred, setBadgeAccred] = useState(null);
+  const [selected, setSelected] = useState(new Set());
+  const [batchOpen, setBatchOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -55,6 +58,27 @@ export default function Accreditations() {
     }
     return result;
   }, [items, eventFilter, statusFilter, query]);
+
+  const toggleSelect = (id) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelected((prev) => {
+      if (prev.size === filtered.length) return new Set();
+      return new Set(filtered.map((a) => a.id));
+    });
+  };
+
+  const handleBatchPrint = () => {
+    const selectedAccreds = filtered.filter((a) => selected.has(a.id));
+    if (selectedAccreds.length === 0) return;
+    setBatchOpen(true);
+  };
 
   const handleExport = () => {
     exportToExcel(
@@ -234,6 +258,10 @@ export default function Accreditations() {
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
             <Download className="h-4 w-4" /> Exportar
           </button>
+          <button onClick={handleBatchPrint} disabled={selected.size === 0}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">
+            <Printer className="h-4 w-4" /> Imprimir ({selected.size})
+          </button>
           <button onClick={openNew}
             className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800">
             <Plus className="h-4 w-4" /> Nueva acreditación
@@ -281,6 +309,14 @@ export default function Accreditations() {
             <table className="w-full min-w-[800px] text-left">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
+                  <th className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selected.size === filtered.length && filtered.length > 0}
+                      onChange={toggleSelectAll}
+                      className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                    />
+                  </th>
                   <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Persona</th>
                   <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Evento</th>
                   <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Código</th>
@@ -293,6 +329,14 @@ export default function Accreditations() {
               <tbody>
                 {filtered.map((a) => (
                   <tr key={a.id} className="border-b border-slate-50 transition hover:bg-slate-50/50">
+                    <td className="px-4 py-3.5">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(a.id)}
+                        onChange={() => toggleSelect(a.id)}
+                        className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                      />
+                    </td>
                     <td className="px-4 py-3.5">
                       <p className="text-sm font-semibold text-slate-900">{a.person_name || '—'}</p>
                       <p className="text-xs text-slate-400">{a.person_type}</p>
@@ -341,6 +385,14 @@ export default function Accreditations() {
           accreditation={badgeAccred}
           event={events.find((e) => e.id === badgeAccred.event_id)}
           onClose={() => setBadgeAccred(null)}
+        />
+      )}
+
+      {batchOpen && (
+        <BatchBadgePrint
+          accreditations={filtered.filter((a) => selected.has(a.id))}
+          events={events}
+          onClose={() => setBatchOpen(false)}
         />
       )}
     </div>
