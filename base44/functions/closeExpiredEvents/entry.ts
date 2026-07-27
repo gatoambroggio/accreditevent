@@ -21,15 +21,29 @@ export default async function(req: Request): Promise<Response> {
     });
 
     let closed = 0;
+    let accreditationsBlocked = 0;
     for (const evt of expired) {
       try {
         await base44.asServiceRole.entities.Event.update(evt.id, { status: 'closed' });
         closed++;
+
+        const accs = await base44.asServiceRole.entities.Accreditation.filter(
+          { event_id: evt.id, status: 'active' },
+          '-created_date',
+          500
+        );
+        for (const acc of accs) {
+          try {
+            await base44.asServiceRole.entities.Accreditation.update(acc.id, { status: 'blocked' });
+            accreditationsBlocked++;
+          } catch {}
+        }
       } catch {}
     }
 
     return Response.json({
       closed,
+      accreditations_blocked: accreditationsBlocked,
       total_checked: events.length,
       expired_found: expired.length,
     });
