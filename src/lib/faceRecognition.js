@@ -38,7 +38,7 @@ export function compareDescriptors(d1, d2) {
   return Math.sqrt(sum);
 }
 
-export const MATCH_THRESHOLD = 0.5;
+export const MATCH_THRESHOLD = 0.7;
 
 export function findBestMatch(capturedDescriptor, storedEntries) {
   let bestMatch = null;

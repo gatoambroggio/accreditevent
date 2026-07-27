@@ -67,7 +67,11 @@ export default function AccreditationFacial() {
       }
 
       const bios = await base44.entities.Biometric.filter({ status: 'active' }, '-created_date', 500);
-      const withDescriptors = bios.filter((b) => b.face_descriptor && b.face_descriptor.length > 0);
+      const persons = await base44.entities.Person.list('-created_date', 500);
+      const validPersonIds = new Set(persons.map((p) => p.id));
+      const withDescriptors = bios.filter(
+        (b) => b.face_descriptor && b.face_descriptor.length > 0 && validPersonIds.has(b.person_id)
+      );
       if (withDescriptors.length === 0) {
         setResult({ ok: false, message: 'No hay rostros registrados en el sistema.' });
         return;
