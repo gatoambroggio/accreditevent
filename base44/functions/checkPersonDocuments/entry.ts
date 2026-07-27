@@ -17,11 +17,18 @@ export default async function(req) {
       100
     );
 
-    const pending = docs.filter((d) => d.status !== 'approved');
+    const now = new Date();
+    const pending = docs.filter((d) => {
+      // Non-approved documents block accreditation
+      if (d.status !== 'approved') return true;
+      // Approved documents with a past expiration date also block
+      if (d.expires_at && new Date(d.expires_at + 'T23:59:59') < now) return true;
+      return false;
+    });
     return Response.json({
       has_pending: pending.length > 0,
       pending_count: pending.length,
-      pending_statuses: [...new Set(pending.map((d) => d.status))],
+      pending_statuses: [...new Set(pending.map((d) => d.status === 'approved' ? 'expired' : d.status))],
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

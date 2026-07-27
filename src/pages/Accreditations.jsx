@@ -122,7 +122,7 @@ export default function Accreditations() {
     if (!editing) {
       const res = await base44.functions.invoke('checkPersonDocuments', { person_id: data.person_id });
       if (res.data?.has_pending) {
-        throw new Error(`No se puede asignar: la persona tiene documentación pendiente de aprobación (${res.data.pending_statuses.join(', ')}).`);
+        throw new Error(`No se puede asignar: la persona tiene documentación pendiente o vencida (${res.data.pending_statuses.join(', ')}).`);
       }
     }
     // Denormalize event/person data
