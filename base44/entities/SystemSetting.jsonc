@@ -1,0 +1,50 @@
+{
+  "name": "SystemSetting",
+  "type": "object",
+  "properties": {
+    "system_name": {
+      "type": "string",
+      "description": "Nombre del sistema mostrado en la barra lateral"
+    },
+    "organization_name": {
+      "type": "string",
+      "description": "Nombre de la organizaci\u00f3n"
+    },
+    "logo_url": {
+      "type": "string",
+      "description": "URL del logo del sistema"
+    },
+    "mail_from": {
+      "type": "string",
+      "description": "Email remitente para notificaciones"
+    },
+    "mail_host": {
+      "type": "string",
+      "description": "Host del servidor SMTP"
+    },
+    "mail_port": {
+      "type": "number",
+      "description": "Puerto SMTP"
+    },
+    "mail_user": {
+      "type": "string",
+      "description": "Usuario SMTP"
+    },
+    "mail_password": {
+      "type": "string",
+      "description": "Contrase\u00f1a SMTP"
+    },
+    "whatsapp_token": {
+      "type": "string",
+      "description": "Token de WhatsApp Cloud API"
+    },
+    "whatsapp_phone_id": {
+      "type": "string",
+      "description": "Phone Number ID de WhatsApp Cloud API"
+    },
+    "role_access": {
+      "type": "object",
+      "description": "Mapa de path de m\u00f3dulo a array de roles con acceso permitido"
+    }
+  }
+}

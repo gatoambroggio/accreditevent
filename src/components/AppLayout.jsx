@@ -17,7 +17,9 @@ import {
   MessageSquare,
   ScanFace,
   BarChart3,
+  Settings as SettingsIcon,
 } from 'lucide-react';
+import { base44 } from '@/api/base44Client';
 
 export const ROLE_LEVEL = { provider: -1, control: 0, coordinator: 1, admin: 2, superadmin: 3 };
 
@@ -33,6 +35,7 @@ const NAV_ITEMS = [
   { path: '/documents', label: 'Documentos', icon: FileText, minLevel: 1 },
   { path: '/users', label: 'Usuarios y roles', icon: ShieldCheck, minLevel: 2 },
   { path: '/audit', label: 'Auditoría', icon: ScrollText, minLevel: 2 },
+  { path: '/settings', label: 'Configuración', icon: SettingsIcon, minLevel: 2 },
   { path: '/portal', label: 'Mi portal', icon: UserCircle, providerOnly: true },
 ];
 
@@ -41,9 +44,22 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [settings, setSettings] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const all = await base44.entities.SystemSetting.list('-created_date', 1);
+        if (all[0]) setSettings(all[0]);
+      } catch {}
+    })();
+  }, []);
 
   const userLevel = ROLE_LEVEL[user?.role] ?? -1;
   const isProvider = user?.role === 'provider';
+  const sysName = settings?.system_name || 'acceso';
+  const orgName = settings?.organization_name || 'Acceso Eventos';
+  const logoUrl = settings?.logo_url;
 
   useEffect(() => {
     if (isProvider && location.pathname !== '/portal') {
@@ -58,6 +74,9 @@ export default function AppLayout() {
   const visibleItems = NAV_ITEMS.filter((item) => {
     if (item.providerOnly) return isProvider;
     if (isProvider) return false;
+    if (settings?.role_access?.[item.path]) {
+      return settings.role_access[item.path].includes(user?.role);
+    }
     return userLevel >= item.minLevel;
   });
 
@@ -68,8 +87,12 @@ export default function AppLayout() {
       {/* Mobile top bar */}
       <div className="sticky top-0 z-20 flex items-center justify-between bg-[hsl(157_42%_11%)] px-4 py-3 lg:hidden">
         <div className="flex items-center gap-2">
-          <span className="grid h-7 w-7 place-items-center rounded-md bg-[hsl(39_86%_63%)] text-xs font-extrabold text-[hsl(146_34%_11%)]">A</span>
-          <span className="text-base font-extrabold tracking-tight text-white">acceso</span>
+          {logoUrl ? (
+            <img src={logoUrl} alt="Logo" className="h-7 w-7 rounded-md object-cover" />
+          ) : (
+            <span className="grid h-7 w-7 place-items-center rounded-md bg-[hsl(39_86%_63%)] text-xs font-extrabold text-[hsl(146_34%_11%)]">A</span>
+          )}
+          <span className="text-base font-extrabold tracking-tight text-white">{sysName}</span>
         </div>
         <button onClick={() => setMobileOpen(true)} className="rounded-lg p-2 text-white hover:bg-white/10">
           <Menu className="h-5 w-5" />
@@ -85,8 +108,12 @@ export default function AppLayout() {
       <aside className={`fixed inset-y-0 left-0 z-40 flex w-60 flex-col bg-[hsl(157_42%_11%)] text-slate-300 transition-transform duration-300 lg:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center justify-between px-5 py-6">
           <div className="flex items-center gap-2.5">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-[hsl(39_86%_63%)] text-sm font-extrabold text-[hsl(146_34%_11%)]">A</span>
-            <span className="text-lg font-extrabold tracking-tight text-white">acceso</span>
+            {logoUrl ? (
+              <img src={logoUrl} alt="Logo" className="h-8 w-8 rounded-lg object-cover" />
+            ) : (
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-[hsl(39_86%_63%)] text-sm font-extrabold text-[hsl(146_34%_11%)]">A</span>
+            )}
+            <span className="text-lg font-extrabold tracking-tight text-white">{sysName}</span>
           </div>
           <button onClick={() => setMobileOpen(false)} className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white lg:hidden">
             <X className="h-5 w-5" />
@@ -94,7 +121,7 @@ export default function AppLayout() {
         </div>
         <div className="mx-4 mb-5 rounded-lg border border-white/10 px-3 py-2.5">
           <p className="font-mono text-[9px] uppercase tracking-wider text-emerald-400/70">Organización</p>
-          <p className="mt-0.5 truncate text-sm font-semibold text-white">Acceso Eventos</p>
+          <p className="mt-0.5 truncate text-sm font-semibold text-white">{orgName}</p>
         </div>
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3">
           {visibleItems.map((item) => {

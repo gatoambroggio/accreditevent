@@ -28,6 +28,7 @@ import ProviderRegister from '@/pages/ProviderRegister';
 import Messages from '@/pages/Messages';
 import AccreditationFacial from '@/pages/AccreditationFacial';
 import Reports from '@/pages/Reports';
+import Settings from '@/pages/Settings';
 
 const AUTH_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password', '/provider-register'];
 
@@ -75,6 +76,7 @@ const AuthenticatedApp = () => {
         <Route path="/messages" element={<Messages />} />
         <Route path="/accreditation-facial" element={<AccreditationFacial />} />
         <Route path="/reports" element={<Reports />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="/access-control" element={<AccessControl />} />
       </Route>
       <Route path="/portal" element={<ProviderPortal />} />
