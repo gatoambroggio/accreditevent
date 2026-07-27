@@ -25,10 +25,14 @@ export default function ProviderPortal() {
   const [savingVehicle, setSavingVehicle] = useState(false);
   const [msg, setMsg] = useState('');
   const [viewingDoc, setViewingDoc] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [creatingProfile, setCreatingProfile] = useState(false);
+  const [profileError, setProfileError] = useState('');
 
   const load = useCallback(async () => {
     try {
       const me = await base44.auth.me();
+      setCurrentUser(me);
       const people = await base44.entities.Person.filter({ email: me.email }, '-created_date', 5);
       const p = people[0];
       if (!p) { setLoading(false); return; }
@@ -49,6 +53,42 @@ export default function ProviderPortal() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const handleCreateProfile = async (e) => {
+    e.preventDefault();
+    setCreatingProfile(true);
+    setProfileError('');
+    try {
+      const formData = new FormData(e.target);
+      const full_name = (formData.get('full_name') || '').trim();
+      const document = (formData.get('document') || '').trim();
+      const phone = (formData.get('phone') || '').trim();
+      const company = (formData.get('company') || '').trim();
+      if (!full_name) {
+        setProfileError('El nombre completo es obligatorio.');
+        setCreatingProfile(false);
+        return;
+      }
+      const created = await base44.entities.Person.create({
+        full_name,
+        document,
+        phone,
+        email: currentUser?.email || '',
+        company: company || currentUser?.data?.company || '',
+        person_type: 'provider',
+        status: 'active',
+      });
+      await logAudit('provider-self-register', 'Person', created.id, full_name);
+      setPerson(created);
+      setAccreditations([]);
+      setDocuments([]);
+      setVehicles([]);
+    } catch (err) {
+      setProfileError(err.message || 'No se pudo crear el perfil.');
+    } finally {
+      setCreatingProfile(false);
+    }
+  };
 
   const handleProfileSave = async (e) => {
     e.preventDefault();
@@ -145,11 +185,61 @@ export default function ProviderPortal() {
 
   if (!person) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[hsl(120_14%_97%)] px-4">
-        <div className="max-w-md text-center">
-          <UserCircle className="mx-auto h-12 w-12 text-slate-300" />
-          <h2 className="mt-4 text-xl font-bold text-slate-900">No tenés un perfil de proveedor asociado</h2>
-          <p className="mt-2 text-sm text-slate-500">Contactá al administrador para que cree tu persona y vincule tu cuenta.</p>
+      <div className="min-h-screen bg-[hsl(120_14%_97%)]">
+        <div className="mx-auto max-w-md px-5 py-12">
+          <div className="mb-6 flex items-center gap-2.5">
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-[hsl(39_86%_63%)] text-sm font-extrabold text-[hsl(146_34%_11%)]">A</span>
+            <span className="text-lg font-extrabold tracking-tight text-slate-900">acceso</span>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+            <div className="mb-6 flex items-center gap-3">
+              <div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
+                <UserCircle className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Creá tu perfil de proveedor</h2>
+                <p className="text-sm text-slate-500">Completá tus datos para activar tu cuenta.</p>
+              </div>
+            </div>
+            <form onSubmit={handleCreateProfile} className="space-y-4">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Nombre completo *</span>
+                <input name="full_name" type="text" required defaultValue={currentUser?.full_name || ''}
+                  placeholder="Ej: Juan Pérez"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Documento</span>
+                <input name="document" type="text" inputMode="numeric"
+                  placeholder="Ej: 12345678"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Teléfono</span>
+                <input name="phone" type="tel"
+                  placeholder="Ej: 11 12345678"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Empresa / Razón social</span>
+                <input name="company" type="text" defaultValue={currentUser?.data?.company || ''}
+                  placeholder="Ej: Producciones SA"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+              </label>
+              <p className="text-xs text-slate-400">Tu email ({currentUser?.email}) se vinculará automáticamente.</p>
+              {profileError && (
+                <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">{profileError}</div>
+              )}
+              <button type="submit" disabled={creatingProfile}
+                className="w-full rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50">
+                {creatingProfile ? 'Creando perfil…' : 'Crear perfil'}
+              </button>
+            </form>
+          </div>
+          <div className="mt-4 text-center">
+            <button onClick={() => base44.auth.logout(window.location.href)}
+              className="text-sm font-medium text-slate-500 hover:text-slate-900">Cerrar sesión</button>
+          </div>
         </div>
       </div>
     );
