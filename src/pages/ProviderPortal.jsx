@@ -417,7 +417,7 @@ export default function ProviderPortal() {
           <h3 className="mb-4 flex items-center gap-2 text-base font-bold text-slate-900">
             <Package className="h-4 w-4 text-emerald-600" /> Requerimientos de logística
           </h3>
-          <ProviderRequirementsSection user={currentUser} />
+          <ProviderRequirementsSection user={currentUser} person={person} accreditations={accreditations} />
         </div>
 
         {/* Documents */}

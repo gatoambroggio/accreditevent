@@ -2,9 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Package, Loader2, Save, CheckCircle2, AlertCircle } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 
-export default function ProviderRequirementsSection({ user }) {
+export default function ProviderRequirementsSection({ user, person, accreditations }) {
   const [catalog, setCatalog] = useState([]);
-  const [accreditations, setAccreditations] = useState([]);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -16,23 +15,25 @@ export default function ProviderRequirementsSection({ user }) {
   const [itemNotes, setItemNotes] = useState({});
   const [generalNotes, setGeneralNotes] = useState('');
 
+  const activeAccreditations = useMemo(
+    () => (accreditations || []).filter((a) => a.status === 'active'),
+    [accreditations]
+  );
+
   useEffect(() => {
     (async () => {
       try {
-        const [cat, accs, reqs] = await Promise.all([
+        const [cat, reqs] = await Promise.all([
           base44.entities.RequirementItem.list('name', 200),
-          base44.entities.Accreditation.filter({ person_email: user.email }, '-created_date', 100),
           base44.entities.ProviderRequest.list('-created_date', 100),
         ]);
-        const activeCat = cat.filter((c) => c.is_active !== false);
-        setCatalog(activeCat);
-        setAccreditations(accs.filter((a) => a.status === 'active'));
+        setCatalog(cat.filter((c) => c.is_active !== false));
         setRequests(reqs);
-        if (accs.length > 0) setSelectedEventId(accs[0].event_id);
+        if (activeAccreditations.length > 0) setSelectedEventId(activeAccreditations[0].event_id);
       } catch {}
       setLoading(false);
     })();
-  }, [user.email]);
+  }, [activeAccreditations.length]);
 
   const currentRequest = useMemo(
     () => requests.find((r) => r.event_id === selectedEventId),
@@ -92,7 +93,7 @@ export default function ProviderRequirementsSection({ user }) {
     setSaving(true);
     setError('');
     try {
-      const acc = accreditations.find((a) => a.event_id === selectedEventId);
+      const acc = activeAccreditations.find((a) => a.event_id === selectedEventId);
       if (!acc) throw new Error('No se encontró tu acreditación para este evento.');
 
       const items = catalog
@@ -141,7 +142,7 @@ export default function ProviderRequirementsSection({ user }) {
     );
   }
 
-  if (accreditations.length === 0) {
+  if (activeAccreditations.length === 0) {
     return (
       <div className="rounded-xl border border-slate-200 bg-slate-50 px-6 py-10 text-center">
         <Package className="mx-auto h-10 w-10 text-slate-300" />
@@ -169,7 +170,7 @@ export default function ProviderRequirementsSection({ user }) {
           onChange={(e) => setSelectedEventId(e.target.value)}
           className="w-full max-w-md rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
         >
-          {accreditations.map((a) => (
+          {activeAccreditations.map((a) => (
             <option key={a.id} value={a.event_id}>{a.event_name}</option>
           ))}
         </select>
