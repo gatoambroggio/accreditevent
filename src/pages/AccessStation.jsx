@@ -81,6 +81,18 @@ export default function AccessStation() {
     setResult(null);
     try {
       if (!descriptor) {
+        const me = await base44.auth.me();
+        await base44.entities.AccessLog.create({
+          accreditation_id: 'unknown',
+          person_name: 'Desconocido',
+          badge_code: '',
+          event_name: selectedEvent.name,
+          verified_by: me?.full_name || me?.email || 'Sistema',
+          method: 'biometric',
+          zone: selectedZones.join(', '),
+          result: 'denied',
+          access_level: '',
+        });
         setResult({ ok: false, message: 'No se detectó un rostro humano en la captura.' });
         return;
       }
@@ -94,6 +106,18 @@ export default function AccessStation() {
 
       const withDescriptors = bios.filter((b) => b.face_descriptor && b.face_descriptor.length > 0);
       if (withDescriptors.length === 0) {
+        const me = await base44.auth.me();
+        await base44.entities.AccessLog.create({
+          accreditation_id: 'unknown',
+          person_name: 'Desconocido',
+          badge_code: '',
+          event_name: selectedEvent.name,
+          verified_by: me?.full_name || me?.email || 'Sistema',
+          method: 'biometric',
+          zone: selectedZones.join(', '),
+          result: 'denied',
+          access_level: '',
+        });
         setResult({ ok: false, message: 'No hay rostros registrados en el sistema.' });
         return;
       }
@@ -111,7 +135,7 @@ export default function AccessStation() {
       if (!match) {
         const me = await base44.auth.me();
         await base44.entities.AccessLog.create({
-          accreditation_id: '',
+          accreditation_id: 'unknown',
           person_name: 'Desconocido',
           badge_code: '',
           event_name: selectedEvent.name,
@@ -130,7 +154,7 @@ export default function AccessStation() {
       if (!accred) {
         const me = await base44.auth.me();
         await base44.entities.AccessLog.create({
-          accreditation_id: '',
+          accreditation_id: 'unknown',
           person_name: match.person_name || 'Desconocido',
           badge_code: '',
           event_name: selectedEvent.name,

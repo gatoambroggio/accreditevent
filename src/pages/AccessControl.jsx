@@ -81,10 +81,34 @@ export default function AccessControl({ standalone = false }) {
     try {
       const items = await base44.entities.Accreditation.filter({ badge_code: badgeCode.trim() }, '-created_date', 5);
       if (items.length === 0) {
+        const me = await base44.auth.me();
+        await base44.entities.AccessLog.create({
+          accreditation_id: 'unknown',
+          person_name: 'Desconocido',
+          badge_code: badgeCode.trim(),
+          event_name: '',
+          verified_by: me?.full_name || me?.email || 'Sistema',
+          method: 'manual',
+          zone: selectedZones.join(', '),
+          result: 'denied',
+          access_level: '',
+        });
         setResult({ ok: false, message: 'No se encontró ninguna acreditación con ese código.' });
       } else {
         const accred = items[0];
         if (accred.status !== 'active') {
+          const me = await base44.auth.me();
+          await base44.entities.AccessLog.create({
+            accreditation_id: accred.id,
+            person_name: accred.person_name,
+            badge_code: accred.badge_code,
+            event_name: accred.event_name,
+            verified_by: me?.full_name || me?.email || 'Sistema',
+            method: 'manual',
+            zone: selectedZones.join(', '),
+            result: 'denied',
+            access_level: accred.access_level,
+          });
           setResult({ ok: false, message: `Acreditación ${accred.status}. Acceso denegado.`, accred });
         } else {
           setFound(accred);
