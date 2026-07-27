@@ -120,6 +120,7 @@ export default function ProviderPortal() {
         person_id: person.id,
         person_name: person.full_name,
         event_id: person.event_id || null,
+        company: person.productora || person.company || '',
         document_type: e.target.elements.document_type.value,
         original_name: file.name,
         file_url,

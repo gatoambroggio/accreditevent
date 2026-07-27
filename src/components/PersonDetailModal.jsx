@@ -162,6 +162,7 @@ export default function PersonDetailModal({ person, onClose }) {
         person_id: person.id,
         person_name: person.full_name,
         event_id: person.event_id,
+        company: person.productora || person.company || '',
         document_type: docType,
         original_name: selectedFile.name,
         file_url,
