@@ -33,13 +33,7 @@
     },
     "zone": {
       "type": "string",
-      "enum": [
-        "general",
-        "backstage",
-        "technical",
-        "vip"
-      ],
-      "description": "Zona de control de acceso"
+      "description": "Zona(s) de control de acceso (separadas por coma)"
     },
     "result": {
       "type": "string",

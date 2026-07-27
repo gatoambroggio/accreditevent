@@ -16,3 +16,8 @@ export function canAccessZone(accessLevel, zone) {
   if (!zone || zone === 'general') return true;
   return ZONE_ACCESS[zone]?.includes(accessLevel) ?? false;
 }
+
+export function canAccessAnyZone(accessLevel, zones) {
+  if (!zones || zones.length === 0) return true;
+  return zones.some((zone) => canAccessZone(accessLevel, zone));
+}
