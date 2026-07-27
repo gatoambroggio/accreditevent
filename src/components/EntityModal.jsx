@@ -108,6 +108,35 @@ export default function EntityModal({
       );
     }
 
+    if (f.type === 'toggle-group') {
+      const selectedValues = value ? String(value).split(',').map((v) => v.trim()).filter(Boolean) : [];
+      return (
+        <div key={f.name} className={f.full ? 'sm:col-span-2' : ''}>
+          <span className="mb-1.5 block text-xs font-semibold text-slate-600">{f.label}{f.required && ' *'}</span>
+          <div className="flex flex-wrap gap-2">
+            {(f.options || []).map((o) => {
+              const active = selectedValues.includes(o.value);
+              return (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => {
+                    const next = active
+                      ? selectedValues.filter((v) => v !== o.value)
+                      : [...selectedValues, o.value];
+                    setField(f.name, next.join(','));
+                  }}
+                  className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                >
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
     if (f.type === 'searchable-select') {
       const selectedOption = (f.options || []).find((o) => o.value === data[f.name]);
       const searchQuery = data[`_search_${f.name}`] || '';

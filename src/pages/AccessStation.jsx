@@ -173,7 +173,7 @@ export default function AccessStation() {
     const timer = setTimeout(() => {
       setResult(null);
       setCycle((c) => c + 1);
-    }, 5000);
+    }, 2500);
     return () => clearTimeout(timer);
   }, [result, speak]);
 

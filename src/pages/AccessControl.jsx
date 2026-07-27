@@ -62,7 +62,7 @@ export default function AccessControl({ standalone = false }) {
   useEffect(() => {
     if (!result) return;
     speak(result.ok ? 'Aceptado' : 'Denegado');
-    const timer = setTimeout(() => setResult(null), 5000);
+    const timer = setTimeout(() => setResult(null), 2500);
     return () => clearTimeout(timer);
   }, [result, speak]);
 

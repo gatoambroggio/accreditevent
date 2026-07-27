@@ -42,7 +42,7 @@ export default function ZKTecoDevices() {
       { name: 'serial_number', label: 'Número de serie (SN)', type: 'text', required: true, placeholder: 'Ej: BGF823456789' },
       { name: 'api_key', label: 'API Key', type: 'text', required: true, hint: 'Se genera automáticamente. Pegala en la URL de push del dispositivo.' },
       {
-        name: 'zone', label: 'Zona de acceso', type: 'select',
+        name: 'zone', label: 'Zona(s) de acceso', type: 'toggle-group', full: true,
         options: zones.map((z) => ({ value: z.value, label: z.label })),
       },
       {
@@ -185,7 +185,7 @@ export default function ZKTecoDevices() {
                 </div>
 
                 <div className="mt-4 space-y-1.5 text-xs">
-                  <div className="flex justify-between"><span className="text-slate-400">Zona</span><span className="font-medium text-slate-600">{zones.find((z) => z.value === d.zone)?.label || d.zone || '—'}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Zona(s)</span><span className="ml-2 truncate text-right font-medium text-slate-600">{d.zone ? d.zone.split(',').map((v) => zones.find((z) => z.value === v.trim())?.label || v.trim()).join(', ') : '—'}</span></div>
                   <div className="flex justify-between"><span className="text-slate-400">Evento</span><span className="ml-2 truncate max-w-[150px] font-medium text-slate-600">{d.event_name || '—'}</span></div>
                   <div className="flex justify-between"><span className="text-slate-400">Última conexión</span><span className="font-medium text-slate-600">{lastSeenLabel(d)}</span></div>
                   <div className="flex justify-between"><span className="text-slate-400">Comandos pendientes</span><span className={`font-bold ${pending > 0 ? 'text-amber-600' : 'text-slate-600'}`}>{pending}</span></div>
