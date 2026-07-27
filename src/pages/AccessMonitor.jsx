@@ -152,7 +152,6 @@ export default function AccessMonitor() {
                     <p className="text-xs text-slate-500">
                       {log.event_name || 'Sin evento'}
                       {log.zone ? ` · ${ZONE_LABELS[log.zone] || log.zone}` : ''}
-                      {log.verified_by ? ` · ${log.verified_by}` : ''}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
