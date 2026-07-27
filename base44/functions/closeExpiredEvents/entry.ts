@@ -22,6 +22,8 @@ export default async function(req: Request): Promise<Response> {
 
     let closed = 0;
     let accreditationsDeleted = 0;
+    let vehiclesDeleted = 0;
+    let vehiclesUpdated = 0;
 
     const expiredIds = expired.map((e) => e.id);
     const closedEvents = await base44.asServiceRole.entities.Event.filter(
@@ -51,11 +53,38 @@ export default async function(req: Request): Promise<Response> {
           } catch {}
         }
       } catch {}
+      // Clean up vehicles: remove closed event from event_ids; delete if no events remain
+      try {
+        const vehicles = await base44.asServiceRole.entities.Vehicle.filter(
+          { event_ids: evtId },
+          '-created_date',
+          500
+        );
+        for (const v of vehicles) {
+          const remaining = (v.event_ids || []).filter((id) => id !== evtId);
+          if (remaining.length === 0) {
+            try {
+              await base44.asServiceRole.entities.Vehicle.delete(v.id);
+              vehiclesDeleted++;
+            } catch {}
+          } else {
+            try {
+              await base44.asServiceRole.entities.Vehicle.update(v.id, {
+                event_ids: remaining,
+                event_names: (v.event_names || []).filter((_, i) => (v.event_ids || [])[i] !== evtId),
+              });
+              vehiclesUpdated++;
+            } catch {}
+          }
+        }
+      } catch {}
     }
 
     return Response.json({
       closed,
       accreditations_deleted: accreditationsDeleted,
+      vehicles_deleted: vehiclesDeleted,
+      vehicles_updated: vehiclesUpdated,
       total_checked: events.length,
       expired_found: expired.length,
     });
