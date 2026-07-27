@@ -6,7 +6,7 @@ export const DEFAULT_ZONES = [
 ];
 
 export function canAccessZone(accessLevel, zone) {
-  if (!zone || zone === 'general') return true;
+  if (!zone) return true;
   if (accessLevel === 'all-access') return true;
   return accessLevel === zone;
 }
