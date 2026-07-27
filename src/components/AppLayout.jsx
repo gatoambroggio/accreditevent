@@ -80,7 +80,7 @@ export default function AppLayout() {
   const userLevel = ROLE_LEVEL[user?.role] ?? -1;
   const isProvider = user?.role === 'provider';
   const sysName = settings?.system_name || 'acceso';
-  const orgName = settings?.organization_name || 'Acceso Eventos';
+  const orgName = user?.role === 'productora' && user?.company ? user.company : (settings?.organization_name || 'Acceso Eventos');
   const logoUrl = settings?.logo_url;
 
   useEffect(() => {
