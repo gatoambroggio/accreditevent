@@ -22,6 +22,10 @@
       "type": "string",
       "description": "Tipo de persona (denormalizado)"
     },
+    "person_email": {
+      "type": "string",
+      "description": "Email de la persona (denormalizado para RLS)"
+    },
     "badge_code": {
       "type": "string",
       "description": "C\u00f3digo \u00fanico de credencial"
@@ -75,7 +79,7 @@
           }
         },
         {
-          "created_by_id": "{{user.id}}"
+          "data.person_email": "{{user.email}}"
         }
       ]
     },
@@ -94,11 +98,6 @@
         {
           "data.event_id": {
             "$in": "{{user.data.assigned_event_ids}}"
-          }
-        },
-        {
-          "user_condition": {
-            "role": "provider"
           }
         }
       ]
@@ -119,9 +118,6 @@
           "data.event_id": {
             "$in": "{{user.data.assigned_event_ids}}"
           }
-        },
-        {
-          "created_by_id": "{{user.id}}"
         }
       ]
     },
@@ -141,9 +137,6 @@
           "data.event_id": {
             "$in": "{{user.data.assigned_event_ids}}"
           }
-        },
-        {
-          "created_by_id": "{{user.id}}"
         }
       ]
     }
