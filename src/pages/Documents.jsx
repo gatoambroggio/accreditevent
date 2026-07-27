@@ -25,6 +25,7 @@ const REVIEW_FIELDS = [
       { value: 'expired', label: 'Vencido' },
     ],
   },
+  { name: 'expires_at', label: 'Fecha de vencimiento', type: 'date' },
   { name: 'review_note', label: 'Nota del revisor', type: 'textarea', full: true },
 ];
 
@@ -75,6 +76,7 @@ export default function Documents() {
     const me = await base44.auth.me();
     await update(reviewing.id, {
       status: data.status,
+      expires_at: data.expires_at || '',
       review_note: data.review_note || '',
       reviewed_by: me?.full_name || me?.email || '',
       reviewed_at: new Date().toISOString(),
