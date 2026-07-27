@@ -131,23 +131,29 @@ export default function ProviderRegister() {
     setError('');
     setSaving(true);
     try {
-      if (!descriptor) {
-        setError('No se detectó un rostro humano. Probá de nuevo.');
+      let file_url;
+      try {
+        const uploadRes = await base44.integrations.Core.UploadFile({ file });
+        file_url = uploadRes.file_url;
+      } catch (uploadErr) {
+        setError('No se pudo subir la foto. Verificá tu conexión a internet e intentá de nuevo.');
         return;
       }
 
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
       await base44.functions.invoke('saveProviderBiometric', {
         person_id: personId,
         person_name: form.full_name,
         event_id: form.event_id,
         face_photo_url: file_url,
-        face_descriptor: descriptor,
+        face_descriptor: descriptor || [],
       });
-      toast({ title: '¡Rostro registrado!', description: 'Ya podés ingresar al portal.' });
+      toast({
+        title: descriptor ? '¡Rostro registrado!' : 'Foto guardada',
+        description: descriptor ? 'Ya podés ingresar al portal.' : 'Tu foto se guardó. Un administrador revisará tu biometría.',
+      });
       window.location.href = '/portal';
     } catch (err) {
-      setError(err.message || 'No se pudo guardar el rostro.');
+      setError(err.message || 'No se pudo guardar el rostro. Intentá de nuevo.');
     } finally {
       setSaving(false);
     }

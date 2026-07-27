@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Camera, RefreshCw, Check, Loader2, X, AlertCircle, SwitchCamera } from 'lucide-react';
-import { getFaceDescriptor } from '@/lib/faceRecognition';
+import { getFaceDescriptor, loadModels } from '@/lib/faceRecognition';
 
 export default function FaceCapture({ onCaptured, disabled, label = 'Abrir cámara', autoCapture = false }) {
   const [stream, setStream] = useState(null);
@@ -10,12 +10,30 @@ export default function FaceCapture({ onCaptured, disabled, label = 'Abrir cáma
   const [starting, setStarting] = useState(false);
   const [detecting, setDetecting] = useState(false);
   const [faceDetected, setFaceDetected] = useState(true);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [modelsError, setModelsError] = useState('');
   const [facingMode, setFacingMode] = useState(() => {
     try { return localStorage.getItem('facecam_facing') || 'user'; } catch { return 'user'; }
   });
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const descriptorRef = useRef(null);
+
+  // Pre-load face-api models on mount
+  useEffect(() => {
+    let mounted = true;
+    setModelsLoading(true);
+    setModelsError('');
+    loadModels()
+      .then(() => { if (mounted) setModelsLoading(false); })
+      .catch((err) => {
+        if (mounted) {
+          setModelsLoading(false);
+          setModelsError('No se pudieron cargar los modelos de reconocimiento facial. Verificá tu conexión a internet.');
+        }
+      });
+    return () => { mounted = false; };
+  }, []);
 
   const stopCamera = useCallback(() => {
     setStream((prev) => {
@@ -116,6 +134,7 @@ export default function FaceCapture({ onCaptured, disabled, label = 'Abrir cáma
       } catch (err) {
         descriptorRef.current = null;
         setFaceDetected(false);
+        setModelsError('Error al procesar el rostro. Probá nuevamente o en un lugar con mejor iluminación.');
         if (autoCapture) {
           onCaptured(file, null);
         }
@@ -196,7 +215,7 @@ export default function FaceCapture({ onCaptured, disabled, label = 'Abrir cáma
           )}
           {!autoCapture && (
             <div className="mt-3 flex gap-2">
-              <button onClick={confirm} disabled={disabled || !faceDetected}
+              <button onClick={confirm} disabled={disabled}
                 className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:opacity-50">
                 <Check className="h-5 w-5" /> Confirmar
               </button>
@@ -216,12 +235,26 @@ export default function FaceCapture({ onCaptured, disabled, label = 'Abrir cáma
             <span className="mt-2 text-sm text-slate-500">Iniciando cámara…</span>
           </div>
         ) : (
-          <button onClick={startCamera} disabled={disabled || starting}
+          <button onClick={startCamera} disabled={disabled || starting || modelsLoading}
             className="inline-flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-sm font-bold text-slate-600 transition hover:border-emerald-400 hover:bg-emerald-50 disabled:opacity-50">
             {starting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
-            {starting ? 'Iniciando cámara…' : label}
+            {starting ? 'Iniciando cámara…' : modelsLoading ? 'Cargando modelos de reconocimiento…' : label}
           </button>
         )
+      )}
+
+      {modelsLoading && !stream && !photoUrl && (
+        <div className="mt-2 flex items-center gap-2 text-xs text-slate-400">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Cargando modelos de reconocimiento facial…
+        </div>
+      )}
+
+      {modelsError && (
+        <div className="mt-2 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 ring-1 ring-amber-200">
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>{modelsError}</span>
+        </div>
       )}
 
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
