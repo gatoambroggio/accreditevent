@@ -27,16 +27,8 @@ const STATUS_INFO = {
   ended: { label: 'Finalizado', cls: 'bg-red-50 text-red-700 ring-red-200' },
 };
 
-export default function AccessQrStation() {
+export default function AccessQrStation({ mode = 'person' }) {
   const [phase, setPhase] = useState('select');
-  const [mode, setMode] = useState(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      return params.get('mode') === 'vehicle' ? 'vehicle' : 'person';
-    } catch {
-      return 'person';
-    }
-  });
   const [events, setEvents] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState('');
   const [selectedZones, setSelectedZones] = useState(['general']);
@@ -281,7 +273,9 @@ export default function AccessQrStation() {
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <div className="flex items-center gap-2.5">
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-[hsl(39_86%_63%)] text-sm font-extrabold text-[hsl(146_34%_11%)]">A</span>
-            <span className="text-lg font-extrabold tracking-tight text-slate-900">Control por QR</span>
+            <span className="text-lg font-extrabold tracking-tight text-slate-900">
+              {mode === 'person' ? 'Control de Personas QR' : 'Control Vehicular QR'}
+            </span>
           </div>
           <div className="flex items-center gap-4">
             {phase === 'active' && (
@@ -310,39 +304,6 @@ export default function AccessQrStation() {
               <div>
                 <h2 className="text-xl font-bold text-slate-900">Control de acceso por QR</h2>
                 <p className="text-sm text-slate-500">Elegí el tipo de acceso y el evento para iniciar.</p>
-              </div>
-            </div>
-
-            {/* Mode selector */}
-            <div className="mb-5">
-              <label className="mb-1.5 block text-xs font-semibold text-slate-600">Tipo de acceso</label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setMode('person')}
-                  className={`flex items-center gap-3 rounded-xl border p-4 text-left transition ${mode === 'person' ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500/20' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
-                >
-                  <div className={`grid h-10 w-10 place-items-center rounded-lg ${mode === 'person' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                    <User className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-900">Personas</p>
-                    <p className="text-xs text-slate-500">Acreditaciones</p>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMode('vehicle')}
-                  className={`flex items-center gap-3 rounded-xl border p-4 text-left transition ${mode === 'vehicle' ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500/20' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
-                >
-                  <div className={`grid h-10 w-10 place-items-center rounded-lg ${mode === 'vehicle' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                    <Car className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-900">Vehículos</p>
-                    <p className="text-xs text-slate-500">Credenciales vehiculares</p>
-                  </div>
-                </button>
               </div>
             </div>
 

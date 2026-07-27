@@ -100,7 +100,8 @@ const AuthenticatedApp = () => {
       </Route>
       <Route path="/portal" element={<ProviderPortal />} />
       <Route path="/control-acceso" element={<AccessStation />} />
-      <Route path="/control-qr" element={<AccessQrStation />} />
+      <Route path="/control-qr" element={<AccessQrStation mode="person" />} />
+      <Route path="/control-vehicular" element={<AccessQrStation mode="vehicle" />} />
       <Route path="/control-manual" element={<AccessManual />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
