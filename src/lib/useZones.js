@@ -8,9 +8,9 @@ export function useZones() {
   useEffect(() => {
     (async () => {
       try {
-        const all = await base44.entities.SystemSetting.list('-created_date', 1);
-        if (all[0]?.zones?.length) {
-          setZones(all[0].zones);
+        const levels = await base44.entities.AccessLevel.list('-created_date', 100);
+        if (levels.length > 0) {
+          setZones(levels.map((l) => ({ value: l.value, label: l.label })));
         }
       } catch {}
     })();

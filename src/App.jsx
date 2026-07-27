@@ -17,6 +17,7 @@ import Home from '@/pages/Home';
 import Events from '@/pages/Events';
 import People from '@/pages/People';
 import Accreditations from '@/pages/Accreditations';
+import AccessLevels from '@/pages/AccessLevels';
 import Documents from '@/pages/Documents';
 import Users from '@/pages/Users';
 import Audit from '@/pages/Audit';
@@ -70,6 +71,7 @@ const AuthenticatedApp = () => {
         <Route path="/events" element={<Events />} />
         <Route path="/people" element={<People />} />
         <Route path="/accreditations" element={<Accreditations />} />
+        <Route path="/access-levels" element={<AccessLevels />} />
         <Route path="/documents" element={<Documents />} />
         <Route path="/users" element={<Users />} />
         <Route path="/audit" element={<Audit />} />
