@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Loader2, Users, CheckCircle2, XCircle, DoorOpen, FileBarChart, Download } from 'lucide-react';
+import { Loader2, Users, CheckCircle2, XCircle, DoorOpen, FileBarChart, Download, Search } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
 
 const ZONE_LABELS = {
@@ -17,6 +17,7 @@ export default function Reports() {
   const [loading, setLoading] = useState(true);
   const [eventFilter, setEventFilter] = useState('');
   const [resultFilter, setResultFilter] = useState('');
+  const [personQuery, setPersonQuery] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -43,8 +44,12 @@ export default function Reports() {
     if (resultFilter) {
       logs = logs.filter((l) => (resultFilter === 'granted' ? l.result !== 'denied' : l.result === 'denied'));
     }
+    const q = personQuery.toLowerCase().trim();
+    if (q) {
+      logs = logs.filter((l) => `${l.person_name} ${l.badge_code}`.toLowerCase().includes(q));
+    }
     return logs;
-  }, [accessLogs, eventFilter, resultFilter, events]);
+  }, [accessLogs, eventFilter, resultFilter, personQuery, events]);
 
   const filteredAccreditations = useMemo(() => {
     if (!eventFilter) return accreditations;
@@ -73,8 +78,11 @@ export default function Reports() {
         map[key].zones[zone] = (map[key].zones[zone] || 0) + 1;
       }
     }
-    return Object.values(map).sort((a, b) => (b.granted + b.denied) - (a.granted + a.denied));
-  }, [filteredLogs]);
+    const q = personQuery.toLowerCase().trim();
+    const arr = Object.values(map).sort((a, b) => (b.granted + b.denied) - (a.granted + a.denied));
+    if (q) return arr.filter((p) => `${p.name} ${p.badge_code || ''}`.toLowerCase().includes(q));
+    return arr;
+  }, [filteredLogs, personQuery]);
 
   const handleExportAccreditations = () => {
     exportToExcel(
@@ -126,6 +134,16 @@ export default function Reports() {
       </div>
 
       <div className="flex flex-wrap items-end gap-4">
+        <div className="relative min-w-[200px] flex-1">
+          <label className="mb-1.5 block text-xs font-semibold text-slate-600">Buscar persona</label>
+          <Search className="absolute left-3 top-[34px] h-4 w-4 text-slate-400" />
+          <input
+            value={personQuery}
+            onChange={(e) => setPersonQuery(e.target.value)}
+            placeholder="Nombre o credencial…"
+            className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+          />
+        </div>
         <div>
           <label className="mb-1.5 block text-xs font-semibold text-slate-600">Evento</label>
           <select
