@@ -18,7 +18,6 @@ const validatePerson = (data) => {
   if (!data.email?.trim()) e.email = 'El email es obligatorio';
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e.email = 'Email inválido';
   if (!data.status) e.status = 'Seleccioná un estado';
-  if (!data.notes?.trim()) e.notes = 'Las notas son obligatorias';
   return e;
 };
 
@@ -39,15 +38,15 @@ export default function People() {
   }, [items, query]);
 
   const fields = useMemo(() => [
-    { name: 'full_name', label: 'Nombre completo', type: 'text', required: true, full: true },
+    { name: 'full_name', label: 'Nombre completo', type: 'text', required: true, full: true, placeholder: 'Ej: Juan Pérez' },
     {
       name: 'person_type', label: 'Tipo', type: 'select', required: true,
       options: personTypes.map((t) => ({ value: t.value, label: t.label })),
     },
-    { name: 'document', label: 'Documento', type: 'text', required: true },
-    { name: 'company', label: 'Empresa', type: 'text', required: true },
-    { name: 'phone', label: 'Teléfono', type: 'phone-ar', required: true, hint: 'Código de área sin 0 y número sin 15' },
-    { name: 'email', label: 'Email', type: 'email', required: true },
+    { name: 'document', label: 'Documento', type: 'text', required: true, placeholder: 'Ej: 12345678' },
+    { name: 'company', label: 'Empresa', type: 'text', required: true, placeholder: 'Ej: Producciones S.A.' },
+    { name: 'phone', label: 'Teléfono', type: 'phone-ar', required: true, hint: 'Código de área sin 0 y número sin 15. Ej: 11 12345678' },
+    { name: 'email', label: 'Email', type: 'email', required: true, placeholder: 'Ej: juan@empresa.com' },
     {
       name: 'status', label: 'Estado', type: 'select', required: true,
       options: [
@@ -56,7 +55,7 @@ export default function People() {
         { value: 'pending', label: 'Pendiente' },
       ],
     },
-    { name: 'notes', label: 'Notas', type: 'textarea', required: true, full: true },
+    { name: 'notes', label: 'Notas', type: 'textarea', full: true, placeholder: 'Ej: Responsable de montaje audiovisual' },
     { name: '_face', label: 'Registro facial', type: 'face-capture', full: true },
   ], [personTypes]);
 

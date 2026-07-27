@@ -271,10 +271,11 @@ export default function ProviderRegister() {
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 id="phone"
-                placeholder="+54 11…"
+                placeholder="+54 11 12345678"
                 value={form.phone}
                 onChange={(e) => setField('phone', e.target.value)}
                 className="pl-10 h-12"
+                required
               />
             </div>
           </div>
