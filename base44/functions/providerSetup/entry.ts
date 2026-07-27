@@ -20,6 +20,7 @@ export default async function (req) {
         phone: body.phone,
         person_type: 'provider',
         status: 'active',
+        event_id: body.event_id,
       });
     } else {
       person = await base44.asServiceRole.entities.Person.create({
@@ -30,6 +31,7 @@ export default async function (req) {
         email: body.email,
         person_type: 'provider',
         status: 'active',
+        event_id: body.event_id,
       });
     }
 

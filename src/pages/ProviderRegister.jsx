@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,11 +18,15 @@ import {
   IdCard,
   ArrowRight,
   AlertCircle,
+  CalendarDays,
 } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 
 export default function ProviderRegister() {
+  const { company } = useParams();
   const [step, setStep] = useState(1);
+  const [events, setEvents] = useState([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
   const [form, setForm] = useState({
     email: '',
     password: '',
@@ -31,6 +35,7 @@ export default function ProviderRegister() {
     document: '',
     company: '',
     phone: '',
+    event_id: '',
   });
   const [otpCode, setOtpCode] = useState('');
   const [error, setError] = useState('');
@@ -38,11 +43,26 @@ export default function ProviderRegister() {
   const [saving, setSaving] = useState(false);
   const [personId, setPersonId] = useState(null);
 
+  useEffect(() => {
+    (async () => {
+      if (!company) { setLoadingEvents(false); return; }
+      try {
+        const res = await base44.functions.invoke('getCompanyEvents', { company });
+        setEvents(res.data?.events || []);
+      } catch {}
+      setLoadingEvents(false);
+    })();
+  }, [company]);
+
   const setField = (name, value) => setForm((f) => ({ ...f, [name]: value }));
 
   const handleRegister = async (e) => {
     e.preventDefault();
     setError('');
+    if (!form.event_id) {
+      setError('Seleccioná el evento al que te querés inscribir.');
+      return;
+    }
     if (!/^\d{7,8}$/.test(form.document)) {
       setError('El documento debe tener 7 u 8 dígitos numéricos.');
       return;
@@ -84,6 +104,7 @@ export default function ProviderRegister() {
         company: form.company,
         phone: form.phone,
         email: form.email,
+        event_id: form.event_id,
       });
       setPersonId(res.data.person_id);
       setStep(3);
@@ -117,6 +138,7 @@ export default function ProviderRegister() {
       await base44.entities.Biometric.create({
         person_id: personId,
         person_name: form.full_name,
+        event_id: form.event_id,
         face_photo_url: file_url,
         face_descriptor: descriptor,
         status: 'active',
@@ -227,7 +249,7 @@ export default function ProviderRegister() {
     <AuthLayout
       icon={UserPlus}
       title="Registro de proveedor"
-      subtitle="Creá tu cuenta para gestionar acreditaciones"
+      subtitle={company ? `Inscripción para ${company}` : 'Creá tu cuenta para gestionar acreditaciones'}
       footer={
         <>
           ¿Ya tenés cuenta?{' '}
@@ -241,137 +263,167 @@ export default function ProviderRegister() {
         <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>
       )}
 
-      <form onSubmit={handleRegister} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="full_name">Nombre completo</Label>
-          <div className="relative">
-            <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              id="full_name"
-              autoComplete="name"
-              autoFocus
-              placeholder="Juan Pérez"
-              value={form.full_name}
-              onChange={(e) => setField('full_name', e.target.value)}
-              className="pl-10 h-12"
-              required
-            />
-          </div>
+      {loadingEvents ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      ) : events.length === 0 ? (
+        <div className="mb-4 p-4 rounded-lg bg-amber-50 text-amber-700 text-sm flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <span>No hay eventos disponibles para esta productora. Contactate con el organizador.</span>
+        </div>
+      ) : (
+        <form onSubmit={handleRegister} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="document">Documento</Label>
+            <Label htmlFor="event_id">Evento</Label>
             <div className="relative">
-              <IdCard className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <select
+                id="event_id"
+                value={form.event_id}
+                onChange={(e) => setField('event_id', e.target.value)}
+                className="w-full pl-10 h-12 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                required
+              >
+                <option value="">Seleccionar evento…</option>
+                {events.map((ev) => (
+                  <option key={ev.id} value={ev.id}>{ev.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="full_name">Nombre completo</Label>
+            <div className="relative">
+              <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                id="document"
-                type="text"
-                inputMode="numeric"
-                placeholder="12345678"
-                value={form.document}
-                onChange={(e) => setField('document', e.target.value.replace(/\D/g, ''))}
+                id="full_name"
+                autoComplete="name"
+                autoFocus
+                placeholder="Juan Pérez"
+                value={form.full_name}
+                onChange={(e) => setField('full_name', e.target.value)}
                 className="pl-10 h-12"
-                maxLength={8}
                 required
               />
             </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="phone">Teléfono</Label>
-            <div className="flex">
-              <span className="inline-flex items-center rounded-l-lg border border-r-0 border-input bg-muted px-3 h-12 text-sm font-semibold text-muted-foreground">+54</span>
-              <Input
-                id="phone"
-                type="tel"
-                inputMode="numeric"
-                placeholder="11 12345678"
-                value={form.phone.startsWith('54') ? form.phone.slice(2) : form.phone}
-                onChange={(e) => {
-                  let cleaned = e.target.value.replace(/\D/g, '');
-                  if (cleaned.startsWith('0')) cleaned = cleaned.slice(1);
-                  if (cleaned.startsWith('15')) cleaned = cleaned.slice(2);
-                  setField('phone', '54' + cleaned);
-                }}
-                className="rounded-l-none h-12"
-                required
-              />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="document">Documento</Label>
+              <div className="relative">
+                <IdCard className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="document"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="12345678"
+                  value={form.document}
+                  onChange={(e) => setField('document', e.target.value.replace(/\D/g, ''))}
+                  className="pl-10 h-12"
+                  maxLength={8}
+                  required
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Teléfono</Label>
+              <div className="flex">
+                <span className="inline-flex items-center rounded-l-lg border border-r-0 border-input bg-muted px-3 h-12 text-sm font-semibold text-muted-foreground">+54</span>
+                <Input
+                  id="phone"
+                  type="tel"
+                  inputMode="numeric"
+                  placeholder="11 12345678"
+                  value={form.phone.startsWith('54') ? form.phone.slice(2) : form.phone}
+                  onChange={(e) => {
+                    let cleaned = e.target.value.replace(/\D/g, '');
+                    if (cleaned.startsWith('0')) cleaned = cleaned.slice(1);
+                    if (cleaned.startsWith('15')) cleaned = cleaned.slice(2);
+                    setField('phone', '54' + cleaned);
+                  }}
+                  className="rounded-l-none h-12"
+                  required
+                />
+              </div>
             </div>
           </div>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="company">Empresa</Label>
-          <div className="relative">
-            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              id="company"
-              placeholder="Nombre de la empresa"
-              value={form.company}
-              onChange={(e) => setField('company', e.target.value)}
-              className="pl-10 h-12"
-              required
-            />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <div className="relative">
-            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              placeholder="vos@empresa.com"
-              value={form.email}
-              onChange={(e) => setField('email', e.target.value)}
-              className="pl-10 h-12"
-              required
-            />
-          </div>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="password">Contraseña</Label>
+            <Label htmlFor="company">Empresa</Label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                id="password"
-                type="password"
-                autoComplete="new-password"
-                placeholder="••••••••"
-                value={form.password}
-                onChange={(e) => setField('password', e.target.value)}
+                id="company"
+                placeholder="Nombre de tu empresa"
+                value={form.company}
+                onChange={(e) => setField('company', e.target.value)}
                 className="pl-10 h-12"
                 required
               />
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="confirm">Confirmar</Label>
+            <Label htmlFor="email">Email</Label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                id="confirm"
-                type="password"
-                autoComplete="new-password"
-                placeholder="••••••••"
-                value={form.confirmPassword}
-                onChange={(e) => setField('confirmPassword', e.target.value)}
+                id="email"
+                type="email"
+                autoComplete="email"
+                placeholder="vos@empresa.com"
+                value={form.email}
+                onChange={(e) => setField('email', e.target.value)}
                 className="pl-10 h-12"
                 required
               />
             </div>
           </div>
-        </div>
-        <Button type="submit" className="w-full h-12 font-medium" disabled={loading}>
-          {loading ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creando cuenta…
-            </>
-          ) : (
-            'Registrarme'
-          )}
-        </Button>
-      </form>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="password">Contraseña</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="••••••••"
+                  value={form.password}
+                  onChange={(e) => setField('password', e.target.value)}
+                  className="pl-10 h-12"
+                  required
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm">Confirmar</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="confirm"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="••••••••"
+                  value={form.confirmPassword}
+                  onChange={(e) => setField('confirmPassword', e.target.value)}
+                  className="pl-10 h-12"
+                  required
+                />
+              </div>
+            </div>
+          </div>
+          <Button type="submit" className="w-full h-12 font-medium" disabled={loading}>
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creando cuenta…
+              </>
+            ) : (
+              'Registrarme'
+            )}
+          </Button>
+        </form>
+      )}
     </AuthLayout>
   );
 }
