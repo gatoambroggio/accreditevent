@@ -18,6 +18,10 @@
       "type": "string",
       "description": "Evento al que pertenece el registro biom\u00e9trico"
     },
+    "company": {
+      "type": "string",
+      "description": "Empresa del evento (denormalizado para RLS)"
+    },
     "face_photo_url": {
       "type": "string",
       "description": "URL de la foto de rostro capturada con c\u00e1mara web"
@@ -84,6 +88,18 @@
           }
         },
         {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
           "data.event_id": {
             "$in": "{{user.data.assigned_event_ids}}"
           }
@@ -109,6 +125,18 @@
           "user_condition": {
             "role": "coordinator"
           }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
         },
         {
           "data.event_id": {
@@ -140,6 +168,18 @@
           }
         },
         {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
           "data.event_id": {
             "$in": "{{user.data.assigned_event_ids}}"
           }
@@ -165,6 +205,18 @@
           "user_condition": {
             "role": "coordinator"
           }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
         },
         {
           "data.event_id": {
