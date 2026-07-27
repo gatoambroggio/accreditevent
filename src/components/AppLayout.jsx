@@ -21,6 +21,7 @@ import {
   Settings as SettingsIcon,
   Layers,
   Cpu,
+  Car,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 
@@ -39,6 +40,7 @@ const NAV_ITEMS = [
   { path: '/reports', label: 'Reportes', icon: BarChart3, minLevel: 1 },
   { path: '/messages', label: 'Mensajes', icon: MessageSquare, minLevel: 1 },
   { path: '/documents', label: 'Documentos', icon: FileText, minLevel: 1 },
+  { path: '/vehicles', label: 'Vehículos', icon: Car, minLevel: 1 },
   { path: '/users', label: 'Usuarios y roles', icon: ShieldCheck, minLevel: 2 },
   { path: '/audit', label: 'Auditoría', icon: ScrollText, minLevel: 2 },
   { path: '/settings', label: 'Configuración', icon: SettingsIcon, minLevel: 2 },

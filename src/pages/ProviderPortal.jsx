@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { logAudit } from '@/lib/audit';
-import { Loader2, Upload, FileText, IdCard, UserCircle, CheckCircle2 } from 'lucide-react';
+import { Loader2, Upload, FileText, IdCard, UserCircle, CheckCircle2, Car, Trash2, Plus } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
 import PersonBiometricCard from '@/components/PersonBiometricCard';
+import DocumentViewer from '@/components/DocumentViewer';
 
 const DOC_TYPES = {
   dni: 'Documento de identidad',
@@ -17,10 +18,13 @@ export default function ProviderPortal() {
   const [person, setPerson] = useState(null);
   const [accreditations, setAccreditations] = useState([]);
   const [documents, setDocuments] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savingVehicle, setSavingVehicle] = useState(false);
   const [msg, setMsg] = useState('');
+  const [viewingDoc, setViewingDoc] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -29,12 +33,14 @@ export default function ProviderPortal() {
       const p = people[0];
       if (!p) { setLoading(false); return; }
       setPerson(p);
-      const [accreds, docs] = await Promise.all([
+      const [accreds, docs, vehs] = await Promise.all([
         base44.entities.Accreditation.filter({ person_id: p.id }, '-created_date', 50),
         base44.entities.Document.filter({ person_id: p.id }, '-created_date', 50),
+        base44.entities.Vehicle.filter({ person_id: p.id }, '-created_date', 50),
       ]);
       setAccreditations(accreds);
       setDocuments(docs);
+      setVehicles(vehs);
     } catch {
       // silent
     } finally {
@@ -90,6 +96,42 @@ export default function ProviderPortal() {
       setMsg(err.message || 'Error al subir el documento.');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleVehicleAdd = async (e) => {
+    e.preventDefault();
+    setSavingVehicle(true);
+    try {
+      await base44.entities.Vehicle.create({
+        person_id: person.id,
+        person_name: person.full_name,
+        brand: e.target.elements.brand.value.trim(),
+        model: e.target.elements.model.value.trim(),
+        plate: e.target.elements.plate.value.toUpperCase().trim(),
+        color: e.target.elements.color.value.trim(),
+      });
+      await logAudit('vehicle-create', 'Vehicle', '', e.target.elements.plate.value);
+      e.target.reset();
+      await load();
+      setMsg('Vehículo registrado correctamente.');
+      setTimeout(() => setMsg(''), 3000);
+    } catch (err) {
+      setMsg(err.message || 'Error al registrar el vehículo.');
+    } finally {
+      setSavingVehicle(false);
+    }
+  };
+
+  const handleVehicleDelete = async (vehicleId) => {
+    if (!window.confirm('¿Eliminar este vehículo?')) return;
+    try {
+      await base44.entities.Vehicle.delete(vehicleId);
+      await load();
+      setMsg('Vehículo eliminado.');
+      setTimeout(() => setMsg(''), 3000);
+    } catch (err) {
+      setMsg(err.message || 'Error al eliminar el vehículo.');
     }
   };
 
@@ -167,7 +209,7 @@ export default function ProviderPortal() {
             <form onSubmit={handleUpload} className="space-y-4">
               <label className="block">
                 <span className="mb-1.5 block text-xs font-semibold text-slate-600">Tipo</span>
-                <select name="document_type" required
+                <select name="document_type" required defaultValue="work_insurance"
                   className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20">
                   {Object.entries(DOC_TYPES).map(([v, l]) => (<option key={v} value={v}>{l}</option>))}
                 </select>
@@ -216,6 +258,65 @@ export default function ProviderPortal() {
           </div>
         )}
 
+        {/* Vehicles */}
+        <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="mb-4 flex items-center gap-2 text-base font-bold text-slate-900">
+            <Car className="h-4 w-4 text-emerald-600" /> Mis vehículos
+          </h3>
+          <form onSubmit={handleVehicleAdd} className="mb-5 space-y-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Marca *</span>
+                <input name="brand" type="text" required placeholder="Ej: Ford"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Modelo *</span>
+                <input name="model" type="text" required placeholder="Ej: Fiesta"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Patente *</span>
+                <input name="plate" type="text" required placeholder="Ej: AB123CD"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm uppercase outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Color</span>
+                <input name="color" type="text" placeholder="Ej: Blanco"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+              </label>
+            </div>
+            <button type="submit" disabled={savingVehicle}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">
+              {savingVehicle ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              {savingVehicle ? 'Guardando…' : 'Agregar vehículo'}
+            </button>
+          </form>
+          {vehicles.length === 0 ? (
+            <p className="py-4 text-center text-sm text-slate-400">No registraste vehículos todavía.</p>
+          ) : (
+            <div className="space-y-2">
+              {vehicles.map((v) => (
+                <div key={v.id} className="flex items-center justify-between border-t border-slate-100 py-3 first:border-0">
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex items-center rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1 font-mono text-xs font-bold uppercase tracking-wider text-slate-700">
+                      {v.plate}
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{v.brand} {v.model}</p>
+                      {v.color && <p className="text-xs text-slate-400">{v.color}</p>}
+                    </div>
+                  </div>
+                  <button onClick={() => handleVehicleDelete(v.id)}
+                    className="rounded-lg p-1.5 text-red-500 transition hover:bg-red-50">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Documents */}
         <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <h3 className="mb-4 flex items-center gap-2 text-base font-bold text-slate-900">
@@ -239,9 +340,9 @@ export default function ProviderPortal() {
                     <tr key={d.id} className="border-b border-slate-50">
                       <td className="px-3 py-3 text-sm text-slate-600">{DOC_TYPES[d.document_type] || d.document_type}</td>
                       <td className="px-3 py-3">
-                        <a href={d.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-emerald-700 hover:underline">
+                        <button onClick={() => setViewingDoc(d)} className="text-left text-sm text-emerald-700 hover:underline">
                           {d.original_name}
-                        </a>
+                        </button>
                         {d.review_note && <p className="text-xs text-slate-400">{d.review_note}</p>}
                       </td>
                       <td className="px-3 py-3 text-sm text-slate-500">{d.expires_at || '—'}</td>
@@ -254,6 +355,8 @@ export default function ProviderPortal() {
           )}
         </div>
       </div>
+
+      <DocumentViewer doc={viewingDoc} onClose={() => setViewingDoc(null)} />
     </div>
   );
 }

@@ -1,0 +1,40 @@
+{
+  "name": "Vehicle",
+  "type": "object",
+  "properties": {
+    "person_id": {
+      "type": "string",
+      "description": "Persona due\u00f1a del veh\u00edculo"
+    },
+    "person_name": {
+      "type": "string",
+      "description": "Nombre de la persona (denormalizado)"
+    },
+    "brand": {
+      "type": "string",
+      "description": "Marca del veh\u00edculo"
+    },
+    "model": {
+      "type": "string",
+      "description": "Modelo del veh\u00edculo"
+    },
+    "plate": {
+      "type": "string",
+      "description": "Patente del veh\u00edculo"
+    },
+    "color": {
+      "type": "string",
+      "description": "Color del veh\u00edculo"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas adicionales"
+    }
+  },
+  "required": [
+    "person_id",
+    "brand",
+    "model",
+    "plate"
+  ]
+}
