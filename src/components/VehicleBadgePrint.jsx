@@ -1,4 +1,5 @@
 import React from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { X, Printer, Car } from 'lucide-react';
 import { printBadge } from '@/lib/printBadge';
 
@@ -165,18 +166,21 @@ export default function VehicleBadgePrint({ vehicle, settings, events = [], park
             </div>
           </div>
 
-          {/* Footer — person */}
+          {/* Footer — person + QR */}
           <div style={{
             marginTop: 'auto', backgroundColor: '#0f766e', borderRadius: '0.5rem',
-            padding: '0.5rem 0.9rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0,
+            padding: '0.5rem 0.9rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexShrink: 0,
           }}>
-            <div>
+            <div style={{ minWidth: 0 }}>
               <p style={{ fontSize: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#a7f3d0', fontFamily: 'monospace', margin: 0 }}>
                 Titular
               </p>
               <p style={{ fontSize: '0.95rem', fontWeight: 700, color: 'white', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {vehicle?.person_name || '—'}
               </p>
+            </div>
+            <div style={{ flexShrink: 0, backgroundColor: 'white', borderRadius: '0.3rem', padding: '0.15rem' }}>
+              <QRCodeSVG value={vehicle?.id || vehicle?.plate || ''} size={56} level="M" />
             </div>
           </div>
         </div>
