@@ -21,7 +21,7 @@ export default async function(req: Request): Promise<Response> {
     });
 
     let closed = 0;
-    let accreditationsBlocked = 0;
+    let accreditationsDeleted = 0;
 
     const expiredIds = expired.map((e) => e.id);
     const closedEvents = await base44.asServiceRole.entities.Event.filter(
@@ -40,14 +40,14 @@ export default async function(req: Request): Promise<Response> {
       }
       try {
         const accs = await base44.asServiceRole.entities.Accreditation.filter(
-          { event_id: evtId, status: 'active' },
+          { event_id: evtId },
           '-created_date',
           500
         );
         for (const acc of accs) {
           try {
-            await base44.asServiceRole.entities.Accreditation.update(acc.id, { status: 'blocked' });
-            accreditationsBlocked++;
+            await base44.asServiceRole.entities.Accreditation.delete(acc.id);
+            accreditationsDeleted++;
           } catch {}
         }
       } catch {}
@@ -55,7 +55,7 @@ export default async function(req: Request): Promise<Response> {
 
     return Response.json({
       closed,
-      accreditations_blocked: accreditationsBlocked,
+      accreditations_deleted: accreditationsDeleted,
       total_checked: events.length,
       expired_found: expired.length,
     });
