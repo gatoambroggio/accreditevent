@@ -218,10 +218,9 @@ export default function Events() {
                 <div className="flex items-center justify-end gap-1">
                   <button
                     onClick={() => setShareEvent(e)}
-                    className="rounded-lg p-2 text-slate-400 transition hover:bg-emerald-50 hover:text-emerald-600"
-                    title="Copiar link de registro"
+                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-emerald-600 transition hover:bg-emerald-50"
                   >
-                    <Link2 className="h-3.5 w-3.5" />
+                    <Link2 className="h-3.5 w-3.5" /> Link registro
                   </button>
                   <button onClick={() => openEdit(e)} className={btnIcon}>
                     <Pencil className="h-3.5 w-3.5" />
