@@ -111,6 +111,17 @@ export default function AccreditationFacial() {
         if (person?.email) personEmail = person.email;
       } catch {}
 
+      // Block accreditation if the person has pending/rejected/expired documentation
+      const docCheck = await base44.functions.invoke('checkPersonDocuments', { person_id: personId });
+      if (docCheck.data?.has_pending) {
+        setResult({
+          ok: false,
+          person_name: personName,
+          message: `No se puede acreditar: documentación pendiente o vencida (${docCheck.data.pending_statuses.join(', ')}).`,
+        });
+        return;
+      }
+
       const allAccreditations = await base44.entities.Accreditation.list('-created_date', 500);
       const badgeCode = generateBadgeCode(personType, allAccreditations.map((a) => a.badge_code), typePrefixes);
 
