@@ -42,6 +42,7 @@ export default function ProviderRegister() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [personId, setPersonId] = useState(null);
+  const [companyName, setCompanyName] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -49,6 +50,7 @@ export default function ProviderRegister() {
       try {
         const res = await base44.functions.invoke('getCompanyEvents', { company });
         setEvents(res.data?.events || []);
+        setCompanyName(res.data?.company_name || company);
       } catch {}
       setLoadingEvents(false);
     })();
@@ -249,7 +251,7 @@ export default function ProviderRegister() {
     <AuthLayout
       icon={UserPlus}
       title="Registro de proveedor"
-      subtitle={company ? `Inscripción para ${company}` : 'Creá tu cuenta para gestionar acreditaciones'}
+      subtitle={companyName ? `Inscripción para ${companyName}` : 'Creá tu cuenta para gestionar acreditaciones'}
       footer={
         <>
           ¿Ya tenés cuenta?{' '}

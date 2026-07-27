@@ -34,6 +34,7 @@ import Settings from '@/pages/Settings';
 import ZKTecoDevices from '@/pages/ZKTecoDevices';
 import Vehicles from '@/pages/Vehicles';
 import ParkingSectors from '@/pages/ParkingSectors';
+import Companies from '@/pages/Companies';
 
 const AUTH_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password', '/provider-register'];
 
@@ -89,6 +90,7 @@ const AuthenticatedApp = () => {
         <Route path="/zkteco-devices" element={<ZKTecoDevices />} />
         <Route path="/vehicles" element={<Vehicles />} />
         <Route path="/parking-sectors" element={<ParkingSectors />} />
+        <Route path="/companies" element={<Companies />} />
       </Route>
       <Route path="/portal" element={<ProviderPortal />} />
       <Route path="/control-acceso" element={<AccessStation />} />
