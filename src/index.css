@@ -92,6 +92,7 @@
 }
 
 @media print {
+  @page { size: A5 landscape; margin: 0; }
   body * { visibility: hidden; }
   .badge-print, .badge-print * { visibility: visible; }
   .badge-print { position: absolute; top: 0; left: 0; margin: 0 !important; box-shadow: none !important; }

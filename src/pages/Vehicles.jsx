@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { useCrud } from '@/lib/crud';
-import { Plus, Pencil, Search, Loader2, Download, Car } from 'lucide-react';
+import { Plus, Pencil, Search, Loader2, Download, Car, Printer } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
 import EntityModal from '@/components/EntityModal';
+import VehicleBadgePrint from '@/components/VehicleBadgePrint';
 import { base44 } from '@/api/base44Client';
 
 const validateVehicle = (data) => {
@@ -20,6 +21,8 @@ export default function Vehicles() {
   const [editing, setEditing] = useState(null);
   const [query, setQuery] = useState('');
   const [people, setPeople] = useState([]);
+  const [printingVehicle, setPrintingVehicle] = useState(null);
+  const [settings, setSettings] = useState(null);
 
   const [peopleLoaded, setPeopleLoaded] = useState(false);
   const [showPersonSearch, setShowPersonSearch] = useState(false);
@@ -55,6 +58,17 @@ export default function Vehicles() {
       setPeopleLoaded(true);
     } catch {}
   };
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const all = await base44.entities.SystemSetting.list('-created_date', 1);
+        if (all[0]) setSettings(all[0]);
+      } catch {}
+    })();
+  }, []);
+
+  const openPrint = (vehicle) => setPrintingVehicle(vehicle);
 
   const openNew = () => {
     setEditing(null);
@@ -160,9 +174,14 @@ export default function Vehicles() {
                     </td>
                     <td className="px-4 py-3.5 text-sm text-slate-500">{v.color || '—'}</td>
                     <td className="px-4 py-3.5 text-right">
-                      <button onClick={() => openEdit(v)} className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700">
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button onClick={() => openPrint(v)} className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-emerald-700" title="Imprimir credencial">
+                          <Printer className="h-3.5 w-3.5" />
+                        </button>
+                        <button onClick={() => openEdit(v)} className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -185,6 +204,14 @@ export default function Vehicles() {
         canDelete={!!editing}
         submitLabel={editing ? 'Guardar cambios' : 'Crear vehículo'}
       />
+
+      {printingVehicle && (
+        <VehicleBadgePrint
+          vehicle={printingVehicle}
+          settings={settings}
+          onClose={() => setPrintingVehicle(null)}
+        />
+      )}
     </div>
   );
 }
