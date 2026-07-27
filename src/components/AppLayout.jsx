@@ -19,7 +19,6 @@ import {
   BarChart3,
   Settings as SettingsIcon,
   Layers,
-  Tag,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 
@@ -31,7 +30,6 @@ const NAV_ITEMS = [
   { path: '/people', label: 'Personas', icon: Users, minLevel: 1 },
   { path: '/accreditations', label: 'Acreditaciones', icon: IdCard, minLevel: 0 },
   { path: '/access-levels', label: 'Niveles de acceso', icon: Layers, minLevel: 1 },
-  { path: '/person-types', label: 'Tipos de persona', icon: Tag, minLevel: 1 },
   { path: '/accreditation-facial', label: 'Acreditación facial', icon: ScanFace, minLevel: 1 },
   { path: '/access-control', label: 'Control de acceso', icon: DoorOpen, minLevel: 0 },
   { path: '/reports', label: 'Reportes', icon: BarChart3, minLevel: 1 },

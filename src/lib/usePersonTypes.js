@@ -2,12 +2,10 @@ import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 
 const DEFAULT_TYPES = [
-  { value: 'provider', label: 'Proveedor', badge_prefix: 'PR' },
-  { value: 'technician', label: 'Técnico', badge_prefix: 'TE' },
-  { value: 'staff', label: 'Staff', badge_prefix: 'ST' },
-  { value: 'press', label: 'Prensa', badge_prefix: 'PS' },
-  { value: 'artist', label: 'Artista', badge_prefix: 'AR' },
-  { value: 'guest', label: 'Invitado', badge_prefix: 'GU' },
+  { value: 'general', label: 'General', badge_prefix: 'GE' },
+  { value: 'backstage', label: 'Backstage', badge_prefix: 'BA' },
+  { value: 'technical', label: 'Técnica', badge_prefix: 'TE' },
+  { value: 'vip', label: 'VIP', badge_prefix: 'VI' },
 ];
 
 export function usePersonTypes() {
@@ -16,7 +14,7 @@ export function usePersonTypes() {
   useEffect(() => {
     (async () => {
       try {
-        const data = await base44.entities.PersonType.list('-created_date', 100);
+        const data = await base44.entities.AccessLevel.list('-created_date', 100);
         if (data.length > 0) {
           setTypes(data.map((t) => ({
             value: t.value,

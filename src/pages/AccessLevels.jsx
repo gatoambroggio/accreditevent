@@ -6,6 +6,7 @@ import EntityModal from '@/components/EntityModal';
 const FIELDS = [
   { name: 'label', label: 'Nombre', type: 'text', required: true, placeholder: 'Ej: Backstage' },
   { name: 'value', label: 'Identificador (slug)', type: 'text', required: true, placeholder: 'backstage', hint: 'Minúsculas, sin espacios ni caracteres especiales.' },
+  { name: 'badge_prefix', label: 'Prefijo de credencial', type: 'text', placeholder: 'PR', hint: '2-3 letras para generar códigos de credencial.' },
   { name: 'description', label: 'Descripción', type: 'textarea', full: true },
 ];
 
@@ -19,7 +20,8 @@ export default function AccessLevels() {
 
   const handleSubmit = async (data) => {
     const slug = (data.value || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
-    const enriched = { ...data, value: slug };
+    const prefix = (data.badge_prefix || '').toUpperCase().slice(0, 3);
+    const enriched = { ...data, value: slug, badge_prefix: prefix };
     if (editing) {
       await update(editing.id, enriched);
     } else {
@@ -54,6 +56,7 @@ export default function AccessLevels() {
                 <tr className="border-b border-slate-100 bg-slate-50">
                   <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Nombre</th>
                   <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Identificador</th>
+                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Prefijo</th>
                   <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Descripción</th>
                   <th className="px-4 py-3" />
                 </tr>
@@ -63,6 +66,7 @@ export default function AccessLevels() {
                   <tr key={item.id} className="border-b border-slate-50 transition hover:bg-slate-50/50">
                     <td className="px-4 py-3.5 text-sm font-semibold text-slate-900">{item.label}</td>
                     <td className="px-4 py-3.5"><code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700">{item.value}</code></td>
+                    <td className="px-4 py-3.5"><code className="rounded bg-emerald-50 px-1.5 py-0.5 text-xs font-bold text-emerald-700">{item.badge_prefix || '—'}</code></td>
                     <td className="px-4 py-3.5 text-sm text-slate-500">{item.description || '—'}</td>
                     <td className="px-4 py-3.5 text-right">
                       <button onClick={() => openEdit(item)} className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700">
