@@ -7,6 +7,7 @@ import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
 import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
 import { btnPrimary, btnIcon } from '@/components/ui/button-styles';
+import { slugify } from '@/lib/slugify';
 
 const ROLES = [
   { value: 'provider', label: 'Proveedor' },
@@ -79,6 +80,27 @@ export default function Users() {
 
   const openEdit = (u) => { setEditing(u); setModalOpen(true); setResetMsg(''); };
 
+  const syncUserCompany = async (userId, oldCompany, newCompany) => {
+    if ((oldCompany || '').toLowerCase() === (newCompany || '').toLowerCase()) return;
+    if (oldCompany) {
+      const oldComps = await base44.entities.Company.filter({ name: oldCompany });
+      for (const c of oldComps) {
+        const newIds = (c.assigned_user_ids || []).filter((id) => id !== userId);
+        await base44.entities.Company.update(c.id, { assigned_user_ids: newIds });
+      }
+    }
+    if (newCompany) {
+      const existing = await base44.entities.Company.filter({ name: newCompany });
+      if (existing.length > 0) {
+        const c = existing[0];
+        const merged = [...new Set([...(c.assigned_user_ids || []), userId])];
+        await base44.entities.Company.update(c.id, { assigned_user_ids: merged });
+      } else {
+        await base44.entities.Company.create({ name: newCompany, slug: slugify(newCompany), assigned_user_ids: [userId] });
+      }
+    }
+  };
+
   const handleUpdate = async (data) => {
     if (data.password) {
       try {
@@ -88,9 +110,12 @@ export default function Users() {
         throw new Error('No se pudo cambiar la contraseña: ' + (err.data?.error || err.message || err));
       }
     }
-    await base44.entities.User.update(editing.id, { role: data.role, company: data.company || '' });
-    await logAudit('update', 'User', editing.id, `Rol: ${data.role}, Empresa: ${data.company || '—'}`);
-    setUsers((prev) => prev.map((u) => (u.id === editing.id ? { ...u, role: data.role, company: data.company } : u)));
+    const oldCompany = editing.company || '';
+    const newCompany = data.company || '';
+    await base44.entities.User.update(editing.id, { role: data.role, company: newCompany });
+    await syncUserCompany(editing.id, oldCompany, newCompany);
+    await logAudit('update', 'User', editing.id, `Rol: ${data.role}, Empresa: ${newCompany || '—'}`);
+    setUsers((prev) => prev.map((u) => (u.id === editing.id ? { ...u, role: data.role, company: newCompany } : u)));
   };
 
   const handleDelete = async () => {
