@@ -155,6 +155,7 @@ export default function Accreditations() {
     const enriched = {
       ...data,
       event_name: evt?.name || '',
+      company: evt?.company || '',
       person_name: person?.full_name || '',
       person_type: person?.person_type || '',
       person_email: person?.email || '',

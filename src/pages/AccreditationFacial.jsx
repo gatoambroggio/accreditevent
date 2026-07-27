@@ -128,6 +128,7 @@ export default function AccreditationFacial() {
       const newAccred = await base44.entities.Accreditation.create({
         event_id: selectedEvent.id,
         event_name: selectedEvent.name,
+        company: selectedEvent.company || '',
         person_id: personId,
         person_name: personName,
         person_type: personType,
