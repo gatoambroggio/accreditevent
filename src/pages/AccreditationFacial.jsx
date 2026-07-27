@@ -27,7 +27,7 @@ export default function AccreditationFacial() {
   useEffect(() => {
     (async () => {
       try {
-        const data = await base44.entities.Event.list('-created_date', 100);
+        const data = await base44.entities.Event.filter({ status: 'active' }, '-created_date', 100);
         setEvents(data);
       } catch {}
       setLoadingEvents(false);
