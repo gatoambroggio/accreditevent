@@ -30,6 +30,7 @@ import Messages from '@/pages/Messages';
 import AccreditationFacial from '@/pages/AccreditationFacial';
 import Reports from '@/pages/Reports';
 import Settings from '@/pages/Settings';
+import ZKTecoDevices from '@/pages/ZKTecoDevices';
 
 const AUTH_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password', '/provider-register'];
 
@@ -80,6 +81,7 @@ const AuthenticatedApp = () => {
         <Route path="/reports" element={<Reports />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/access-control" element={<AccessControl />} />
+        <Route path="/zkteco-devices" element={<ZKTecoDevices />} />
       </Route>
       <Route path="/portal" element={<ProviderPortal />} />
       <Route path="/control-acceso" element={<AccessStation />} />

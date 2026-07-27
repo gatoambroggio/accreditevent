@@ -1,0 +1,46 @@
+{
+  "name": "ZKTecoCommand",
+  "type": "object",
+  "properties": {
+    "device_id": {
+      "type": "string",
+      "description": "Dispositivo destino del comando"
+    },
+    "command_type": {
+      "type": "string",
+      "enum": [
+        "sync_user",
+        "delete_user",
+        "clear_data"
+      ],
+      "description": "Tipo de comando iClock"
+    },
+    "command_data": {
+      "type": "string",
+      "description": "Comando en formato iClock (USER, OPERATION, etc.)"
+    },
+    "person_id": {
+      "type": "string",
+      "description": "Persona asociada al comando"
+    },
+    "person_name": {
+      "type": "string",
+      "description": "Nombre de la persona (denormalizado)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "delivered",
+        "failed"
+      ],
+      "default": "pending",
+      "description": "Estado del comando"
+    }
+  },
+  "required": [
+    "device_id",
+    "command_type",
+    "command_data"
+  ]
+}

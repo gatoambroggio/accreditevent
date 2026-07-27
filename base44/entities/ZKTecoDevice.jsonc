@@ -1,0 +1,49 @@
+{
+  "name": "ZKTecoDevice",
+  "type": "object",
+  "properties": {
+    "serial_number": {
+      "type": "string",
+      "description": "N\u00famero de serie del dispositivo ZKTeco"
+    },
+    "name": {
+      "type": "string",
+      "description": "Nombre descriptivo del dispositivo"
+    },
+    "api_key": {
+      "type": "string",
+      "description": "Clave de autenticaci\u00f3n para el push HTTP del dispositivo"
+    },
+    "zone": {
+      "type": "string",
+      "description": "Zona de acceso asignada al dispositivo"
+    },
+    "event_id": {
+      "type": "string",
+      "description": "Evento asociado al dispositivo"
+    },
+    "event_name": {
+      "type": "string",
+      "description": "Nombre del evento (denormalizado)"
+    },
+    "last_seen": {
+      "type": "string",
+      "format": "date-time",
+      "description": "\u00daltima comunicaci\u00f3n del dispositivo"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "inactive"
+      ],
+      "default": "active",
+      "description": "Estado del dispositivo"
+    }
+  },
+  "required": [
+    "serial_number",
+    "name",
+    "api_key"
+  ]
+}

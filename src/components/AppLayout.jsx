@@ -19,6 +19,7 @@ import {
   BarChart3,
   Settings as SettingsIcon,
   Layers,
+  Cpu,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 
@@ -32,6 +33,7 @@ const NAV_ITEMS = [
   { path: '/access-levels', label: 'Niveles de acceso', icon: Layers, minLevel: 1 },
   { path: '/accreditation-facial', label: 'Acreditación facial', icon: ScanFace, minLevel: 1 },
   { path: '/access-control', label: 'Control de acceso', icon: DoorOpen, minLevel: 0 },
+  { path: '/zkteco-devices', label: 'Terminales ZKTeco', icon: Cpu, minLevel: 1 },
   { path: '/reports', label: 'Reportes', icon: BarChart3, minLevel: 1 },
   { path: '/messages', label: 'Mensajes', icon: MessageSquare, minLevel: 1 },
   { path: '/documents', label: 'Documentos', icon: FileText, minLevel: 1 },
