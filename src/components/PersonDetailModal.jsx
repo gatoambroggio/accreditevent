@@ -4,6 +4,7 @@ import { X, Loader2, FileText, ExternalLink, User, UploadCloud } from 'lucide-re
 import StatusBadge from '@/components/StatusBadge';
 import { Image } from '@/components/ui/image';
 import { useDocumentTypes } from '@/lib/useDocumentTypes';
+import DocumentViewer from '@/components/DocumentViewer';
 
 export default function PersonDetailModal({ person, onClose }) {
   const [docs, setDocs] = useState([]);
@@ -12,6 +13,7 @@ export default function PersonDetailModal({ person, onClose }) {
   const [uploading, setUploading] = useState(false);
   const [docType, setDocType] = useState('dni');
   const [selectedFile, setSelectedFile] = useState(null);
+  const [viewingDoc, setViewingDoc] = useState(null);
   const { docTypes } = useDocumentTypes();
 
   const loadDocs = async (personId) => {
@@ -121,9 +123,9 @@ export default function PersonDetailModal({ person, onClose }) {
                 <div className="flex items-center gap-2">
                   <StatusBadge status={doc.status} />
                   {doc.file_url && (
-                    <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50" title="Ver archivo">
+                    <button onClick={() => setViewingDoc(doc)} className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50" title="Ver archivo">
                       <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
+                    </button>
                   )}
                 </div>
               </div>
@@ -165,6 +167,8 @@ export default function PersonDetailModal({ person, onClose }) {
           )}
         </div>
       </div>
+
+      <DocumentViewer doc={viewingDoc} onClose={() => setViewingDoc(null)} />
     </div>
   );
 }

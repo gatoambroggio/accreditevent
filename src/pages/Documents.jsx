@@ -4,6 +4,7 @@ import { Eye, Loader2, FileText, Search, Download, Plus, Pencil, Settings2, Chev
 import { exportToExcel } from '@/lib/exportUtils';
 import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
+import DocumentViewer from '@/components/DocumentViewer';
 import { base44 } from '@/api/base44Client';
 import { logAudit } from '@/lib/audit';
 import { useDocumentTypes } from '@/lib/useDocumentTypes';
@@ -37,6 +38,7 @@ export default function Documents() {
   const [showTypes, setShowTypes] = useState(false);
   const [typeModalOpen, setTypeModalOpen] = useState(false);
   const [editingType, setEditingType] = useState(null);
+  const [viewingDoc, setViewingDoc] = useState(null);
 
   const filtered = useMemo(() => {
     let result = items;
@@ -216,10 +218,10 @@ export default function Documents() {
                     <td className="px-4 py-3.5 text-sm font-semibold text-slate-900">{d.person_name || '—'}</td>
                     <td className="px-4 py-3.5 text-sm text-slate-500">{docTypeLabel(d.document_type)}</td>
                     <td className="px-4 py-3.5">
-                      <a href={d.file_url} target="_blank" rel="noopener noreferrer"
+                      <button onClick={() => setViewingDoc(d)}
                         className="inline-flex items-center gap-1.5 text-sm text-emerald-700 hover:underline">
                         <FileText className="h-3.5 w-3.5" /> {d.original_name}
-                      </a>
+                      </button>
                     </td>
                     <td className="px-4 py-3.5 text-sm text-slate-500">{d.expires_at || '—'}</td>
                     <td className="px-4 py-3.5"><StatusBadge status={d.status} /></td>
@@ -261,6 +263,8 @@ export default function Documents() {
         canDelete={!!editingType}
         submitLabel={editingType ? 'Guardar cambios' : 'Crear tipo'}
       />
+
+      <DocumentViewer doc={viewingDoc} onClose={() => setViewingDoc(null)} />
     </div>
   );
 }
