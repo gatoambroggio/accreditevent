@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Download, Car, CarFront } from 'lucide-react';
+import { Download, Car, CarFront, Check, XCircle } from 'lucide-react';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
 import FilterSelect from '@/components/ui/filter-select';
@@ -63,6 +63,13 @@ export default function RegisteredVehicles() {
       ]),
       'vehiculos_registrados'
     );
+  };
+
+  const handleStatusChange = async (vehicle, newStatus) => {
+    try {
+      await base44.entities.Vehicle.update(vehicle.id, { status: newStatus });
+      setVehicles((prev) => prev.map((v) => (v.id === vehicle.id ? { ...v, status: newStatus } : v)));
+    } catch {}
   };
 
   return (
@@ -131,6 +138,7 @@ export default function RegisteredVehicles() {
             <Th>Sector</Th>
             <Th>Eventos</Th>
             <Th>Estado</Th>
+            <Th>Acciones</Th>
             <Th>Registrado</Th>
           </tr>
         </thead>
@@ -146,6 +154,20 @@ export default function RegisteredVehicles() {
                 {(v.event_names || []).join(', ') || '—'}
               </Td>
               <Td><StatusBadge status={v.status} /></Td>
+              <Td>
+                <div className="flex items-center gap-1">
+                  {v.status !== 'approved' && (
+                    <button onClick={() => handleStatusChange(v, 'approved')} className="rounded-md border border-emerald-200 bg-emerald-50 p-1.5 text-emerald-700 transition hover:bg-emerald-100" title="Aprobar">
+                      <Check className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  {v.status !== 'rejected' && (
+                    <button onClick={() => handleStatusChange(v, 'rejected')} className="rounded-md border border-red-200 bg-red-50 p-1.5 text-red-700 transition hover:bg-red-100" title="Rechazar">
+                      <XCircle className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              </Td>
               <Td className="text-xs text-slate-400">
                 {v.created_date ? parseServerDate(v.created_date).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }) : '—'}
               </Td>
