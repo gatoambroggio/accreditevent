@@ -22,6 +22,10 @@
       "type": "string",
       "description": "Nombre del evento (denormalizado)"
     },
+    "company": {
+      "type": "string",
+      "description": "Empresa del evento (denormalizado para RLS)"
+    },
     "verified_by": {
       "type": "string",
       "description": "Usuario que valid\u00f3 el acceso"
@@ -90,9 +94,16 @@
           }
         },
         {
-          "user_condition": {
-            "role": "productora"
-          }
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
         },
         {
           "data.event_id": {
@@ -124,9 +135,16 @@
           }
         },
         {
-          "user_condition": {
-            "role": "productora"
-          }
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
         },
         {
           "data.event_id": {
