@@ -10,6 +10,10 @@
       "type": "string",
       "description": "Nombre de la persona (denormalizado)"
     },
+    "company": {
+      "type": "string",
+      "description": "Empresa del evento (denormalizado para RLS)"
+    },
     "brand": {
       "type": "string",
       "description": "Marca del veh\u00edculo"
@@ -59,6 +63,18 @@
     "read": {
       "$or": [
         {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
           "user_condition": {
             "role": "superadmin"
           }
@@ -85,6 +101,18 @@
     },
     "create": {
       "$or": [
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
         {
           "user_condition": {
             "role": "superadmin"
@@ -115,6 +143,18 @@
     "update": {
       "$or": [
         {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
           "user_condition": {
             "role": "superadmin"
           }
@@ -141,6 +181,18 @@
     },
     "delete": {
       "$or": [
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
         {
           "user_condition": {
             "role": "superadmin"
