@@ -6,8 +6,7 @@ import BiometricButton from '@/components/BiometricButton';
 import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
 import BadgePrint from '@/components/BadgePrint';
-
-const ACCESS_LEVELS = ['general', 'backstage', 'technical', 'vip', 'all-access'];
+import { useZones } from '@/lib/useZones';
 
 const TYPE_PREFIXES = {
   provider: 'PR',
@@ -34,6 +33,8 @@ function generateBadgeCode(personType, existingCodes) {
 
 export default function Accreditations() {
   const { items, loading, create, update, remove, reload } = useCrud('Accreditation');
+  const { zones } = useZones();
+  const accessLevels = [...zones.map((z) => z.value), 'all-access'];
   const [events, setEvents] = useState([]);
   const [people, setPeople] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -69,7 +70,7 @@ export default function Accreditations() {
     { name: 'area', label: 'Área', type: 'text' },
     {
       name: 'access_level', label: 'Nivel de acceso', type: 'select',
-      options: ACCESS_LEVELS.map((l) => ({ value: l, label: l })),
+      options: accessLevels.map((l) => ({ value: l, label: l })),
     },
     {
       name: 'status', label: 'Estado', type: 'select',

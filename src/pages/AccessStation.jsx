@@ -4,7 +4,8 @@ import { base44 } from '@/api/base44Client';
 import { Loader2, CheckCircle2, XCircle, Calendar, Clock, AlertTriangle } from 'lucide-react';
 import FaceCapture from '@/components/FaceCapture';
 import { findBestMatch } from '@/lib/faceRecognition';
-import { ZONES, canAccessAnyZone } from '@/lib/accessZones';
+import { canAccessAnyZone } from '@/lib/accessZones';
+import { useZones } from '@/lib/useZones';
 
 function getEventStatus(event) {
   const now = Date.now();
@@ -36,6 +37,7 @@ export default function AccessStation() {
   const [cycle, setCycle] = useState(0);
   const [verifying, setVerifying] = useState(false);
   const [result, setResult] = useState(null);
+  const { zones } = useZones();
 
   useEffect(() => {
     (async () => {
@@ -123,7 +125,7 @@ export default function AccessStation() {
       }
 
       const me = await base44.auth.me();
-      const zoneLabel = selectedZones.map((z) => ZONES.find((zz) => zz.value === z)?.label || z).join(', ');
+      const zoneLabel = selectedZones.map((z) => zones.find((zz) => zz.value === z)?.label || z).join(', ');
 
       if (!canAccessAnyZone(accred.access_level, selectedZones)) {
         await base44.entities.AccessLog.create({
@@ -259,7 +261,7 @@ export default function AccessStation() {
                   <label className="mb-1.5 block text-xs font-semibold text-slate-600">Zona(s) de control</label>
                   <p className="mb-2 text-xs text-slate-400">Seleccioná una o varias. Se permite el ingreso si la persona tiene acceso a alguna de las seleccionadas.</p>
                   <div className="flex flex-wrap gap-2">
-                    {ZONES.map((z) => {
+                    {zones.map((z) => {
                       const active = selectedZones.includes(z.value);
                       return (
                         <button
@@ -294,7 +296,7 @@ export default function AccessStation() {
             <div className="mx-auto flex max-w-7xl items-center justify-between">
               <div>
                 <p className="text-sm font-bold text-slate-900">{selectedEvent.name}</p>
-                <p className="text-xs text-slate-500">{selectedEvent.venue || 'Sin sede'} · Zonas: {selectedZones.map((z) => ZONES.find((zz) => zz.value === z)?.label || z).join(', ')}</p>
+                <p className="text-xs text-slate-500">{selectedEvent.venue || 'Sin sede'} · Zonas: {selectedZones.map((z) => zones.find((zz) => zz.value === z)?.label || z).join(', ')}</p>
               </div>
               {eventStatus === 'ended' ? (
                 <div className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-inset ring-red-200">

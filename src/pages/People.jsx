@@ -4,6 +4,7 @@ import { Plus, Pencil, Search, Loader2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
+import PersonDetailModal from '@/components/PersonDetailModal';
 
 const PERSON_TYPES = ['provider', 'technician', 'staff', 'press', 'artist', 'guest'];
 
@@ -49,6 +50,7 @@ export default function People() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [query, setQuery] = useState('');
+  const [detailPerson, setDetailPerson] = useState(null);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -140,7 +142,7 @@ export default function People() {
                 {filtered.map((p) => (
                   <tr key={p.id} className="border-b border-slate-50 transition hover:bg-slate-50/50">
                     <td className="px-4 py-3.5">
-                      <p className="text-sm font-semibold text-slate-900">{p.full_name}</p>
+                      <button onClick={() => setDetailPerson(p)} className="text-left text-sm font-semibold text-slate-900 hover:text-emerald-600">{p.full_name}</button>
                       <p className="text-xs text-slate-400">{p.document || 'Sin documento'}</p>
                     </td>
                     <td className="px-4 py-3.5 text-sm text-slate-500">{p.person_type}</td>
@@ -173,6 +175,10 @@ export default function People() {
         canDelete={!!editing}
         submitLabel={editing ? 'Guardar cambios' : 'Crear persona'}
       />
+
+      {detailPerson && (
+        <PersonDetailModal person={detailPerson} onClose={() => setDetailPerson(null)} />
+      )}
     </div>
   );
 }

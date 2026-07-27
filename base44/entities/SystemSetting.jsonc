@@ -45,6 +45,21 @@
     "role_access": {
       "type": "object",
       "description": "Mapa de path de m\u00f3dulo a array de roles con acceso permitido"
+    },
+    "zones": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Zonas de control de acceso configurables"
     }
   }
 }

@@ -32,15 +32,8 @@
     },
     "access_level": {
       "type": "string",
-      "enum": [
-        "general",
-        "backstage",
-        "technical",
-        "vip",
-        "all-access"
-      ],
       "default": "general",
-      "description": "Nivel de acceso"
+      "description": "Nivel de acceso (coincide con el valor de zona)"
     },
     "status": {
       "type": "string",

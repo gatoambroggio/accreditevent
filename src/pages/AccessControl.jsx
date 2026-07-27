@@ -14,7 +14,8 @@ import {
 } from 'lucide-react';
 import FaceCapture from '@/components/FaceCapture';
 import { compareDescriptors, MATCH_THRESHOLD } from '@/lib/faceRecognition';
-import { ZONES, canAccessZone } from '@/lib/accessZones';
+import { canAccessZone } from '@/lib/accessZones';
+import { useZones } from '@/lib/useZones';
 
 export default function AccessControl({ standalone = false }) {
   const [events, setEvents] = useState([]);
@@ -27,6 +28,7 @@ export default function AccessControl({ standalone = false }) {
   const [result, setResult] = useState(null);
   const [recent, setRecent] = useState([]);
   const [showCamera, setShowCamera] = useState(false);
+  const { zones } = useZones();
 
   const loadEvents = async () => {
     try {
@@ -261,7 +263,7 @@ export default function AccessControl({ standalone = false }) {
                 onChange={(e) => setSelectedZone(e.target.value)}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
               >
-                {ZONES.map((z) => (<option key={z.value} value={z.value}>{z.label}</option>))}
+                {zones.map((z) => (<option key={z.value} value={z.value}>{z.label}</option>))}
               </select>
             </div>
 

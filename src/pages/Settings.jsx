@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Loader2, Save, Upload } from 'lucide-react';
+import { Loader2, Save, Upload, Trash2, Plus } from 'lucide-react';
 import { MODULES, ROLES, DEFAULT_ROLE_ACCESS } from '@/lib/modules';
+import { DEFAULT_ZONES } from '@/lib/accessZones';
 
 function Field({ label, value, onChange, type = 'text', placeholder = '', hint }) {
   return (
@@ -47,6 +48,7 @@ export default function Settings() {
             system_name: 'AccreditEvent',
             organization_name: 'Acceso Eventos',
             role_access: DEFAULT_ROLE_ACCESS,
+            zones: DEFAULT_ZONES,
           });
           setSettings(created);
         }
@@ -65,6 +67,20 @@ export default function Settings() {
       const newList = has ? current.filter((r) => r !== role) : [...current, role];
       return { ...s, role_access: { ...(s.role_access || {}), [path]: newList } };
     });
+  };
+
+  const addZone = () => {
+    update('zones', [...(settings.zones || []), { value: '', label: '' }]);
+  };
+
+  const updateZone = (index, field, val) => {
+    const newZones = [...(settings.zones || [])];
+    newZones[index] = { ...newZones[index], [field]: val };
+    update('zones', newZones);
+  };
+
+  const removeZone = (index) => {
+    update('zones', (settings.zones || []).filter((_, i) => i !== index));
   };
 
   const handleLogoUpload = async (e) => {
@@ -95,6 +111,7 @@ export default function Settings() {
         whatsapp_token: settings.whatsapp_token,
         whatsapp_phone_id: settings.whatsapp_phone_id,
         role_access: settings.role_access,
+        zones: settings.zones,
       });
       setSettings(updated);
       setSuccess(true);
@@ -162,6 +179,33 @@ export default function Settings() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Token de acceso" type="password" value={settings.whatsapp_token} onChange={(v) => update('whatsapp_token', v)} placeholder="EAAxxxxxxxxx" />
           <Field label="Phone Number ID" value={settings.whatsapp_phone_id} onChange={(v) => update('whatsapp_phone_id', v)} placeholder="123456789" />
+        </div>
+      </Section>
+
+      <Section title="Zonas de control" description="Gestioná las zonas de acceso del sistema">
+        <div className="space-y-2">
+          {(settings.zones || []).map((zone, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input
+                value={zone.label}
+                onChange={(e) => updateZone(i, 'label', e.target.value)}
+                placeholder="Ej: Backstage"
+                className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+              />
+              <input
+                value={zone.value}
+                onChange={(e) => updateZone(i, 'value', e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                placeholder="backstage"
+                className="w-32 rounded-lg border border-slate-200 px-3 py-2 font-mono text-xs text-slate-500 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+              />
+              <button onClick={() => removeZone(i)} className="rounded-lg p-2 text-red-500 transition hover:bg-red-50">
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+          <button onClick={addZone} className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-500 transition hover:bg-slate-50">
+            <Plus className="h-4 w-4" /> Agregar zona
+          </button>
         </div>
       </Section>
 
