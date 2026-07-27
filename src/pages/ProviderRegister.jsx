@@ -83,10 +83,36 @@ export default function ProviderRegister() {
     }
     setLoading(true);
     try {
-      await base44.auth.register({ email: form.email, password: form.password });
-      setStep(2);
+      try {
+        await base44.auth.register({ email: form.email, password: form.password });
+        setStep(2);
+      } catch (regErr) {
+        const msg = (regErr.message || '').toLowerCase();
+        if (msg.includes('already exists')) {
+          // User account exists (e.g. person was deleted but account remains)
+          // Try logging in with the same credentials, then recreate provider profile
+          await base44.auth.loginViaEmailPassword(form.email, form.password);
+          const res = await base44.functions.invoke('providerSetup', {
+            full_name: form.full_name,
+            document: form.document,
+            company: form.company,
+            phone: form.phone,
+            email: form.email,
+            event_id: form.event_id,
+          });
+          setPersonId(res.data.person_id);
+          setStep(3);
+        } else {
+          throw regErr;
+        }
+      }
     } catch (err) {
-      setError(err.message || 'No se pudo registrar.');
+      const msg = (err.message || '').toLowerCase();
+      if (msg.includes('already exists')) {
+        setError('Ya tenés una cuenta con este email. Iniciá sesión con tu contraseña anterior o recuperá tu cuenta.');
+      } else {
+        setError(err.message || 'No se pudo registrar.');
+      }
     } finally {
       setLoading(false);
     }
