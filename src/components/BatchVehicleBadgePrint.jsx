@@ -22,70 +22,71 @@ function VehicleCard({ vehicle, settings, eventMap, sectors }) {
       style={{
         width: '21cm',
         height: '14.8cm',
-        padding: '1.2cm',
+        padding: '0.9cm 1.1cm',
         display: 'flex',
         flexDirection: 'column',
         boxSizing: 'border-box',
         margin: '0 auto',
         background: 'white',
         fontFamily: 'Manrope, sans-serif',
+        overflow: 'hidden',
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           {logoUrl ? (
-            <img src={logoUrl} alt="Logo" style={{ maxHeight: '1.8cm', maxWidth: '4cm', objectFit: 'contain' }} />
+            <img src={logoUrl} alt="Logo" style={{ maxHeight: '1.4cm', maxWidth: '3.5cm', objectFit: 'contain' }} />
           ) : (
-            <div style={{ height: '1.8cm', width: '1.8cm', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '0.5rem', backgroundColor: '#0f766e', color: 'white', fontWeight: 800, fontSize: '1.4rem' }}>
+            <div style={{ height: '1.4cm', width: '1.4cm', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '0.4rem', backgroundColor: '#0f766e', color: 'white', fontWeight: 800, fontSize: '1.1rem' }}>
               {orgName?.charAt(0)?.toUpperCase() || 'A'}
             </div>
           )}
           <div>
-            <p style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>{orgName}</p>
-            <p style={{ fontSize: '0.6rem', color: '#94a3b8', margin: 0, fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Credencial de vehículo</p>
+            <p style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>{orgName}</p>
+            <p style={{ fontSize: '0.55rem', color: '#94a3b8', margin: 0, fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Credencial de vehículo</p>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '2.2cm', height: '2.2cm', borderRadius: '50%', backgroundColor: '#ecfdf5', color: '#0f766e' }}>
-          <Car style={{ width: '1.1cm', height: '1.1cm' }} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '1.8cm', height: '1.8cm', borderRadius: '50%', backgroundColor: '#ecfdf5', color: '#0f766e' }}>
+          <Car style={{ width: '0.9cm', height: '0.9cm' }} />
         </div>
       </div>
 
-      <hr style={{ margin: '0.6rem 0', border: 0, borderTop: '2px solid #0f766e' }} />
+      <hr style={{ margin: '0.5rem 0', border: 0, borderTop: '2px solid #0f766e' }} />
 
-      <div style={{ display: 'flex', flex: 1, gap: '1rem', marginTop: '0.3rem' }}>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <p style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', fontFamily: 'monospace', margin: 0 }}>Vehículo</p>
-          <p style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0f172a', margin: '0.1rem 0', lineHeight: 1.1 }}>{vehicle?.brand} {vehicle?.model}</p>
-          {vehicle?.color && <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>Color: {vehicle.color}</p>}
+      <div style={{ display: 'flex', flex: 1, gap: '0.8rem', marginTop: '0.2rem', minHeight: 0 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
+          <p style={{ fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', fontFamily: 'monospace', margin: 0 }}>Vehículo</p>
+          <p style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', margin: '0.1rem 0', lineHeight: 1.1 }}>{vehicle?.brand} {vehicle?.model}</p>
+          {vehicle?.color && <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>Color: {vehicle.color}</p>}
           {eventNames.length > 0 && (
-            <div style={{ marginTop: '0.4rem' }}>
-              <p style={{ fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', fontFamily: 'monospace', margin: 0 }}>Evento</p>
-              <p style={{ fontSize: '2rem', fontWeight: 800, color: '#0f766e', margin: 0, lineHeight: 1.1, letterSpacing: '0.01em' }}>{eventNames.join(' · ')}</p>
-              {dateText && <p style={{ fontSize: '1.1rem', fontWeight: 600, color: '#475569', margin: '0.2rem 0 0 0', lineHeight: 1.1 }}>{dateText}</p>}
+            <div style={{ marginTop: '0.3rem' }}>
+              <p style={{ fontSize: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', fontFamily: 'monospace', margin: 0 }}>Evento</p>
+              <p style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f766e', margin: 0, lineHeight: 1.1, letterSpacing: '0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{eventNames.join(' · ')}</p>
+              {dateText && <p style={{ fontSize: '1rem', fontWeight: 600, color: '#475569', margin: '0.15rem 0 0 0', lineHeight: 1.1 }}>{dateText}</p>}
             </div>
           )}
-          {vehicle?.notes && <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.4rem', fontStyle: 'italic' }}>{vehicle.notes}</p>}
+          {vehicle?.notes && <p style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.3rem', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{vehicle.notes}</p>}
         </div>
-        <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '0.6rem' }}>
+        <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}>
           <div>
-            <p style={{ fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', fontFamily: 'monospace', margin: '0 0 0.3rem 0', textAlign: 'center' }}>Patente</p>
-            <div style={{ border: '3px solid #0f172a', borderRadius: '0.4rem', padding: '0.4rem 0.8rem', backgroundColor: '#fff', minWidth: '6cm', textAlign: 'center' }}>
-              <p style={{ fontSize: '2rem', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace', margin: 0, letterSpacing: '0.15em', lineHeight: 1 }}>{vehicle?.plate}</p>
+            <p style={{ fontSize: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', fontFamily: 'monospace', margin: '0 0 0.25rem 0', textAlign: 'center' }}>Patente</p>
+            <div style={{ border: '3px solid #0f172a', borderRadius: '0.4rem', padding: '0.35rem 0.7rem', backgroundColor: '#fff', minWidth: '5.5cm', textAlign: 'center' }}>
+              <p style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace', margin: 0, letterSpacing: '0.15em', lineHeight: 1 }}>{vehicle?.plate}</p>
             </div>
           </div>
           {sectorLabel && (
-            <div style={{ border: '2px solid #0f766e', borderRadius: '0.4rem', padding: '0.3rem 0.8rem', backgroundColor: '#ecfdf5', textAlign: 'center' }}>
+            <div style={{ border: '2px solid #0f766e', borderRadius: '0.4rem', padding: '0.25rem 0.7rem', backgroundColor: '#ecfdf5', textAlign: 'center' }}>
               <p style={{ fontSize: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#0f766e', fontFamily: 'monospace', margin: 0 }}>Estacionamiento</p>
-              <p style={{ fontSize: '1rem', fontWeight: 800, color: '#0f766e', margin: 0 }}>{sectorLabel}</p>
+              <p style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f766e', margin: 0 }}>{sectorLabel}</p>
             </div>
           )}
         </div>
       </div>
 
-      <div style={{ marginTop: 'auto', backgroundColor: '#0f766e', borderRadius: '0.5rem', padding: '0.6rem 0.9rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ marginTop: 'auto', backgroundColor: '#0f766e', borderRadius: '0.5rem', padding: '0.5rem 0.9rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
         <div>
-          <p style={{ fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#a7f3d0', fontFamily: 'monospace', margin: 0 }}>Titular</p>
-          <p style={{ fontSize: '1rem', fontWeight: 700, color: 'white', margin: 0 }}>{vehicle?.person_name || '—'}</p>
+          <p style={{ fontSize: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#a7f3d0', fontFamily: 'monospace', margin: 0 }}>Titular</p>
+          <p style={{ fontSize: '0.95rem', fontWeight: 700, color: 'white', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{vehicle?.person_name || '—'}</p>
         </div>
       </div>
     </div>
