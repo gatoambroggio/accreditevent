@@ -119,6 +119,7 @@ export default function ProviderPortal() {
       await base44.entities.Document.create({
         person_id: person.id,
         person_name: person.full_name,
+        event_id: person.event_id || null,
         document_type: e.target.elements.document_type.value,
         original_name: file.name,
         file_url,
