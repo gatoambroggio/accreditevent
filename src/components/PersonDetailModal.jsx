@@ -21,7 +21,7 @@ export default function PersonDetailModal({ person, onClose }) {
   const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState(null);
   const [printingVehicle, setPrintingVehicle] = useState(null);
-  const [activeEvent, setActiveEvent] = useState(null);
+  const [events, setEvents] = useState([]);
   const { docTypes } = useDocumentTypes();
   const { sectors } = useParkingSectors();
 
@@ -39,16 +39,16 @@ export default function PersonDetailModal({ person, onClose }) {
     if (!person) return;
     (async () => {
       try {
-        const [docData, bioData, vehData, events] = await Promise.all([
+        const [docData, bioData, vehData, evs] = await Promise.all([
           base44.entities.Document.filter({ person_id: person.id }, '-created_date', 100),
           base44.entities.Biometric.filter({ person_id: person.id, status: 'active' }, '-created_date', 1),
           base44.entities.Vehicle.filter({ person_id: person.id }, '-created_date', 50),
-          base44.entities.Event.filter({ status: 'active' }, '-start_at', 1),
+          base44.entities.Event.list('-start_at', 200),
         ]);
         setDocs(docData);
         setBio(bioData[0] || null);
         setVehicles(vehData);
-        if (events[0]) setActiveEvent(events[0]);
+        setEvents(evs);
       } catch {}
       setLoading(false);
     })();
@@ -60,6 +60,11 @@ export default function PersonDetailModal({ person, onClose }) {
     { name: 'plate', label: 'Patente', type: 'text', required: true, placeholder: 'Ej: AB123CD' },
     { name: 'color', label: 'Color', type: 'text', placeholder: 'Ej: Blanco' },
     {
+      name: 'event_ids', label: 'Eventos asignados', type: 'toggle-group',
+      options: events.map((e) => ({ value: e.id, label: e.name })),
+      full: true,
+    },
+    {
       name: 'parking_sector', label: 'Sector de estacionamiento', type: 'select',
       options: sectors.map((s) => ({ value: s.value, label: s.label })),
     },
@@ -70,11 +75,14 @@ export default function PersonDetailModal({ person, onClose }) {
   const openEditVehicle = (v) => { setEditingVehicle(v); setVehicleModalOpen(true); };
 
   const handleVehicleSubmit = async (data) => {
+    const selectedEventIds = data.event_ids ? String(data.event_ids).split(',').filter(Boolean) : [];
     const enriched = {
       ...data,
       person_id: person.id,
       person_name: person.full_name,
       plate: (data.plate || '').toUpperCase().trim(),
+      event_ids: selectedEventIds,
+      event_names: selectedEventIds.map((id) => events.find((e) => e.id === id)?.name).filter(Boolean),
     };
     if (editingVehicle) {
       await base44.entities.Vehicle.update(editingVehicle.id, enriched);
@@ -291,7 +299,7 @@ export default function PersonDetailModal({ person, onClose }) {
       {printingVehicle && (
         <VehicleBadgePrint
           vehicle={printingVehicle}
-          event={activeEvent}
+          events={events.filter((e) => printingVehicle.event_ids?.includes(e.id))}
           parkingSectors={sectors}
           onClose={() => setPrintingVehicle(null)}
         />

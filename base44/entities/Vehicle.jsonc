@@ -30,6 +30,20 @@
       "type": "string",
       "description": "Sector de estacionamiento asignado (coincide con el value de ParkingSector)"
     },
+    "event_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs de eventos asignados al veh\u00edculo"
+    },
+    "event_names": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Nombres de eventos (denormalizado)"
+    },
     "notes": {
       "type": "string",
       "description": "Notas adicionales"

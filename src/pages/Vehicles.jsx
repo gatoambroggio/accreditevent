@@ -24,7 +24,7 @@ export default function Vehicles() {
   const [people, setPeople] = useState([]);
   const [printingVehicle, setPrintingVehicle] = useState(null);
   const [settings, setSettings] = useState(null);
-  const [activeEvent, setActiveEvent] = useState(null);
+  const [events, setEvents] = useState([]);
   const { sectors } = useParkingSectors();
 
   const [peopleLoaded, setPeopleLoaded] = useState(false);
@@ -42,13 +42,14 @@ export default function Vehicles() {
 
   const handleExport = () => {
     exportToExcel(
-      ['Persona', 'Marca', 'Modelo', 'Patente', 'Color', 'Estacionamiento', 'Notas'],
+      ['Persona', 'Marca', 'Modelo', 'Patente', 'Color', 'Eventos', 'Estacionamiento', 'Notas'],
       filtered.map((v) => [
         v.person_name || '',
         v.brand || '',
         v.model || '',
         v.plate || '',
         v.color || '',
+        (v.event_names || []).join(', '),
         sectors.find((s) => s.value === v.parking_sector)?.label || v.parking_sector || '',
         v.notes || '',
       ]),
@@ -68,12 +69,12 @@ export default function Vehicles() {
   React.useEffect(() => {
     (async () => {
       try {
-        const [all, events] = await Promise.all([
+        const [all, evs] = await Promise.all([
           base44.entities.SystemSetting.list('-created_date', 1),
-          base44.entities.Event.filter({ status: 'active' }, '-start_at', 1),
+          base44.entities.Event.list('-start_at', 200),
         ]);
         if (all[0]) setSettings(all[0]);
-        if (events[0]) setActiveEvent(events[0]);
+        setEvents(evs);
       } catch {}
     })();
   }, []);
@@ -100,10 +101,13 @@ export default function Vehicles() {
 
   const handleSubmit = async (data) => {
     const person = people.find((p) => p.id === data.person_id);
+    const selectedEventIds = data.event_ids ? String(data.event_ids).split(',').filter(Boolean) : [];
     const enriched = {
       ...data,
       person_name: person?.full_name || editing?.person_name || '',
       plate: (data.plate || '').toUpperCase().trim(),
+      event_ids: selectedEventIds,
+      event_names: selectedEventIds.map((id) => events.find((e) => e.id === id)?.name).filter(Boolean),
     };
     if (editing) {
       await update(editing.id, enriched);
@@ -125,12 +129,17 @@ export default function Vehicles() {
     { name: 'plate', label: 'Patente', type: 'text', required: true, placeholder: 'Ej: AB123CD', hint: 'Se guardará en mayúsculas.' },
     { name: 'color', label: 'Color', type: 'text', placeholder: 'Ej: Blanco' },
     {
+      name: 'event_ids', label: 'Eventos asignados', type: 'toggle-group',
+      options: events.map((e) => ({ value: e.id, label: e.name })),
+      full: true,
+    },
+    {
       name: 'parking_sector', label: 'Sector de estacionamiento', type: 'select',
       options: sectors.map((s) => ({ value: s.value, label: s.label })),
       placeholder: 'Seleccionar sector…',
     },
     { name: 'notes', label: 'Notas', type: 'textarea', full: true, placeholder: 'Ej: Vehículo de carga' },
-  ], [people, sectors]);
+  ], [people, sectors, events]);
 
   return (
     <div className="space-y-6">
@@ -177,6 +186,7 @@ export default function Vehicles() {
                   <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Persona</th>
                   <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Vehículo</th>
                   <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Patente</th>
+                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Eventos</th>
                   <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Estacionamiento</th>
                   <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Color</th>
                   <th className="px-4 py-3" />
@@ -191,6 +201,9 @@ export default function Vehicles() {
                        <span className="inline-flex items-center rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1 font-mono text-xs font-bold uppercase tracking-wider text-slate-700">
                          {v.plate}
                        </span>
+                     </td>
+                     <td className="px-4 py-3.5 text-sm text-slate-600">
+                       {v.event_names?.length ? v.event_names.join(', ') : '—'}
                      </td>
                      <td className="px-4 py-3.5 text-sm text-slate-600">
                        {sectors.find((s) => s.value === v.parking_sector)?.label || v.parking_sector || '—'}
@@ -232,7 +245,7 @@ export default function Vehicles() {
         <VehicleBadgePrint
           vehicle={printingVehicle}
           settings={settings}
-          event={activeEvent}
+          events={events.filter((e) => printingVehicle.event_ids?.includes(e.id))}
           parkingSectors={sectors}
           onClose={() => setPrintingVehicle(null)}
         />

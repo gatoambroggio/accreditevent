@@ -1,7 +1,7 @@
 import React from 'react';
 import { X, Printer, Car } from 'lucide-react';
 
-export default function VehicleBadgePrint({ vehicle, settings, event, parkingSectors = [], onClose }) {
+export default function VehicleBadgePrint({ vehicle, settings, events = [], parkingSectors = [], onClose }) {
   const handlePrint = () => {
     window.print();
   };
@@ -20,7 +20,9 @@ export default function VehicleBadgePrint({ vehicle, settings, event, parkingSec
     }
   };
 
-  const eventDate = formatDate(event?.start_at);
+  const eventNames = events.map((e) => e.name).filter(Boolean);
+  const eventDates = events.map((e) => formatDate(e.start_at)).filter(Boolean);
+  const dateText = eventDates.length > 1 ? `${eventDates[0]} - ${eventDates[eventDates.length - 1]}` : eventDates[0];
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-sm sm:p-6">
@@ -100,14 +102,19 @@ export default function VehicleBadgePrint({ vehicle, settings, event, parkingSec
               {vehicle?.color && (
                 <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>Color: {vehicle.color}</p>
               )}
-              {eventDate && (
+              {eventNames.length > 0 && (
                 <div style={{ marginTop: '0.4rem' }}>
                   <p style={{ fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', fontFamily: 'monospace', margin: 0 }}>
-                    {event?.name ? `Evento: ${event.name}` : 'Fecha del evento'}
+                    Evento
                   </p>
-                  <p style={{ fontSize: '1.7rem', fontWeight: 800, color: '#0f766e', margin: 0, lineHeight: 1.1, letterSpacing: '0.02em' }}>
-                    {eventDate}
+                  <p style={{ fontSize: '2rem', fontWeight: 800, color: '#0f766e', margin: 0, lineHeight: 1.1, letterSpacing: '0.01em' }}>
+                    {eventNames.join(' · ')}
                   </p>
+                  {dateText && (
+                    <p style={{ fontSize: '1.1rem', fontWeight: 600, color: '#475569', margin: '0.2rem 0 0 0', lineHeight: 1.1 }}>
+                      {dateText}
+                    </p>
+                  )}
                 </div>
               )}
               {vehicle?.notes && (
