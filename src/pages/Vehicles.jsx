@@ -4,6 +4,7 @@ import { Plus, Pencil, Search, Loader2, Download, Car, Printer } from 'lucide-re
 import { exportToExcel } from '@/lib/exportUtils';
 import EntityModal from '@/components/EntityModal';
 import VehicleBadgePrint from '@/components/VehicleBadgePrint';
+import { useParkingSectors } from '@/lib/useParkingSectors';
 import { base44 } from '@/api/base44Client';
 
 const validateVehicle = (data) => {
@@ -23,6 +24,8 @@ export default function Vehicles() {
   const [people, setPeople] = useState([]);
   const [printingVehicle, setPrintingVehicle] = useState(null);
   const [settings, setSettings] = useState(null);
+  const [activeEvent, setActiveEvent] = useState(null);
+  const { sectors } = useParkingSectors();
 
   const [peopleLoaded, setPeopleLoaded] = useState(false);
   const [showPersonSearch, setShowPersonSearch] = useState(false);
@@ -39,13 +42,14 @@ export default function Vehicles() {
 
   const handleExport = () => {
     exportToExcel(
-      ['Persona', 'Marca', 'Modelo', 'Patente', 'Color', 'Notas'],
+      ['Persona', 'Marca', 'Modelo', 'Patente', 'Color', 'Estacionamiento', 'Notas'],
       filtered.map((v) => [
         v.person_name || '',
         v.brand || '',
         v.model || '',
         v.plate || '',
         v.color || '',
+        sectors.find((s) => s.value === v.parking_sector)?.label || v.parking_sector || '',
         v.notes || '',
       ]),
       'vehiculos'
@@ -64,8 +68,12 @@ export default function Vehicles() {
   React.useEffect(() => {
     (async () => {
       try {
-        const all = await base44.entities.SystemSetting.list('-created_date', 1);
+        const [all, events] = await Promise.all([
+          base44.entities.SystemSetting.list('-created_date', 1),
+          base44.entities.Event.filter({ status: 'active' }, '-start_at', 1),
+        ]);
         if (all[0]) setSettings(all[0]);
+        if (events[0]) setActiveEvent(events[0]);
       } catch {}
     })();
   }, []);
@@ -116,8 +124,13 @@ export default function Vehicles() {
     { name: 'model', label: 'Modelo', type: 'text', required: true, placeholder: 'Ej: Fiesta' },
     { name: 'plate', label: 'Patente', type: 'text', required: true, placeholder: 'Ej: AB123CD', hint: 'Se guardará en mayúsculas.' },
     { name: 'color', label: 'Color', type: 'text', placeholder: 'Ej: Blanco' },
+    {
+      name: 'parking_sector', label: 'Sector de estacionamiento', type: 'select',
+      options: sectors.map((s) => ({ value: s.value, label: s.label })),
+      placeholder: 'Seleccionar sector…',
+    },
     { name: 'notes', label: 'Notas', type: 'textarea', full: true, placeholder: 'Ej: Vehículo de carga' },
-  ], [people]);
+  ], [people, sectors]);
 
   return (
     <div className="space-y-6">
@@ -158,12 +171,13 @@ export default function Vehicles() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[700px] text-left">
+            <table className="w-full min-w-[820px] text-left">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
                   <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Persona</th>
                   <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Vehículo</th>
                   <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Patente</th>
+                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Estacionamiento</th>
                   <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Color</th>
                   <th className="px-4 py-3" />
                 </tr>
@@ -174,11 +188,14 @@ export default function Vehicles() {
                     <td className="px-4 py-3.5 text-sm font-semibold text-slate-900">{v.person_name || '—'}</td>
                     <td className="px-4 py-3.5 text-sm text-slate-600">{v.brand} {v.model}</td>
                     <td className="px-4 py-3.5">
-                      <span className="inline-flex items-center rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1 font-mono text-xs font-bold uppercase tracking-wider text-slate-700">
-                        {v.plate}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5 text-sm text-slate-500">{v.color || '—'}</td>
+                       <span className="inline-flex items-center rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1 font-mono text-xs font-bold uppercase tracking-wider text-slate-700">
+                         {v.plate}
+                       </span>
+                     </td>
+                     <td className="px-4 py-3.5 text-sm text-slate-600">
+                       {sectors.find((s) => s.value === v.parking_sector)?.label || v.parking_sector || '—'}
+                     </td>
+                     <td className="px-4 py-3.5 text-sm text-slate-500">{v.color || '—'}</td>
                     <td className="px-4 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => openPrint(v)} className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-emerald-700" title="Imprimir credencial">
@@ -215,6 +232,8 @@ export default function Vehicles() {
         <VehicleBadgePrint
           vehicle={printingVehicle}
           settings={settings}
+          event={activeEvent}
+          parkingSectors={sectors}
           onClose={() => setPrintingVehicle(null)}
         />
       )}

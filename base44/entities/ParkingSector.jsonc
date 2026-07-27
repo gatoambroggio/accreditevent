@@ -1,0 +1,22 @@
+{
+  "name": "ParkingSector",
+  "type": "object",
+  "properties": {
+    "value": {
+      "type": "string",
+      "description": "Identificador \u00fanico (slug)"
+    },
+    "label": {
+      "type": "string",
+      "description": "Nombre visible del sector de estacionamiento"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n del sector de estacionamiento"
+    }
+  },
+  "required": [
+    "value",
+    "label"
+  ]
+}

@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { X, Loader2, FileText, ExternalLink, User, UploadCloud, Car, Plus, Pencil, Trash2 } from 'lucide-react';
+import { X, Loader2, FileText, ExternalLink, User, UploadCloud, Car, Plus, Pencil, Trash2, Printer } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
 import { Image } from '@/components/ui/image';
 import { useDocumentTypes } from '@/lib/useDocumentTypes';
 import DocumentViewer from '@/components/DocumentViewer';
 import EntityModal from '@/components/EntityModal';
+import VehicleBadgePrint from '@/components/VehicleBadgePrint';
+import { useParkingSectors } from '@/lib/useParkingSectors';
 
 export default function PersonDetailModal({ person, onClose }) {
   const [docs, setDocs] = useState([]);
@@ -18,7 +20,10 @@ export default function PersonDetailModal({ person, onClose }) {
   const [viewingDoc, setViewingDoc] = useState(null);
   const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState(null);
+  const [printingVehicle, setPrintingVehicle] = useState(null);
+  const [activeEvent, setActiveEvent] = useState(null);
   const { docTypes } = useDocumentTypes();
+  const { sectors } = useParkingSectors();
 
   const loadDocs = async (personId) => {
     const docData = await base44.entities.Document.filter({ person_id: personId }, '-created_date', 100);
@@ -34,14 +39,16 @@ export default function PersonDetailModal({ person, onClose }) {
     if (!person) return;
     (async () => {
       try {
-        const [docData, bioData, vehData] = await Promise.all([
+        const [docData, bioData, vehData, events] = await Promise.all([
           base44.entities.Document.filter({ person_id: person.id }, '-created_date', 100),
           base44.entities.Biometric.filter({ person_id: person.id, status: 'active' }, '-created_date', 1),
           base44.entities.Vehicle.filter({ person_id: person.id }, '-created_date', 50),
+          base44.entities.Event.filter({ status: 'active' }, '-start_at', 1),
         ]);
         setDocs(docData);
         setBio(bioData[0] || null);
         setVehicles(vehData);
+        if (events[0]) setActiveEvent(events[0]);
       } catch {}
       setLoading(false);
     })();
@@ -52,6 +59,10 @@ export default function PersonDetailModal({ person, onClose }) {
     { name: 'model', label: 'Modelo', type: 'text', required: true, placeholder: 'Ej: Fiesta' },
     { name: 'plate', label: 'Patente', type: 'text', required: true, placeholder: 'Ej: AB123CD' },
     { name: 'color', label: 'Color', type: 'text', placeholder: 'Ej: Blanco' },
+    {
+      name: 'parking_sector', label: 'Sector de estacionamiento', type: 'select',
+      options: sectors.map((s) => ({ value: s.value, label: s.label })),
+    },
     { name: 'notes', label: 'Notas', type: 'textarea', full: true, placeholder: 'Ej: Vehículo de carga' },
   ];
 
@@ -239,6 +250,15 @@ export default function PersonDetailModal({ person, onClose }) {
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
+                        {v.parking_sector && (
+                          <span className="mr-1 inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                            {sectors.find((s) => s.value === v.parking_sector)?.label || v.parking_sector}
+                          </span>
+                        )}
+                        <button onClick={() => setPrintingVehicle(v)}
+                          className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-emerald-700" title="Imprimir credencial">
+                          <Printer className="h-3.5 w-3.5" />
+                        </button>
                         <button onClick={() => openEditVehicle(v)}
                           className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700">
                           <Pencil className="h-3.5 w-3.5" />
@@ -267,6 +287,15 @@ export default function PersonDetailModal({ person, onClose }) {
       />
 
       <DocumentViewer doc={viewingDoc} onClose={() => setViewingDoc(null)} />
+
+      {printingVehicle && (
+        <VehicleBadgePrint
+          vehicle={printingVehicle}
+          event={activeEvent}
+          parkingSectors={sectors}
+          onClose={() => setPrintingVehicle(null)}
+        />
+      )}
     </div>
   );
 }

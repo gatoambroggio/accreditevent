@@ -26,6 +26,10 @@
       "type": "string",
       "description": "Color del veh\u00edculo"
     },
+    "parking_sector": {
+      "type": "string",
+      "description": "Sector de estacionamiento asignado (coincide con el value de ParkingSector)"
+    },
     "notes": {
       "type": "string",
       "description": "Notas adicionales"

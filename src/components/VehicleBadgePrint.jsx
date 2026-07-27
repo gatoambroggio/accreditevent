@@ -1,13 +1,26 @@
 import React from 'react';
 import { X, Printer, Car } from 'lucide-react';
 
-export default function VehicleBadgePrint({ vehicle, settings, onClose }) {
+export default function VehicleBadgePrint({ vehicle, settings, event, parkingSectors = [], onClose }) {
   const handlePrint = () => {
     window.print();
   };
 
   const orgName = settings?.organization_name || 'Acceso Eventos';
   const logoUrl = settings?.logo_url;
+
+  const sectorLabel = parkingSectors.find((s) => s.value === vehicle?.parking_sector)?.label || vehicle?.parking_sector;
+
+  const formatDate = (iso) => {
+    if (!iso) return null;
+    try {
+      return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    } catch {
+      return null;
+    }
+  };
+
+  const eventDate = formatDate(event?.start_at);
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-sm sm:p-6">
@@ -76,7 +89,7 @@ export default function VehicleBadgePrint({ vehicle, settings, onClose }) {
 
           {/* Main content */}
           <div style={{ display: 'flex', flex: 1, gap: '1rem', marginTop: '0.3rem' }}>
-            {/* Left — vehicle data */}
+            {/* Left — vehicle data + event date */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               <p style={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', fontFamily: 'monospace', margin: 0 }}>
                 Vehículo
@@ -87,31 +100,59 @@ export default function VehicleBadgePrint({ vehicle, settings, onClose }) {
               {vehicle?.color && (
                 <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>Color: {vehicle.color}</p>
               )}
+              {eventDate && (
+                <div style={{ marginTop: '0.4rem' }}>
+                  <p style={{ fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', fontFamily: 'monospace', margin: 0 }}>
+                    {event?.name ? `Evento: ${event.name}` : 'Fecha del evento'}
+                  </p>
+                  <p style={{ fontSize: '1.7rem', fontWeight: 800, color: '#0f766e', margin: 0, lineHeight: 1.1, letterSpacing: '0.02em' }}>
+                    {eventDate}
+                  </p>
+                </div>
+              )}
               {vehicle?.notes && (
                 <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.4rem', fontStyle: 'italic' }}>{vehicle.notes}</p>
               )}
             </div>
 
-            {/* Right — plate */}
-            <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-              <p style={{ fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', fontFamily: 'monospace', margin: '0 0 0.3rem 0' }}>
-                Patente
-              </p>
-              <div style={{
-                border: '3px solid #0f172a',
-                borderRadius: '0.4rem',
-                padding: '0.4rem 0.8rem',
-                backgroundColor: '#fff',
-                minWidth: '6cm',
-                textAlign: 'center',
-              }}>
-                <p style={{
-                  fontSize: '2rem', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace',
-                  margin: 0, letterSpacing: '0.15em', lineHeight: 1,
-                }}>
-                  {vehicle?.plate}
+            {/* Right — plate + parking sector */}
+            <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '0.6rem' }}>
+              <div>
+                <p style={{ fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', fontFamily: 'monospace', margin: '0 0 0.3rem 0', textAlign: 'center' }}>
+                  Patente
                 </p>
+                <div style={{
+                  border: '3px solid #0f172a',
+                  borderRadius: '0.4rem',
+                  padding: '0.4rem 0.8rem',
+                  backgroundColor: '#fff',
+                  minWidth: '6cm',
+                  textAlign: 'center',
+                }}>
+                  <p style={{
+                    fontSize: '2rem', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace',
+                    margin: 0, letterSpacing: '0.15em', lineHeight: 1,
+                  }}>
+                    {vehicle?.plate}
+                  </p>
+                </div>
               </div>
+              {sectorLabel && (
+                <div style={{
+                  border: '2px solid #0f766e',
+                  borderRadius: '0.4rem',
+                  padding: '0.3rem 0.8rem',
+                  backgroundColor: '#ecfdf5',
+                  textAlign: 'center',
+                }}>
+                  <p style={{ fontSize: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#0f766e', fontFamily: 'monospace', margin: 0 }}>
+                    Estacionamiento
+                  </p>
+                  <p style={{ fontSize: '1rem', fontWeight: 800, color: '#0f766e', margin: 0 }}>
+                    {sectorLabel}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -128,9 +169,6 @@ export default function VehicleBadgePrint({ vehicle, settings, onClose }) {
                 {vehicle?.person_name || '—'}
               </p>
             </div>
-            <p style={{ fontSize: '0.55rem', color: '#a7f3d0', fontFamily: 'monospace', textAlign: 'right', margin: 0 }}>
-              {new Date().toLocaleDateString('es-AR')}
-            </p>
           </div>
         </div>
       </div>
