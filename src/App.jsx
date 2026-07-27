@@ -57,14 +57,14 @@ const AuthenticatedApp = () => {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
-      // Redirect to register page instead of platform login
-      return <Navigate to="/register" replace />;
+      // Redirect to login page instead of platform login
+      return <Navigate to="/login" replace />;
     }
   }
 
-  // Unauthenticated visitors (public app) land on register page
+  // Unauthenticated visitors (public app) land on login page
   if (!isAuthenticated && authChecked && !isAuthRoute) {
-    return <Navigate to="/register" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   // Render the main app
