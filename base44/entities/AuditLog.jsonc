@@ -32,11 +32,14 @@
     "entity"
   ],
   "rls": {
-    "read": {
+    "create": {
       "$or": [
         {
+          "created_by_id": "{{user.id}}"
+        },
+        {
           "user_condition": {
-            "role": "productora"
+            "role": "admin"
           }
         },
         {
@@ -46,27 +49,45 @@
         },
         {
           "user_condition": {
-            "role": "admin"
+            "role": "coordinator"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "control"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "provider"
           }
         }
       ]
     },
-    "create": {},
-    "update": {
+    "read": {
       "$or": [
         {
           "user_condition": {
-            "role": "productora"
+            "role": "admin"
           }
         },
         {
           "user_condition": {
             "role": "superadmin"
           }
-        },
+        }
+      ]
+    },
+    "update": {
+      "$or": [
         {
           "user_condition": {
             "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "superadmin"
           }
         }
       ]
@@ -75,17 +96,12 @@
       "$or": [
         {
           "user_condition": {
-            "role": "productora"
+            "role": "admin"
           }
         },
         {
           "user_condition": {
             "role": "superadmin"
-          }
-        },
-        {
-          "user_condition": {
-            "role": "admin"
           }
         }
       ]
