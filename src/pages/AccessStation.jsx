@@ -205,6 +205,7 @@ export default function AccessStation() {
         person_name: accred.person_name,
         badge_code: accred.badge_code,
         event_name: accred.event_name,
+        event_id: accred.event_id,
         verified_by: me?.full_name || me?.email || 'Sistema',
         method: 'biometric',
         zone: selectedZones.join(', '),

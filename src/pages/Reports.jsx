@@ -30,29 +30,34 @@ export default function Reports() {
   const [resultFilter, setResultFilter] = useState('');
   const [personQuery, setPersonQuery] = useState('');
 
-  useEffect(() => {
-  (async () => {
-    try {
-      const [evs, accs, logs] = await Promise.all([
-        base44.entities.Event.list('-created_date', 100),
-        base44.entities.Accreditation.list('-created_date', 500),
-        base44.entities.AccessLog.list('-created_date', 500),
-      ]);
-      setEvents(evs);
-      setAccreditations(accs);
-      setAccessLogs(logs);
-    } catch {}
-    setLoading(false);
-  })();
+    useEffect(() => {
+    const isProductora = user?.role === 'productora';
+    userEventIdsRef.current = isProductora ? (user?.assigned_event_ids || user?.data?.assigned_event_ids || []) : [];
 
-  const unsubscribe = base44.entities.AccessLog.subscribe((event) => {
-    setAccessLogs((prev) => {
-      if (event.type === 'create' && event.data) {
-        return [{ ...event.data, result: event.data.result || 'granted' }, ...prev].slice(0, 500);
-      }
-      if (event.type === 'update' && event.data) {
-        return prev.map((l) => (l.id === event.data.id ? { ...event.data, result: event.data.result || 'granted' } : l));
-      }
+    (async () => {
+      try {
+        const [evs, accs, logs] = await Promise.all([
+          base44.entities.Event.list('-created_date', 100),
+          base44.entities.Accreditation.list('-created_date', 500),
+          base44.entities.AccessLog.list('-created_date', 500),
+        ]);
+        setEvents(evs);
+        setAccreditations(accs);
+        setAccessLogs(logs.filter(shouldShowLog));
+      } catch {}
+      setLoading(false);
+    })();
+
+    const unsubscribe = base44.entities.AccessLog.subscribe((event) => {
+      setAccessLogs((prev) => {
+        if (event.type === 'create' && event.data) {
+          if (!shouldShowLog(event.data)) return prev;
+          return [{ ...event.data, result: event.data.result || 'granted' }, ...prev].slice(0, 500);
+        }
+        if (event.type === 'update' && event.data) {
+          if (!shouldShowLog(event.data)) return prev.filter((l) => l.id !== event.data.id);
+          return prev.map((l) => (l.id === event.data.id ? { ...event.data, result: event.data.result || 'granted' } : l));
+        }
         if (event.type === 'delete' && event.id) {
           return prev.filter((l) => l.id !== event.id);
         }
