@@ -5,8 +5,14 @@ import { CheckCircle2, XCircle, Loader2, Radio, Users, TrendingUp, AlertTriangle
 import { formatTimeWithSeconds } from '@/lib/formatDate';
 
 const userEventIdsRef = { current: [] };
+const userCompanyRef = { current: '' };
+const isProductoraRef = { current: false };
 
 const shouldShowLog = (log) => {
+  if (isProductoraRef.current) {
+    if (!userCompanyRef.current) return false;
+    return log.company === userCompanyRef.current;
+  }
   const ids = userEventIdsRef.current;
   if (!ids || ids.length === 0) return true;
   return ids.includes(log.event_id);
@@ -29,6 +35,8 @@ export default function AccessMonitor() {
 
   useEffect(() => {
     const isProductora = user?.role === 'productora';
+    isProductoraRef.current = isProductora;
+    userCompanyRef.current = user?.company || user?.data?.company || '';
     userEventIdsRef.current = isProductora ? (user?.assigned_event_ids || user?.data?.assigned_event_ids || []) : [];
 
     (async () => {

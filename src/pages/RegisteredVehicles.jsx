@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
+import { getUserCompany } from '@/lib/userCompany';
 import { Download, Car, CarFront, Check, XCircle } from 'lucide-react';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
@@ -10,6 +12,9 @@ import { exportToExcel } from '@/lib/exportUtils';
 import { parseServerDate } from '@/lib/formatDate';
 
 export default function RegisteredVehicles() {
+  const { user } = useAuth();
+  const userCompany = getUserCompany(user);
+  const isProductora = user?.role === 'productora';
   const [vehicles, setVehicles] = useState([]);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +37,11 @@ export default function RegisteredVehicles() {
 
   const filtered = useMemo(() => {
     let list = [...vehicles];
+    // Filtrado estricto por empresa para productoras
+    if (isProductora) {
+      if (!userCompany) return [];
+      list = list.filter((v) => v.company === userCompany);
+    }
     if (eventFilter) list = list.filter((v) => v.event_ids?.includes(eventFilter));
     const q = query.toLowerCase().trim();
     if (q) {
@@ -40,7 +50,7 @@ export default function RegisteredVehicles() {
       );
     }
     return list;
-  }, [vehicles, eventFilter, query]);
+  }, [vehicles, eventFilter, query, isProductora, userCompany]);
 
   const stats = useMemo(() => ({
     total: filtered.length,

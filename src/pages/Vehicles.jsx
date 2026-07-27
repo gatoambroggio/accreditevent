@@ -66,8 +66,10 @@ export default function Vehicles() {
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
     return items.filter((v) => {
-      const userCompany = currentUser?.company || currentUser?.data?.company;
-      if (isProductora && v.company && v.company !== userCompany) return false;
+      if (isProductora) {
+        const userCompany = currentUser?.company || currentUser?.data?.company;
+        if (!userCompany || v.company !== userCompany) return false;
+      }
       if (statusFilter && v.status !== statusFilter) return false;
       if (!q) {
         if (v.status === 'approved') return true;

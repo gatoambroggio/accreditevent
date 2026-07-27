@@ -6,8 +6,14 @@ import { exportToExcel } from '@/lib/exportUtils';
 import { formatDateTime, parseServerDate } from '@/lib/formatDate';
 
 const userEventIdsRef = { current: [] };
+const userCompanyRef = { current: '' };
+const isProductoraRef = { current: false };
 
 const shouldShowLog = (log) => {
+  if (isProductoraRef.current) {
+    if (!userCompanyRef.current) return false;
+    return log.company === userCompanyRef.current;
+  }
   const ids = userEventIdsRef.current;
   if (!ids || ids.length === 0) return true;
   return ids.includes(log.event_id);
@@ -34,6 +40,8 @@ export default function Reports() {
 
   useEffect(() => {
     const isProductora = user?.role === 'productora';
+    isProductoraRef.current = isProductora;
+    userCompanyRef.current = user?.company || user?.data?.company || '';
     userEventIdsRef.current = isProductora ? (user?.assigned_event_ids || user?.data?.assigned_event_ids || []) : [];
 
     (async () => {
@@ -91,13 +99,21 @@ export default function Reports() {
   }, [accessLogs, tab, eventFilter, resultFilter, query, events]);
 
   const filteredAccreditations = useMemo(() => {
-    if (!eventFilter) return accreditations;
-    return accreditations.filter((a) => a.event_id === eventFilter);
+    let list = accreditations;
+    if (isProductoraRef.current && userCompanyRef.current) {
+      list = list.filter((a) => a.company === userCompanyRef.current);
+    }
+    if (!eventFilter) return list;
+    return list.filter((a) => a.event_id === eventFilter);
   }, [accreditations, eventFilter]);
 
   const filteredVehicles = useMemo(() => {
-    if (!eventFilter) return vehicles;
-    return vehicles.filter((v) => v.event_ids?.includes(eventFilter));
+    let list = vehicles;
+    if (isProductoraRef.current && userCompanyRef.current) {
+      list = list.filter((v) => v.company === userCompanyRef.current);
+    }
+    if (!eventFilter) return list;
+    return list.filter((v) => v.event_ids?.includes(eventFilter));
   }, [vehicles, eventFilter]);
 
   const stats = useMemo(() => {
