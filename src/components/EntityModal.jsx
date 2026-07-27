@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Trash2, Loader2, Upload } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import AddressInput from '@/components/AddressInput';
+import FaceCapture from '@/components/FaceCapture';
 
 export default function EntityModal({
   open,
@@ -16,6 +17,7 @@ export default function EntityModal({
   submitLabel = 'Guardar',
   topContent,
   validate,
+  onFieldChange,
 }) {
   const [data, setData] = useState({});
   const [saving, setSaving] = useState(false);
@@ -36,6 +38,7 @@ export default function EntityModal({
   const setField = (name, value) => {
     setData((d) => ({ ...d, [name]: value }));
     setErrors((e) => ({ ...e, [name]: undefined }));
+    if (onFieldChange) onFieldChange(name, value, setField);
   };
 
   const handleSubmit = async (e) => {
@@ -273,6 +276,47 @@ export default function EntityModal({
             />
           </div>
         </label>
+      );
+    }
+
+    if (f.type === 'face-capture') {
+      const photoUrl = data['face_photo_url'];
+      const handleFaceCaptured = async (file, desc) => {
+        if (!desc) {
+          setError('No se detectó un rostro humano.');
+          return;
+        }
+        setUploading(true);
+        setError('');
+        try {
+          const { file_url } = await base44.integrations.Core.UploadFile({ file });
+          setField('face_photo_url', file_url);
+          setField('face_descriptor', desc);
+        } catch {
+          setError('No se pudo subir la foto.');
+        } finally {
+          setUploading(false);
+        }
+      };
+      return (
+        <div key={f.name} className={f.full ? 'sm:col-span-2' : ''}>
+          <span className="mb-1.5 block text-xs font-semibold text-slate-600">{f.label}</span>
+          {photoUrl ? (
+            <div className="flex items-center gap-4">
+              <img src={photoUrl} alt="Rostro capturado" className="h-24 rounded-lg object-cover" />
+              <button type="button" onClick={() => { setField('face_photo_url', ''); setField('face_descriptor', null); }} className="text-xs text-red-500 hover:underline">
+                Volver a capturar
+              </button>
+            </div>
+          ) : uploading ? (
+            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-emerald-600" />
+              <span className="text-sm text-slate-500">Procesando…</span>
+            </div>
+          ) : (
+            <FaceCapture onCaptured={handleFaceCaptured} />
+          )}
+        </div>
       );
     }
 

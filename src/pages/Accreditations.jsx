@@ -85,6 +85,15 @@ export default function Accreditations() {
   const openNew = () => { setEditing(null); setModalOpen(true); };
   const openEdit = (item) => { setEditing(item); setModalOpen(true); };
 
+  const handleFieldChange = async (name, value, setField) => {
+    if (name === 'person_id' && value) {
+      try {
+        const bios = await base44.entities.Biometric.filter({ person_id: value, status: 'active' }, '-created_date', 1);
+        setField('has_biometric', bios.length > 0);
+      } catch {}
+    }
+  };
+
   const handleSubmit = async (data) => {
     // Prevent duplicate: one credential per person per event (server-side check)
     const existing = await base44.entities.Accreditation.filter(
@@ -278,6 +287,7 @@ export default function Accreditations() {
         onDelete={editing ? handleDelete : null}
         canDelete={!!editing}
         submitLabel={editing ? 'Guardar cambios' : 'Crear acreditación'}
+        onFieldChange={handleFieldChange}
       />
 
       {badgeAccred && (

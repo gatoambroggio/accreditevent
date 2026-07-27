@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import { useCrud } from '@/lib/crud';
 import { Plus, Pencil, Search, Loader2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
-import { Image as UIImage } from '@/components/ui/image';
 import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
 
@@ -27,6 +26,7 @@ const FIELDS = [
     ],
   },
   { name: 'notes', label: 'Notas', type: 'textarea', required: true, full: true },
+  { name: '_face', label: 'Registro facial', type: 'face-capture', full: true },
 ];
 
 const validatePerson = (data) => {
@@ -49,7 +49,6 @@ export default function People() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [query, setQuery] = useState('');
-  const [personPhoto, setPersonPhoto] = useState(null);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -59,19 +58,40 @@ export default function People() {
     );
   }, [items, query]);
 
-  const openNew = () => { setEditing(null); setPersonPhoto(null); setModalOpen(true); };
+  const openNew = () => { setEditing(null); setModalOpen(true); };
   const openEdit = async (item) => {
     setEditing(item);
-    setPersonPhoto(null);
     setModalOpen(true);
     try {
       const bios = await base44.entities.Biometric.filter({ person_id: item.id, status: 'active' }, '-created_date', 1);
-      if (bios[0]?.face_photo_url) setPersonPhoto(bios[0].face_photo_url);
+      if (bios[0]?.face_photo_url) {
+        setEditing({ ...item, face_photo_url: bios[0].face_photo_url });
+      }
     } catch {}
   };
   const handleSubmit = async (data) => {
-    if (editing) await update(editing.id, data);
-    else await create(data);
+    const { face_photo_url, face_descriptor, ...personData } = data;
+    let personId;
+    if (editing) {
+      await update(editing.id, personData);
+      personId = editing.id;
+    } else {
+      const created = await create(personData);
+      personId = created.id;
+    }
+    if (face_photo_url && face_descriptor?.length) {
+      const existing = await base44.entities.Biometric.filter({ person_id: personId, status: 'active' });
+      for (const b of existing) {
+        await base44.entities.Biometric.update(b.id, { status: 'revoked' });
+      }
+      await base44.entities.Biometric.create({
+        person_id: personId,
+        person_name: personData.full_name,
+        face_photo_url,
+        face_descriptor,
+        status: 'active',
+      });
+    }
   };
   const handleDelete = async () => { await remove(editing.id); };
 
@@ -152,17 +172,6 @@ export default function People() {
         onDelete={editing ? handleDelete : null}
         canDelete={!!editing}
         submitLabel={editing ? 'Guardar cambios' : 'Crear persona'}
-        topContent={personPhoto && (
-          <div className="flex items-center gap-4 rounded-lg bg-slate-50 p-4">
-            <div className="h-20 w-20 overflow-hidden rounded-lg">
-              <UIImage src={personPhoto} alt="Foto de registro" className="h-full w-full" fittingType="fit" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-slate-600">Foto de registro facial</p>
-              <p className="text-xs text-slate-400">Capturada para verificación biométrica</p>
-            </div>
-          </div>
-        )}
       />
     </div>
   );
