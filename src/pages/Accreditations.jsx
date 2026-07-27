@@ -118,6 +118,15 @@ export default function Accreditations() {
     if (existing.some((a) => !editing || a.id !== editing.id)) {
       throw new Error('Esta persona ya tiene una credencial registrada para este evento.');
     }
+    // Block assignment if the person has pending/rejected/expired documentation
+    if (!editing) {
+      const docs = await base44.entities.Document.filter({ person_id: data.person_id }, '-created_date', 100);
+      const pending = docs.filter((d) => d.status !== 'approved');
+      if (pending.length > 0) {
+        const statuses = [...new Set(pending.map((d) => d.status))];
+        throw new Error(`No se puede asignar: la persona tiene documentación pendiente de aprobación (${statuses.join(', ')}).`);
+      }
+    }
     // Denormalize event/person data
     const evt = events.find((e) => e.id === data.event_id);
     const person = people.find((p) => p.id === data.person_id);
