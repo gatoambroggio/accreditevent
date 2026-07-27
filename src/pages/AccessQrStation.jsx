@@ -28,6 +28,7 @@ const STATUS_INFO = {
 
 export default function AccessQrStation() {
   const [phase, setPhase] = useState('select');
+  const [mode, setMode] = useState('person');
   const [events, setEvents] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState('');
   const [selectedZones, setSelectedZones] = useState(['general']);
@@ -66,6 +67,10 @@ export default function AccessQrStation() {
     setVerifying(false);
   };
 
+  const backToMode = () => {
+    setPhase('select');
+  };
+
   const speak = useCallback((text) => {
     try {
       const u = new SpeechSynthesisUtterance(text);
@@ -86,15 +91,32 @@ export default function AccessQrStation() {
       const verifier = me?.full_name || me?.email || 'Sistema';
       const zoneLabel = selectedZones.map((z) => zones.find((zz) => zz.value === z)?.label || z).join(', ');
 
-      // 1) Try matching an accreditation (person) by badge_code
-      const accreditations = await base44.entities.Accreditation.filter(
-        { status: 'active', event_id: selectedEvent.id },
-        '-created_date',
-        500
-      );
-      const accred = accreditations.find((a) => a.id === code);
+      if (mode === 'person') {
+        // --- Person validation ---
+        const accreditations = await base44.entities.Accreditation.filter(
+          { status: 'active', event_id: selectedEvent.id },
+          '-created_date',
+          500
+        );
+        const accred = accreditations.find((a) => a.id === code);
 
-      if (accred) {
+        if (!accred) {
+          await base44.entities.AccessLog.create({
+            accreditation_id: 'unknown',
+            person_name: 'Desconocido',
+            badge_code: code,
+            event_name: selectedEvent.name,
+            event_id: selectedEvent.id,
+            verified_by: verifier,
+            method: 'manual',
+            zone: selectedZones.join(', '),
+            result: 'denied',
+            access_level: '',
+          });
+          setResult({ ok: false, type: 'person', message: 'Credencial no válida para este evento.' });
+          return;
+        }
+
         if (!canAccessAnyZone(accred.access_level, selectedZones)) {
           await base44.entities.AccessLog.create({
             accreditation_id: accred.id,
@@ -134,68 +156,68 @@ export default function AccessQrStation() {
         return;
       }
 
-      // 2) Try matching a vehicle by ID
+      // --- Vehicle validation ---
+      let vehicle = null;
       try {
-        const vehicle = await base44.entities.Vehicle.get(code);
-
-        if (vehicle) {
-          const isAssigned = vehicle.event_ids?.includes(selectedEvent.id);
-
-          if (!isAssigned) {
-            await base44.entities.AccessLog.create({
-              accreditation_id: vehicle.id,
-              person_name: vehicle.person_name || '—',
-              badge_code: vehicle.plate || code,
-              event_name: selectedEvent.name,
-              event_id: selectedEvent.id,
-              verified_by: verifier,
-              method: 'manual',
-              zone: selectedZones.join(', '),
-              result: 'denied',
-              access_level: '',
-            });
-            setResult({
-              ok: false,
-              person_name: vehicle.person_name,
-              type: 'vehicle',
-              vehicle,
-              message: 'Vehículo no asignado a este evento.',
-            });
-            return;
-          }
-
-          await base44.entities.AccessLog.create({
-            accreditation_id: vehicle.id,
-            person_name: vehicle.person_name || '—',
-            badge_code: vehicle.plate || code,
-            event_name: selectedEvent.name,
-            event_id: selectedEvent.id,
-            verified_by: verifier,
-            method: 'manual',
-            zone: selectedZones.join(', '),
-            result: 'granted',
-            access_level: '',
-          });
-
-          setResult({ ok: true, person_name: vehicle.person_name, type: 'vehicle', vehicle });
-          return;
-        }
+        vehicle = await base44.entities.Vehicle.get(code);
       } catch {}
 
-      // 3) Neither accreditation nor vehicle found
+      if (!vehicle) {
+        await base44.entities.AccessLog.create({
+          accreditation_id: 'unknown',
+          person_name: 'Desconocido',
+          badge_code: code,
+          event_name: selectedEvent.name,
+          event_id: selectedEvent.id,
+          verified_by: verifier,
+          method: 'manual',
+          zone: selectedZones.join(', '),
+          result: 'denied',
+          access_level: '',
+        });
+        setResult({ ok: false, type: 'vehicle', message: 'Vehículo no registrado.' });
+        return;
+      }
+
+      const isAssigned = vehicle.event_ids?.includes(selectedEvent.id);
+
+      if (!isAssigned) {
+        await base44.entities.AccessLog.create({
+          accreditation_id: vehicle.id,
+          person_name: vehicle.person_name || '—',
+          badge_code: vehicle.plate || code,
+          event_name: selectedEvent.name,
+          event_id: selectedEvent.id,
+          verified_by: verifier,
+          method: 'manual',
+          zone: selectedZones.join(', '),
+          result: 'denied',
+          access_level: '',
+        });
+        setResult({
+          ok: false,
+          person_name: vehicle.person_name,
+          type: 'vehicle',
+          vehicle,
+          message: 'Vehículo no asignado a este evento.',
+        });
+        return;
+      }
+
       await base44.entities.AccessLog.create({
-        accreditation_id: 'unknown',
-        person_name: 'Desconocido',
-        badge_code: code,
+        accreditation_id: vehicle.id,
+        person_name: vehicle.person_name || '—',
+        badge_code: vehicle.plate || code,
         event_name: selectedEvent.name,
         event_id: selectedEvent.id,
         verified_by: verifier,
         method: 'manual',
         zone: selectedZones.join(', '),
-        result: 'denied',
+        result: 'granted',
         access_level: '',
       });
-      setResult({ ok: false, message: 'Credencial no válida para este evento.' });
+
+      setResult({ ok: true, person_name: vehicle.person_name, type: 'vehicle', vehicle });
     } catch (err) {
       setResult({ ok: false, message: err.message || 'Error en la verificación.' });
     } finally {
@@ -253,8 +275,41 @@ export default function AccessQrStation() {
                 <Calendar className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-slate-900">Seleccionar evento</h2>
-                <p className="text-sm text-slate-500">Elegí el evento para iniciar el control por QR.</p>
+                <h2 className="text-xl font-bold text-slate-900">Control de acceso por QR</h2>
+                <p className="text-sm text-slate-500">Elegí el tipo de acceso y el evento para iniciar.</p>
+              </div>
+            </div>
+
+            {/* Mode selector */}
+            <div className="mb-5">
+              <label className="mb-1.5 block text-xs font-semibold text-slate-600">Tipo de acceso</label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setMode('person')}
+                  className={`flex items-center gap-3 rounded-xl border p-4 text-left transition ${mode === 'person' ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500/20' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
+                >
+                  <div className={`grid h-10 w-10 place-items-center rounded-lg ${mode === 'person' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                    <User className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">Personas</p>
+                    <p className="text-xs text-slate-500">Acreditaciones</p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode('vehicle')}
+                  className={`flex items-center gap-3 rounded-xl border p-4 text-left transition ${mode === 'vehicle' ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500/20' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
+                >
+                  <div className={`grid h-10 w-10 place-items-center rounded-lg ${mode === 'vehicle' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                    <Car className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">Vehículos</p>
+                    <p className="text-xs text-slate-500">Credenciales vehiculares</p>
+                  </div>
+                </button>
               </div>
             </div>
 
@@ -297,30 +352,37 @@ export default function AccessQrStation() {
                     );
                   })}
                 </div>
-                <div className="mt-5">
-                  <label className="mb-1.5 block text-xs font-semibold text-slate-600">Zona(s) de control</label>
-                  <p className="mb-2 text-xs text-slate-400">Seleccioná una o varias. Se permite el ingreso si la persona tiene acceso a alguna de las seleccionadas.</p>
-                  <div className="flex flex-wrap gap-2">
-                    {zones.map((z) => {
-                      const active = selectedZones.includes(z.value);
-                      return (
-                        <button
-                          key={z.value}
-                          onClick={() => setSelectedZones((prev) => active ? prev.filter((v) => v !== z.value) : [...prev, z.value])}
-                          className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-                        >
-                          {z.label}
-                        </button>
-                      );
-                    })}
+                {mode === 'person' && (
+                  <div className="mt-5">
+                    <label className="mb-1.5 block text-xs font-semibold text-slate-600">Zona(s) de control</label>
+                    <p className="mb-2 text-xs text-slate-400">Seleccioná una o varias. Se permite el ingreso si la persona tiene acceso a alguna de las seleccionadas.</p>
+                    <div className="flex flex-wrap gap-2">
+                      {zones.map((z) => {
+                        const active = selectedZones.includes(z.value);
+                        return (
+                          <button
+                            key={z.value}
+                            onClick={() => setSelectedZones((prev) => active ? prev.filter((v) => v !== z.value) : [...prev, z.value])}
+                            className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                          >
+                            {z.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                )}
+                {mode === 'vehicle' && (
+                  <div className="mt-5 rounded-lg bg-slate-50 px-4 py-3 text-xs text-slate-500">
+                    Se validarán vehículos asignados al evento mediante el QR de su credencial vehicular.
+                  </div>
+                )}
                 <button
                   onClick={startStation}
-                  disabled={!selectedEventId || selectedZones.length === 0}
+                  disabled={!selectedEventId || (mode === 'person' && selectedZones.length === 0)}
                   className="mt-5 w-full rounded-lg bg-emerald-700 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50"
                 >
-                  Iniciar control por QR
+                  Iniciar control de {mode === 'person' ? 'personas' : 'vehículos'}
                 </button>
               </>
             )}
@@ -360,10 +422,21 @@ export default function AccessQrStation() {
 
           <div className="mx-auto max-w-2xl px-5 py-8">
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="mb-1 text-xl font-bold text-slate-900">Lectura de credencial QR</h2>
-              <p className="mb-5 text-sm text-slate-500">
-                Enfocá el código QR para validar el ingreso de personas o vehículos.
-              </p>
+              <div className="mb-5 flex items-center gap-3">
+                <div className={`grid h-10 w-10 place-items-center rounded-lg ${mode === 'person' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                  {mode === 'person' ? <User className="h-5 w-5" /> : <Car className="h-5 w-5" />}
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">
+                    {mode === 'person' ? 'Acceso de personas' : 'Acceso vehicular'}
+                  </h2>
+                  <p className="text-sm text-slate-500">
+                    {mode === 'person'
+                      ? 'Enfocá el QR de la credencial para validar el ingreso.'
+                      : 'Enfocá el QR de la credencial vehicular para validar el ingreso.'}
+                  </p>
+                </div>
+              </div>
 
               {(eventStatus === 'upcoming' || eventStatus === 'ended') ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
