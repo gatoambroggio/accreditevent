@@ -35,29 +35,38 @@ import { base44 } from '@/api/base44Client';
 export const ROLE_LEVEL = { provider: -1, control: 0, coordinator: 1, productora: 1, admin: 2, superadmin: 3 };
 
 const NAV_ITEMS = [
+  // Operación
   { path: '/', label: 'Resumen', icon: LayoutDashboard, minLevel: 0 },
   { path: '/events', label: 'Eventos', icon: CalendarDays, minLevel: 1 },
+  // Personas y proveedores
   { path: '/people', label: 'Personas', icon: Users, minLevel: 1 },
+  { path: '/registered-people', label: 'Personas registradas', icon: UserSearch, minLevel: 1 },
   { path: '/provider-companies', label: 'Empresas proveedoras', icon: Briefcase, minLevel: 1 },
+  // Acreditaciones
   { path: '/accreditations', label: 'Acreditaciones', icon: IdCard, minLevel: 0 },
   { path: '/access-levels', label: 'Niveles de acceso', icon: Layers, minLevel: 1 },
   { path: '/accreditation-facial', label: 'Acreditación facial', icon: ScanFace, minLevel: 1 },
+  // Control de acceso
   { path: '/access-control', label: 'Control de acceso', icon: DoorOpen, minLevel: 0 },
   { path: '/access-monitor', label: 'Monitor en vivo', icon: Radio, minLevel: 0 },
   { path: '/zkteco-devices', label: 'Terminales ZKTeco', icon: Cpu, minLevel: 1 },
-  { path: '/reports', label: 'Reportes', icon: BarChart3, minLevel: 1 },
-  { path: '/messages', label: 'Mensajes', icon: MessageSquare, minLevel: 1 },
+  // Documentos y vehículos
   { path: '/documents', label: 'Documentos', icon: FileText, minLevel: 1 },
-  { path: '/registered-people', label: 'Personas registradas', icon: UserSearch, minLevel: 1 },
   { path: '/registered-vehicles', label: 'Vehículos registrados', icon: ClipboardList, minLevel: 1 },
   { path: '/vehicles', label: 'Vehículos acreditados', icon: Car, minLevel: 1 },
   { path: '/parking-sectors', label: 'Estacionamiento', icon: SquareParking, minLevel: 1 },
+  // Logística
   { path: '/requirement-items', label: 'Ítems de logística', icon: Boxes, minLevel: 1 },
   { path: '/provider-requests', label: 'Solicitudes', icon: ClipboardCheck, minLevel: 1 },
+  // Reportes y comunicación
+  { path: '/reports', label: 'Reportes', icon: BarChart3, minLevel: 1 },
+  { path: '/messages', label: 'Mensajes', icon: MessageSquare, minLevel: 1 },
+  // Administración
   { path: '/companies', label: 'Empresas', icon: Building2, minLevel: 2 },
   { path: '/users', label: 'Usuarios y roles', icon: ShieldCheck, minLevel: 2 },
   { path: '/audit', label: 'Auditoría', icon: ScrollText, minLevel: 2 },
   { path: '/settings', label: 'Configuración', icon: SettingsIcon, minLevel: 2 },
+  // Portal proveedor
   { path: '/portal', label: 'Mi portal', icon: UserCircle, providerOnly: true },
 ];
 
