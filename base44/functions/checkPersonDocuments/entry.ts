@@ -26,17 +26,34 @@ export default async function(req) {
         pending_statuses: ['no_documents'],
       });
     }
-    const pending = docs.filter((d) => {
-      // Non-approved documents block accreditation
-      if (d.status !== 'approved') return true;
-      // Approved documents with a past expiration date also block
-      if (d.expires_at && new Date(d.expires_at + 'T23:59:59') < now) return true;
-      return false;
+
+    // A document is valid only if approved and not expired
+    const isValid = (d) => {
+      if (d.status !== 'approved') return false;
+      if (d.expires_at && new Date(d.expires_at + 'T23:59:59') < now) return false;
+      return true;
+    };
+
+    // Group by document_type: each type needs at least one valid document.
+    // An expired/pending old doc of the same type doesn't block if a newer valid one exists.
+    const docsByType = {};
+    docs.forEach((d) => {
+      const key = d.document_type || 'other';
+      if (!docsByType[key]) docsByType[key] = [];
+      docsByType[key].push(d);
     });
+
+    const pendingTypes = Object.entries(docsByType)
+      .filter(([, typeDocs]) => !typeDocs.some(isValid))
+      .map(([type, typeDocs]) => ({
+        type,
+        statuses: [...new Set(typeDocs.map((d) => d.status === 'approved' ? 'expired' : d.status))],
+      }));
+
     return Response.json({
-      has_pending: pending.length > 0,
-      pending_count: pending.length,
-      pending_statuses: [...new Set(pending.map((d) => d.status === 'approved' ? 'expired' : d.status))],
+      has_pending: pendingTypes.length > 0,
+      pending_count: pendingTypes.length,
+      pending_statuses: pendingTypes.flatMap((t) => t.statuses),
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
