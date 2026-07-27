@@ -41,8 +41,14 @@ export default function Documents() {
   const [editingType, setEditingType] = useState(null);
   const [viewingDoc, setViewingDoc] = useState(null);
 
+  const isExpired = (d) => {
+    if (d.status === 'expired') return true;
+    if (d.status === 'approved' && d.expires_at && new Date(d.expires_at + 'T23:59:59') < new Date()) return true;
+    return false;
+  };
+
   const filtered = useMemo(() => {
-    let result = items;
+    let result = items.filter((d) => !isExpired(d));
     const q = query.toLowerCase().trim();
     if (q) {
       result = result.filter((d) =>

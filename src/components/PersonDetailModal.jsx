@@ -25,9 +25,15 @@ export default function PersonDetailModal({ person, onClose }) {
   const { docTypes } = useDocumentTypes();
   const { sectors } = useParkingSectors();
 
+  const isExpired = (d) => {
+    if (d.status === 'expired') return true;
+    if (d.status === 'approved' && d.expires_at && new Date(d.expires_at + 'T23:59:59') < new Date()) return true;
+    return false;
+  };
+
   const loadDocs = async (personId) => {
     const docData = await base44.entities.Document.filter({ person_id: personId }, '-created_date', 100);
-    setDocs(docData);
+    setDocs(docData.filter((d) => !isExpired(d)));
   };
 
   const loadVehicles = async (personId) => {
@@ -45,7 +51,7 @@ export default function PersonDetailModal({ person, onClose }) {
           base44.entities.Vehicle.filter({ person_id: person.id }, '-created_date', 50),
           base44.entities.Event.list('-start_at', 200),
         ]);
-        setDocs(docData);
+        setDocs(docData.filter((d) => !isExpired(d)));
         setBio(bioData[0] || null);
         setVehicles(vehData);
         setEvents(evs);
