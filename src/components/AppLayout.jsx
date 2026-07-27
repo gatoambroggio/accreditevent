@@ -15,6 +15,7 @@ import {
   X,
   DoorOpen,
   MessageSquare,
+  ScanFace,
 } from 'lucide-react';
 
 export const ROLE_LEVEL = { provider: -1, control: 0, coordinator: 1, admin: 2, superadmin: 3 };
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { path: '/events', label: 'Eventos', icon: CalendarDays, minLevel: 1 },
   { path: '/people', label: 'Personas', icon: Users, minLevel: 1 },
   { path: '/accreditations', label: 'Acreditaciones', icon: IdCard, minLevel: 0 },
+  { path: '/accreditation-facial', label: 'Acreditación facial', icon: ScanFace, minLevel: 1 },
   { path: '/access-control', label: 'Control de acceso', icon: DoorOpen, minLevel: 0 },
   { path: '/messages', label: 'Mensajes', icon: MessageSquare, minLevel: 1 },
   { path: '/documents', label: 'Documentos', icon: FileText, minLevel: 1 },
