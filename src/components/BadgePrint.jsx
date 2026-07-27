@@ -1,5 +1,5 @@
 import React from 'react';
-import { QRCodeCanvas } from 'qrcode.react';
+import { QRCodeSVG } from 'qrcode.react';
 import { X, Printer } from 'lucide-react';
 
 export default function BadgePrint({ accreditation, event, onClose }) {
@@ -121,11 +121,10 @@ export default function BadgePrint({ accreditation, event, onClose }) {
           {/* QR + Badge code */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem' }}>
             <div style={{ flexShrink: 0 }}>
-              <QRCodeCanvas
+              <QRCodeSVG
                 value={accreditation?.badge_code || accreditation?.id || ''}
                 size={72}
                 level="M"
-                includeMargin={false}
               />
             </div>
             <div style={{ textAlign: 'left' }}>
