@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useCrud } from '@/lib/crud';
-import { Plus, Pencil, Printer, Download, ScanFace } from 'lucide-react';
+import { Plus, Pencil, Printer, Download, ScanFace, Trash2 } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
 import BiometricButton from '@/components/BiometricButton';
 import EntityModal from '@/components/EntityModal';
@@ -76,6 +76,8 @@ export default function Accreditations() {
 
   const { page, setPage, totalPages, paginated } = usePagination(filtered, 15);
 
+  const allFilteredIds = useMemo(() => filtered.map((a) => a.id), [filtered]);
+  const isAllSelected = allFilteredIds.length > 0 && allFilteredIds.every((id) => selected.has(id));
   const toggleSelect = (id) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -83,12 +85,24 @@ export default function Accreditations() {
       return next;
     });
   };
-
   const toggleSelectAll = () => {
     setSelected((prev) => {
-      if (prev.size === filtered.length) return new Set();
-      return new Set(filtered.map((a) => a.id));
+      const next = new Set(prev);
+      if (isAllSelected) {
+        allFilteredIds.forEach((id) => next.delete(id));
+      } else {
+        allFilteredIds.forEach((id) => next.add(id));
+      }
+      return next;
     });
+  };
+  const handleBulkDelete = async () => {
+    if (!confirm(`¿Eliminar ${selected.size} acreditación(es)? Esta acción no se puede deshacer.`)) return;
+    for (const id of selected) {
+      try { await base44.entities.Accreditation.delete(id); } catch {}
+    }
+    setSelected(new Set());
+    await reload();
   };
 
   const handleBatchPrint = () => {
@@ -161,15 +175,16 @@ export default function Accreditations() {
     }
     const evt = events.find((e) => e.id === data.event_id);
     const person = people.find((p) => p.id === data.person_id);
+    const zoneValue = person?.access_area || data.access_level || 'general';
     const enriched = {
       ...data,
       event_name: evt?.name || '',
       company: evt?.company || '',
       person_name: person?.full_name || '',
-      person_type: person?.person_type || '',
+      person_type: zoneValue,
       person_email: person?.email || '',
-      area: data.access_level || 'general',
-      access_level: data.access_level || 'general',
+      area: zoneValue,
+      access_level: zoneValue,
     };
     if (!editing) {
       enriched.badge_code = generateBadgeCode(person?.person_type, items.map((a) => a.badge_code), typePrefixes);
@@ -261,10 +276,6 @@ export default function Accreditations() {
         <button onClick={handleExport} className={btnOutline}>
           <Download className="h-4 w-4" /> Exportar
         </button>
-        <button onClick={handleBatchPrint} disabled={selected.size === 0}
-          className={`${btnOutline} disabled:opacity-40 disabled:cursor-not-allowed`}>
-          <Printer className="h-4 w-4" /> Imprimir ({selected.size})
-        </button>
         <button onClick={openNew} className={btnPrimary}>
           <Plus className="h-4 w-4" /> Nueva acreditación
         </button>
@@ -276,13 +287,26 @@ export default function Accreditations() {
         <FilterSelect value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} placeholder="Todos los estados" />
       </div>
 
+      {selected.size > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5">
+          <span className="text-sm font-semibold text-emerald-700">{selected.size} seleccionada(s)</span>
+          <button onClick={handleBatchPrint} className={btnOutline}>
+            <Printer className="h-4 w-4" /> Imprimir selección
+          </button>
+          <button onClick={handleBulkDelete} className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700">
+            <Trash2 className="h-4 w-4" /> Eliminar selección
+          </button>
+          <button onClick={() => setSelected(new Set())} className="text-sm text-slate-500 hover:text-slate-700">Limpiar</button>
+        </div>
+      )}
+
       <DataTable loading={loading} error={error} isEmpty={filtered.length === 0} emptyMessage="No hay acreditaciones registradas." tableClassName="min-w-[800px]">
         <thead>
           <tr className="border-b border-slate-100 bg-slate-50">
-            <Th>
+            <Th className="w-10">
               <input
                 type="checkbox"
-                checked={selected.size === filtered.length && filtered.length > 0}
+                checked={isAllSelected}
                 onChange={toggleSelectAll}
                 className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
               />

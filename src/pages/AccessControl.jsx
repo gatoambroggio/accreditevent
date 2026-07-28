@@ -16,6 +16,7 @@ import FaceCapture from '@/components/FaceCapture';
 import { compareDescriptors, MATCH_THRESHOLD } from '@/lib/faceRecognition';
 import { canAccessAnyZone } from '@/lib/accessZones';
 import { useZones } from '@/lib/useZones';
+import { speakResult } from '@/lib/accessUtils';
 import { formatTime } from '@/lib/formatDate';
 
 export default function AccessControl({ standalone = false }) {
@@ -50,22 +51,12 @@ export default function AccessControl({ standalone = false }) {
     loadRecent();
   }, [loadRecent]);
 
-  const speak = useCallback((text) => {
-    try {
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = 'es-AR';
-      u.rate = 0.9;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(u);
-    } catch {}
-  }, []);
-
   useEffect(() => {
     if (!result) return;
-    speak(result.ok ? 'Aceptado' : 'Denegado');
+    speakResult(result.ok);
     const timer = setTimeout(() => setResult(null), 2500);
     return () => clearTimeout(timer);
-  }, [result, speak]);
+  }, [result]);
 
   useEffect(() => {
     if (standalone && found?.has_biometric && !showCamera && !verifying && !result) {
@@ -387,7 +378,7 @@ export default function AccessControl({ standalone = false }) {
                   <div>
                     <p className="text-lg font-bold text-slate-900">{found.person_name}</p>
                     <p className="text-sm text-slate-500">{found.event_name} · {found.badge_code}</p>
-                    <p className="mt-1 text-xs text-slate-400">{found.area || 'Sin área'} · {found.access_level}</p>
+                    <p className="mt-1 text-xs text-slate-400">{zones.find((z) => z.value === (found.access_level || found.area))?.label || found.access_level || found.area || 'Sin área'}</p>
                   </div>
                   {found.has_biometric ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
