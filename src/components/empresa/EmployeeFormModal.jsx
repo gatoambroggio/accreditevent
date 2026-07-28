@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, UserPlus, FileImage, ScanFace, CheckCircle2, FileText } from 'lucide-react';
+import { X, Loader2, UserPlus, FileImage, ScanFace, CheckCircle2, FileText, CalendarDays } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Image } from '@/components/ui/image';
 import FaceCapture from '@/components/FaceCapture';
 
-const EMPTY = { first_name: '', last_name: '', document: '', phone: '', employment_type: 'fijo', event_phases: [], notes: '' };
+const EMPTY = { first_name: '', last_name: '', document: '', phone: '', employment_type: 'fijo', event_phases: [], event_ids: [], notes: '' };
 const normalizeType = (v) => (v === 'eventual' || v === 'esporadico' ? 'eventual' : 'fijo');
 
 const PHASES = [
   { value: 'armado', label: 'Armado' },
-  { value: 'dia_evento', label: 'Día del evento' },
+  { value: 'dia_evento', label: 'Show' },
   { value: 'desarme', label: 'Desarme' },
 ];
 
@@ -23,11 +23,12 @@ function buildForm(editing) {
     phone: editing.phone || '',
     employment_type: normalizeType(editing.employment_type),
     event_phases: Array.isArray(editing.event_phases) ? editing.event_phases : [],
+    event_ids: Array.isArray(editing.event_ids) ? editing.event_ids : [],
     notes: editing.notes || '',
   };
 }
 
-export default function EmployeeFormModal({ open, onClose, onSubmit, editing, companyName }) {
+export default function EmployeeFormModal({ open, onClose, onSubmit, editing, companyName, approvedEvents = [] }) {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
@@ -68,6 +69,15 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
     }));
   };
 
+  const toggleEvent = (eventId) => {
+    setForm((f) => ({
+      ...f,
+      event_ids: f.event_ids.includes(eventId)
+        ? f.event_ids.filter((id) => id !== eventId)
+        : [...f.event_ids, eventId],
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -79,12 +89,17 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
     setSaving(true);
     try {
       setStatus('Guardando empleado…');
+      const event_names = form.event_ids
+        .map((id) => approvedEvents.find((e) => e.event_id === id)?.event_name)
+        .filter(Boolean);
       const person = await onSubmit({
         full_name,
         document: form.document,
         phone: form.phone,
         employment_type: form.employment_type,
         event_phases: form.event_phases,
+        event_ids: form.event_ids,
+        event_names,
         notes: form.notes,
         company: companyName,
         person_type: 'provider',
@@ -210,6 +225,34 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
               </div>
             </div>
           </div>
+
+          {/* Event assignment */}
+          {approvedEvents.length > 0 && (
+            <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+              <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+                <CalendarDays className="h-4 w-4" /> Eventos asignados
+              </p>
+              <p className="mb-3 text-xs text-slate-400">Seleccioná a qué eventos va a asistir este empleado.</p>
+              <div className="flex flex-wrap gap-1.5">
+                {approvedEvents.map((ev) => {
+                  const active = form.event_ids.includes(ev.event_id);
+                  return (
+                    <button
+                      key={ev.event_id}
+                      type="button"
+                      onClick={() => toggleEvent(ev.event_id)}
+                      className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}
+                    >
+                      {active && <CheckCircle2 className="mr-1 inline h-3 w-3" />}
+                      {ev.event_name}
+                      {ev.productora && <span className="ml-1 text-[10px] font-normal opacity-60">· {ev.productora}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold text-slate-600">Notas (opcional)</span>
             <textarea value={form.notes} onChange={(e) => setField('notes', e.target.value)} rows={2} className={inputCls} placeholder="Observaciones internas…" />

@@ -58,6 +58,20 @@
       "type": "string",
       "description": "Evento al que pertenece la persona"
     },
+    "event_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs de eventos asignados al empleado (puede trabajar en varios)"
+    },
+    "event_names": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Nombres de eventos (denormalizado)"
+    },
     "notes": {
       "type": "string",
       "description": "Notas internas"

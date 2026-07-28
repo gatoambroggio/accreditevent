@@ -13,8 +13,8 @@ export default function EmployeeExcelImport({ open, onClose, onImport, companyNa
   if (!open) return null;
 
   const downloadTemplate = () => {
-    const headers = ['Nombre', 'Apellido', 'Documento', 'Telefono', 'Tipo (Fijo/Eventual)', 'Fases (Armado/Dia/Desarme)'];
-    const example = ['Juan', 'Pérez', '12345678', '11 12345678', 'Fijo', 'Armado, Dia'];
+    const headers = ['Nombre', 'Apellido', 'Documento', 'Telefono', 'Tipo (Fijo/Eventual)', 'Fases (Armado/Show/Desarme)'];
+    const example = ['Juan', 'Pérez', '12345678', '11 12345678', 'Fijo', 'Armado, Show'];
     const ws = XLSX.utils.aoa_to_sheet([headers, example]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Empleados');
@@ -39,7 +39,7 @@ export default function EmployeeExcelImport({ open, onClose, onImport, companyNa
         const fasesRaw = String(row['Fases'] || row['Fases (Armado/Dia/Desarme)'] || row['fases'] || '').toLowerCase();
         const event_phases = [];
         if (fasesRaw.includes('arm')) event_phases.push('armado');
-        if (fasesRaw.includes('dia')) event_phases.push('dia_evento');
+        if (fasesRaw.includes('dia') || fasesRaw.includes('show')) event_phases.push('dia_evento');
         if (fasesRaw.includes('desa')) event_phases.push('desarme');
         return {
           full_name: `${nombre} ${apellido}`.trim(),
@@ -160,7 +160,7 @@ export default function EmployeeExcelImport({ open, onClose, onImport, companyNa
                               </span>
                             </td>
                             <td className="px-3 py-2 text-xs text-slate-500">
-                              {r.event_phases?.length ? r.event_phases.map((p) => ({armado:'Armado',dia_evento:'Día',desarme:'Desarme'})[p]).join(', ') : '—'}
+                              {r.event_phases?.length ? r.event_phases.map((p) => ({armado:'Armado',dia_evento:'Show',desarme:'Desarme'})[p]).join(', ') : '—'}
                             </td>
                           </tr>
                         ))}

@@ -21,7 +21,7 @@ const DOC_TYPES = {
   other: 'Otro',
 };
 
-const PHASE_LABELS = { armado: 'Armado', dia_evento: 'Día', desarme: 'Desarme' };
+const PHASE_LABELS = { armado: 'Armado', dia_evento: 'Show', desarme: 'Desarme' };
 
 export default function EmpresaPortal() {
   const [user, setUser] = useState(null);
@@ -42,6 +42,7 @@ export default function EmpresaPortal() {
   const companyName = user?.company || user?.data?.company || '';
   const approvedEvents = approvals.filter((a) => a.status === 'approved').map((a) => a.event_name);
   const isApproved = approvedEvents.length > 0;
+  const approvedEventList = approvals.filter((a) => a.status === 'approved').map((a) => ({ event_id: a.event_id, event_name: a.event_name, productora: a.company }));
 
   const load = useCallback(async () => {
     try {
@@ -260,7 +261,7 @@ export default function EmpresaPortal() {
             isEmpty={filtered.length === 0}
             emptyIcon={Users}
             emptyMessage={search || filterType !== 'all' ? 'Sin resultados.' : 'No hay empleados cargados. Agregá el primero o importá desde Excel.'}
-            tableClassName="min-w-[640px]"
+            tableClassName="min-w-[760px]"
           >
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
@@ -269,6 +270,7 @@ export default function EmpresaPortal() {
                 <Th>Contacto</Th>
                 <Th>Tipo</Th>
                 <Th>Fases</Th>
+                <Th>Eventos</Th>
                 <Th />
               </tr>
             </thead>
@@ -297,6 +299,15 @@ export default function EmpresaPortal() {
                       <div className="flex flex-wrap gap-1">
                         {emp.event_phases.map((p) => (
                           <span key={p} className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">{PHASE_LABELS[p] || p}</span>
+                        ))}
+                      </div>
+                    ) : '—'}
+                  </Td>
+                  <Td>
+                    {emp.event_names?.length ? (
+                      <div className="flex flex-wrap gap-1">
+                        {emp.event_names.map((n, i) => (
+                          <span key={i} className="rounded bg-emerald-50 px-1.5 py-0.5 text-xs text-emerald-700">{n}</span>
                         ))}
                       </div>
                     ) : '—'}
@@ -398,6 +409,7 @@ export default function EmpresaPortal() {
         onSubmit={handleSaveEmployee}
         editing={editingEmployee}
         companyName={companyName}
+        approvedEvents={approvedEventList}
       />
       <EmployeeExcelImport
         open={importOpen}
