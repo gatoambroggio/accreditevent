@@ -92,7 +92,7 @@ export default function PersonDetailModal({ person, onClose }) {
   const openEditVehicle = (v) => { setEditingVehicle(v); setVehicleModalOpen(true); };
 
   const handleVehicleSubmit = async (data) => {
-    const selectedEventIds = data.event_ids ? String(data.event_ids).split(',').filter(Boolean) : [];
+    const selectedEventIds = Array.isArray(data.event_ids) ? data.event_ids : (data.event_ids ? String(data.event_ids).split(',').filter(Boolean) : []);
     const enriched = {
       ...data,
       person_id: person.id,
@@ -198,7 +198,7 @@ export default function PersonDetailModal({ person, onClose }) {
                   {person.employment_type === 'eventual' ? 'Eventual' : 'Fijo'}
                 </span>
               )}
-              {person.event_phases?.map((p) => (
+              {(Array.isArray(person.event_phases) ? person.event_phases : []).map((p) => (
                 <span key={p} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
                   {{ armado: 'Armado', dia_evento: 'Show', desarme: 'Desarme' }[p] || p}
                 </span>

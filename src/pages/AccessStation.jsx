@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { loadModels, getFaceDescriptor, findBestMatch } from '@/lib/faceRecognition';
 import { isWithinEventPhases, speakResult, getEventStatus, EVENT_STATUS_INFO } from '@/lib/accessUtils';
 import { canAccessZone } from '@/lib/accessZones';
+import { useZones } from '@/lib/useZones';
 import { CheckCircle2, XCircle, Camera, Loader2, ArrowLeft, RefreshCw } from 'lucide-react';
 
 export default function AccessStation() {
@@ -17,6 +18,7 @@ export default function AccessStation() {
   const [loadingModels, setLoadingModels] = useState(false);
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+  const { zones } = useZones();
 
   useEffect(() => {
     base44.entities.Event.filter({ status: 'active' }, '-created_date', 50).then(setEvents).catch(() => {});
@@ -176,11 +178,7 @@ export default function AccessStation() {
           <select value={zone} onChange={(e) => setZone(e.target.value)}
             className="rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-sm font-semibold text-white outline-none">
             <option value="">Todas las zonas</option>
-            <option value="general">General</option>
-            <option value="backstage">Backstage</option>
-            <option value="technical">Técnica</option>
-            <option value="vip">VIP</option>
-            <option value="all-access">All Access</option>
+            {zones.map((z) => <option key={z.value} value={z.value}>{z.label}</option>)}
           </select>
         </div>
 

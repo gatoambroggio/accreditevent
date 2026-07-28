@@ -80,9 +80,7 @@ export default function Vehicles() {
 
   const handleSubmit = async (data) => {
     const person = people.find((p) => p.id === data.person_id);
-    const eventIds = typeof data.event_ids === 'string'
-      ? data.event_ids.split(',').filter(Boolean)
-      : (data.event_ids || []);
+    const eventIds = Array.isArray(data.event_ids) ? data.event_ids : [];
     const enriched = {
       ...data,
       person_name: person?.full_name || '',
@@ -176,7 +174,14 @@ export default function Vehicles() {
         submitLabel={editing ? 'Guardar cambios' : 'Crear vehículo'}
       />
 
-      {printVehicle && <VehicleBadgePrint vehicle={printVehicle} onClose={() => setPrintVehicle(null)} />}
+      {printVehicle && (
+        <VehicleBadgePrint
+          vehicle={printVehicle}
+          events={events.filter((e) => printVehicle.event_ids?.includes(e.id))}
+          parkingSectors={sectors}
+          onClose={() => setPrintVehicle(null)}
+        />
+      )}
     </div>
   );
 }

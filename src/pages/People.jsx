@@ -218,8 +218,10 @@ export default function People() {
                 <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} className="h-4 w-4 rounded border-slate-300 text-emerald-600" />
               </Td>
               <Td>
-                <p className="font-semibold text-slate-900">{p.full_name}</p>
-                {p.email && <p className="text-xs text-slate-400">{p.email}</p>}
+                <button onClick={() => setDetailOpen(p)} className="text-left transition hover:text-emerald-700">
+                  <p className="font-semibold text-slate-900">{p.full_name}</p>
+                  {p.email && <p className="text-xs text-slate-400">{p.email}</p>}
+                </button>
               </Td>
               <Td className="text-sm text-slate-600">{p.document || '—'}</Td>
               <Td className="text-sm text-slate-600">{p.company || '—'}</Td>
@@ -230,7 +232,7 @@ export default function People() {
               </Td>
               <Td>
                 <div className="flex flex-wrap gap-1">
-                  {(p.event_phases || []).map((ph) => (
+                  {(Array.isArray(p.event_phases) ? p.event_phases : []).map((ph) => (
                     <span key={ph} className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
                       {PHASE_OPTIONS.find((o) => o.value === ph)?.label || ph}
                     </span>

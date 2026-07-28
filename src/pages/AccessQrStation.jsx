@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { isWithinEventPhases, speakResult, getEventStatus, EVENT_STATUS_INFO } from '@/lib/accessUtils';
 import { canAccessZone } from '@/lib/accessZones';
+import { useZones } from '@/lib/useZones';
 import { CheckCircle2, XCircle, ArrowLeft, ScanLine } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 
@@ -13,6 +14,7 @@ export default function AccessQrStation({ mode = 'person' }) {
   const [scanning, setScanning] = useState(false);
   const scannerRef = useRef(null);
   const cooldownRef = useRef(false);
+  const { zones } = useZones();
 
   useEffect(() => {
     base44.entities.Event.filter({ status: 'active' }, '-created_date', 50).then(setEvents).catch(() => {});
@@ -201,11 +203,7 @@ export default function AccessQrStation({ mode = 'person' }) {
           <select value={zone} onChange={(e) => setZone(e.target.value)}
             className="rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-sm font-semibold text-white outline-none">
             <option value="">Todas las zonas</option>
-            <option value="general">General</option>
-            <option value="backstage">Backstage</option>
-            <option value="technical">Técnica</option>
-            <option value="vip">VIP</option>
-            <option value="all-access">All Access</option>
+            {zones.map((z) => <option key={z.value} value={z.value}>{z.label}</option>)}
           </select>
         </div>
         <div className="relative flex-1 flex items-center justify-center">

@@ -67,7 +67,10 @@ export default function EntityModal({
     }
     setErrors({});
     try {
-      await onSubmit(dataRef.current);
+      const cleanData = Object.fromEntries(
+        Object.entries(dataRef.current).filter(([k]) => !k.startsWith('_search_'))
+      );
+      await onSubmit(cleanData);
       onClose();
     } catch (err) {
       setError(err.message || 'No se pudo guardar el registro.');
@@ -121,7 +124,8 @@ export default function EntityModal({
     }
 
     if (f.type === 'toggle-group') {
-      const selectedValues = value ? String(value).split(',').map((v) => v.trim()).filter(Boolean) : [];
+      const raw = data[f.name];
+      const selectedValues = Array.isArray(raw) ? raw : (raw ? String(raw).split(',').map((v) => v.trim()).filter(Boolean) : []);
       return (
         <div key={f.name} className={f.full ? 'sm:col-span-2' : ''}>
           <span className="mb-1.5 block text-xs font-semibold text-slate-600">{f.label}{f.required && ' *'}</span>
@@ -136,7 +140,7 @@ export default function EntityModal({
                     const next = active
                       ? selectedValues.filter((v) => v !== o.value)
                       : [...selectedValues, o.value];
-                    setField(f.name, next.join(','));
+                    setField(f.name, next);
                   }}
                   className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                 >

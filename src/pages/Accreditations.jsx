@@ -85,7 +85,7 @@ export default function Accreditations() {
       if (p?.access_area) setField('access_level', p.access_area);
       if (p?.event_phases) {
         const phases = Array.isArray(p.event_phases) ? p.event_phases : [];
-        setField('event_phases', phases.join(','));
+        setField('event_phases', phases);
       }
       // Check biometric status
       base44.entities.Biometric.filter({ person_id: value, status: 'active' }, '-created_date', 1)
@@ -132,9 +132,7 @@ export default function Accreditations() {
     // ALWAYS use the person's access_area and event_phases as primary source
     const zoneValue = person?.access_area || data.access_level || 'general';
     const personPhases = Array.isArray(person?.event_phases) ? person.event_phases : [];
-    const formPhases = typeof data.event_phases === 'string'
-      ? data.event_phases.split(',').map((s) => s.trim()).filter(Boolean)
-      : (Array.isArray(data.event_phases) ? data.event_phases : []);
+    const formPhases = Array.isArray(data.event_phases) ? data.event_phases : [];
     const finalPhases = formPhases.length > 0 ? formPhases : personPhases;
 
     const enriched = {
@@ -198,7 +196,7 @@ export default function Accreditations() {
     const rows = filtered.map((a) => [
       a.badge_code, a.person_name, a.event_name,
       zones.find((z) => z.value === a.access_level)?.label || a.access_level,
-      (a.event_phases || []).join(', '),
+      (Array.isArray(a.event_phases) ? a.event_phases : []).join(', '),
       a.has_biometric ? 'Sí' : 'No',
       a.status,
     ]);

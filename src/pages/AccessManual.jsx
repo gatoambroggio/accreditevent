@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { isWithinEventPhases, speakResult } from '@/lib/accessUtils';
 import { canAccessZone } from '@/lib/accessZones';
+import { useZones } from '@/lib/useZones';
 import { Search, CheckCircle2, XCircle, ArrowLeft } from 'lucide-react';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
@@ -12,6 +13,7 @@ export default function AccessManual() {
   const [search, setSearch] = useState('');
   const [results, setResults] = useState([]);
   const [zone, setZone] = useState('');
+  const { zones } = useZones();
 
   useEffect(() => {
     base44.entities.Event.filter({ status: 'active' }, '-created_date', 50).then(setEvents).catch(() => {});
@@ -101,11 +103,7 @@ export default function AccessManual() {
         <select value={zone} onChange={(e) => setZone(e.target.value)}
           className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none">
           <option value="">Todas las zonas</option>
-          <option value="general">General</option>
-          <option value="backstage">Backstage</option>
-          <option value="technical">Técnica</option>
-          <option value="vip">VIP</option>
-          <option value="all-access">All Access</option>
+          {zones.map((z) => <option key={z.value} value={z.value}>{z.label}</option>)}
         </select>
       </div>
 

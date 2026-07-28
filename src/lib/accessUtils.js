@@ -21,7 +21,8 @@ export const EVENT_STATUS_INFO = {
 export function isWithinEventPhases(event, eventPhases, date = new Date()) {
   if (!event) return true;
   const now = date.getTime();
-  if (!eventPhases || eventPhases.length === 0) {
+  const phases = Array.isArray(eventPhases) ? eventPhases : (eventPhases ? String(eventPhases).split(',').map((s) => s.trim()).filter(Boolean) : []);
+  if (phases.length === 0) {
     const start = event.start_at ? new Date(event.start_at).getTime() : 0;
     const end = event.end_at ? new Date(event.end_at).getTime() + (event.grace_hours || 0) * 3600000 : Infinity;
     return now >= start && now <= end;
@@ -31,7 +32,7 @@ export function isWithinEventPhases(event, eventPhases, date = new Date()) {
     dia_evento: ['start_at', 'end_at'],
     desarme: ['desarme_start', 'desarme_end'],
   };
-  return eventPhases.some((phase) => {
+  return phases.some((phase) => {
     const [startField, endField] = PHASE_DATES[phase] || [];
     const start = event[startField];
     const end = event[endField];
