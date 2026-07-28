@@ -18,6 +18,17 @@ export const EVENT_STATUS_INFO = {
   ended: { label: 'Finalizado', cls: 'bg-red-50 text-red-700 ring-red-200' },
 };
 
+export function isWithinPhaseDates(phaseDates, date = new Date()) {
+  if (!phaseDates || phaseDates.length === 0) return true;
+  const today = date.toISOString().slice(0, 10);
+  return phaseDates.some((p) => {
+    if (!p.start_date && !p.end_date) return true;
+    const start = p.start_date || p.end_date;
+    const end = p.end_date || p.start_date;
+    return today >= start && today <= end;
+  });
+}
+
 export function speakResult(ok) {
   try {
     const u = new SpeechSynthesisUtterance(ok ? 'Aceptado' : 'Denegado');

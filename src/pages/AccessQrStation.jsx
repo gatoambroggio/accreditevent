@@ -6,7 +6,7 @@ import QrScanner from '@/components/QrScanner';
 import { canAccessAnyZone } from '@/lib/accessZones';
 import { useZones } from '@/lib/useZones';
 import { useParkingSectors } from '@/lib/useParkingSectors';
-import { getEventStatus, EVENT_STATUS_INFO, speakResult } from '@/lib/accessUtils';
+import { getEventStatus, EVENT_STATUS_INFO, speakResult, isWithinPhaseDates } from '@/lib/accessUtils';
 
 export default function AccessQrStation({ mode = 'person' }) {
   const [phase, setPhase] = useState('select');
@@ -99,6 +99,12 @@ export default function AccessQrStation({ mode = 'person' }) {
         if (!canAccessAnyZone(accred.access_level, selectedZones)) {
           await logAccess('denied', { id: accred.id, person_name: accred.person_name, badge_code: accred.badge_code, company: accred.company, access_level: accred.access_level });
           setResult({ ok: false, person_name: accred.person_name, type: 'person', message: `Acceso restringido para la zona: ${zoneLabel}.` });
+          return;
+        }
+
+        if (!isWithinPhaseDates(accred.phase_dates)) {
+          await logAccess('denied', { id: accred.id, person_name: accred.person_name, badge_code: accred.badge_code, company: accred.company, access_level: accred.access_level });
+          setResult({ ok: false, person_name: accred.person_name, type: 'person', message: 'Acceso fuera del rango de fechas autorizado.' });
           return;
         }
 

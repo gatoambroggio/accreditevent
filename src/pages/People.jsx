@@ -165,6 +165,16 @@ export default function People() {
         name: 'event_id', label: 'Evento', type: 'select', required: true,
         options: activeEvents.map((e) => ({ value: e.id, label: e.name })),
       },
+      {
+        name: 'event_phases', label: 'Fases del evento', type: 'toggle-group',
+        options: [
+          { value: 'armado', label: 'Armado' },
+          { value: 'dia_evento', label: 'Show' },
+          { value: 'desarme', label: 'Desarme' },
+        ],
+        full: true,
+      },
+      { name: 'phase_dates', label: 'Rangos de fecha por fase', type: 'phase-dates', full: true },
     {
       name: 'access_area', label: 'Tipo / Área de acceso', type: 'select', required: true,
       options: zones.map((z) => ({ value: z.value, label: z.label })),
@@ -189,6 +199,9 @@ export default function People() {
     if (!normalized.event_id && normalized.event_ids?.length) {
       normalized.event_id = normalized.event_ids[0];
     }
+    if (Array.isArray(normalized.event_phases)) {
+      normalized.event_phases = normalized.event_phases.join(',');
+    }
     setEditing(normalized);
     setModalOpen(true);
     try {
@@ -198,9 +211,37 @@ export default function People() {
       }
     } catch {}
   };
+  const handleFieldChange = (name, value, setField, formData) => {
+    if (name === 'event_id' || name === 'event_phases') {
+      const eventId = name === 'event_id' ? value : formData?.event_id;
+      const phasesRaw = name === 'event_phases' ? value : formData?.event_phases;
+      const phases = Array.isArray(phasesRaw) ? phasesRaw : (typeof phasesRaw === 'string' ? phasesRaw.split(',').map((s) => s.trim()).filter(Boolean) : []);
+      if (eventId && phases.length > 0) {
+        const evt = events.find((e) => e.id === eventId);
+        if (evt?.start_at) {
+          const startDate = evt.start_at.slice(0, 10);
+          const endDate = (evt.end_at || evt.start_at).slice(0, 10);
+          const existing = formData?.phase_dates || [];
+          const next = phases.map((phase) => {
+            const prev = existing.find((p) => p.phase === phase);
+            if (prev && prev.start_date) return prev;
+            const defaultStart = phase === 'desarme' ? endDate : startDate;
+            const defaultEnd = phase === 'armado' ? startDate : endDate;
+            return { phase, start_date: prev?.start_date || defaultStart, end_date: prev?.end_date || defaultEnd };
+          });
+          setField('phase_dates', next);
+        }
+      } else if (phases.length === 0) {
+        setField('phase_dates', []);
+      }
+    }
+  };
   const handleSubmit = async (data) => {
     const { face_photo_url, face_descriptor, ...personData } = data;
     personData.person_type = personData.access_area || 'general';
+    if (typeof personData.event_phases === 'string') {
+      personData.event_phases = personData.event_phases.split(',').map((s) => s.trim()).filter(Boolean);
+    }
     let personId;
     if (editing) {
       await update(editing.id, personData);
@@ -327,6 +368,7 @@ export default function People() {
         onDelete={editing ? handleDelete : null}
         canDelete={!!editing}
         submitLabel={editing ? 'Guardar cambios' : 'Crear persona'}
+        onFieldChange={handleFieldChange}
       />
 
       {detailPerson && (

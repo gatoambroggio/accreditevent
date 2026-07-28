@@ -6,7 +6,7 @@ import FaceCapture from '@/components/FaceCapture';
 import { findBestMatch } from '@/lib/faceRecognition';
 import { canAccessAnyZone } from '@/lib/accessZones';
 import { useZones } from '@/lib/useZones';
-import { getEventStatus, EVENT_STATUS_INFO, speakResult } from '@/lib/accessUtils';
+import { getEventStatus, EVENT_STATUS_INFO, speakResult, isWithinPhaseDates } from '@/lib/accessUtils';
 
 export default function AccessStation() {
   const [phase, setPhase] = useState('select');
@@ -147,6 +147,17 @@ export default function AccessStation() {
           person_name: accred.person_name,
           access_level: accred.access_level,
           message: `Acceso restringido para la zona: ${zoneLabel}.`,
+        });
+        return;
+      }
+
+      if (!isWithinPhaseDates(accred.phase_dates)) {
+        await logAccess('denied', accred);
+        setResult({
+          ok: false,
+          person_name: accred.person_name,
+          access_level: accred.access_level,
+          message: 'Acceso fuera del rango de fechas autorizado para las fases asignadas.',
         });
         return;
       }

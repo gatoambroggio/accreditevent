@@ -10,6 +10,8 @@ import StatusBadge from '@/components/StatusBadge';
 import { exportToExcel } from '@/lib/exportUtils';
 import { parseServerDate } from '@/lib/formatDate';
 
+const PHASE_LABELS = { armado: 'Armado', dia_evento: 'Show', desarme: 'Desarme' };
+
 export default function RegisteredPeople() {
   const { user } = useAuth();
   const [people, setPeople] = useState([]);
@@ -136,6 +138,7 @@ export default function RegisteredPeople() {
             <Th>Empresa</Th>
             <Th>Email</Th>
             <Th>Evento</Th>
+            <Th>Fases / Fechas</Th>
             <Th>Estado</Th>
             <Th>Registrado</Th>
           </tr>
@@ -152,6 +155,17 @@ export default function RegisteredPeople() {
               <Td className="text-sm text-slate-600">{p.email || '—'}</Td>
               <Td className="text-sm text-slate-600">
                 {p.event_id ? (eventMap[p.event_id]?.name || '—') : '—'}
+              </Td>
+              <Td className="text-xs text-slate-500">
+                {(p.phase_dates && p.phase_dates.length > 0) ? (
+                  <div className="space-y-0.5">
+                    {p.phase_dates.map((pd) => (
+                      <div key={pd.phase}>
+                        <span className="font-semibold text-slate-600">{PHASE_LABELS[pd.phase] || pd.phase}:</span> {pd.start_date || '—'} → {pd.end_date || '—'}
+                      </div>
+                    ))}
+                  </div>
+                ) : '—'}
               </Td>
               <Td><StatusBadge status={p.status} /></Td>
               <Td className="text-xs text-slate-400">

@@ -140,21 +140,63 @@ export default function Accreditations() {
       name: 'access_level', label: 'Área de acceso', type: 'select',
       options: zones.map((z) => ({ value: z.value, label: z.label })),
     },
+    {
+      name: 'event_phases', label: 'Fases del evento', type: 'toggle-group',
+      options: [
+        { value: 'armado', label: 'Armado' },
+        { value: 'dia_evento', label: 'Show' },
+        { value: 'desarme', label: 'Desarme' },
+      ],
+      full: true,
+    },
+    { name: 'phase_dates', label: 'Rangos de fecha por fase', type: 'phase-dates', full: true },
     { name: 'status', label: 'Estado', type: 'select', options: STATUS_OPTIONS },
     { name: 'has_biometric', label: 'Biometría registrada', type: 'checkbox' },
   ];
 
   const openNew = () => { setEditing(null); setModalOpen(true); };
-  const openEdit = (item) => { setEditing({ ...item, access_level: item.access_level || item.area || '' }); setModalOpen(true); };
+  const openEdit = (item) => {
+    const normalized = { ...item, access_level: item.access_level || item.area || '' };
+    if (Array.isArray(normalized.event_phases)) {
+      normalized.event_phases = normalized.event_phases.join(',');
+    }
+    setEditing(normalized);
+    setModalOpen(true);
+  };
 
-  const handleFieldChange = async (name, value, setField) => {
+  const handleFieldChange = async (name, value, setField, formData) => {
     if (name === 'person_id' && value) {
       try {
         const bios = await base44.entities.Biometric.filter({ person_id: value, status: 'active' }, '-created_date', 1);
         setField('has_biometric', bios.length > 0);
         const p = people.find((p) => p.id === value);
         if (p?.access_area) setField('access_level', p.access_area);
+        if (p?.event_phases) setField('event_phases', Array.isArray(p.event_phases) ? p.event_phases.join(',') : p.event_phases);
+        if (p?.phase_dates) setField('phase_dates', p.phase_dates);
       } catch {}
+    }
+    if (name === 'event_id' || name === 'event_phases') {
+      const eventId = name === 'event_id' ? value : formData?.event_id;
+      const phasesRaw = name === 'event_phases' ? value : formData?.event_phases;
+      const phases = Array.isArray(phasesRaw) ? phasesRaw : (typeof phasesRaw === 'string' ? phasesRaw.split(',').map((s) => s.trim()).filter(Boolean) : []);
+      if (eventId && phases.length > 0) {
+        const evt = events.find((e) => e.id === eventId);
+        if (evt?.start_at) {
+          const startDate = evt.start_at.slice(0, 10);
+          const endDate = (evt.end_at || evt.start_at).slice(0, 10);
+          const existing = formData?.phase_dates || [];
+          const next = phases.map((phase) => {
+            const prev = existing.find((p) => p.phase === phase);
+            if (prev && prev.start_date) return prev;
+            const defaultStart = phase === 'desarme' ? endDate : startDate;
+            const defaultEnd = phase === 'armado' ? startDate : endDate;
+            return { phase, start_date: prev?.start_date || defaultStart, end_date: prev?.end_date || defaultEnd };
+          });
+          setField('phase_dates', next);
+        }
+      } else if (phases.length === 0) {
+        setField('phase_dates', []);
+      }
     }
   };
 
@@ -185,6 +227,10 @@ export default function Accreditations() {
       person_email: person?.email || '',
       area: zoneValue,
       access_level: zoneValue,
+      event_phases: typeof data.event_phases === 'string'
+        ? data.event_phases.split(',').map((s) => s.trim()).filter(Boolean)
+        : (data.event_phases || person?.event_phases || []),
+      phase_dates: data.phase_dates?.length ? data.phase_dates : (person?.phase_dates || []),
     };
     if (!editing) {
       enriched.badge_code = generateBadgeCode(person?.person_type, items.map((a) => a.badge_code), typePrefixes);

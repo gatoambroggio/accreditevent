@@ -43,6 +43,40 @@
       "default": "general",
       "description": "Nivel de acceso (coincide con el valor de zona)"
     },
+    "event_phases": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "armado",
+          "dia_evento",
+          "desarme"
+        ]
+      },
+      "default": [],
+      "description": "Fases del evento en las que participa (denormalizado)"
+    },
+    "phase_dates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "phase": {
+            "type": "string"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "default": [],
+      "description": "Rangos de fecha por fase de evento"
+    },
     "status": {
       "type": "string",
       "enum": [

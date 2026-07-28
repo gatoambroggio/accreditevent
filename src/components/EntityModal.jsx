@@ -3,6 +3,7 @@ import { X, Trash2, Loader2, Upload } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import AddressInput from '@/components/AddressInput';
 import FaceCapture from '@/components/FaceCapture';
+import PhaseDatesField from '@/components/PhaseDatesField';
 
 export default function EntityModal({
   open,
@@ -38,7 +39,7 @@ export default function EntityModal({
   const setField = (name, value) => {
     setData((d) => ({ ...d, [name]: value }));
     setErrors((e) => ({ ...e, [name]: undefined }));
-    if (onFieldChange) onFieldChange(name, value, setField);
+    if (onFieldChange) onFieldChange(name, value, setField, data);
   };
 
   const handleSubmit = async (e) => {
@@ -377,6 +378,24 @@ export default function EntityModal({
           ) : (
             <FaceCapture onCaptured={handleFaceCaptured} />
           )}
+        </div>
+      );
+    }
+
+    if (f.type === 'phase-dates') {
+      const phasesRaw = data[f.phasesField || 'event_phases'];
+      const phases = Array.isArray(phasesRaw)
+        ? phasesRaw
+        : (typeof phasesRaw === 'string' ? phasesRaw.split(',').map((s) => s.trim()).filter(Boolean) : []);
+      const phaseDates = data[f.name] || [];
+      return (
+        <div key={f.name} className={f.full ? 'sm:col-span-2' : ''}>
+          <span className="mb-1.5 block text-xs font-semibold text-slate-600">{f.label}</span>
+          <PhaseDatesField
+            phases={phases}
+            phaseDates={phaseDates}
+            onChange={(val) => setField(f.name, val)}
+          />
         </div>
       );
     }
