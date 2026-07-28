@@ -12,6 +12,7 @@ import EmployeeExcelImport from '@/components/empresa/EmployeeExcelImport';
 import SearchInput from '@/components/ui/search-input';
 import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
 import { btnPrimary, btnOutline, btnIcon } from '@/components/ui/button-styles';
+import { generateBadgeCode } from '@/lib/badgeCode';
 
 const DOC_TYPES = {
   dni: 'DNI',
@@ -87,18 +88,63 @@ export default function EmpresaPortal() {
     eventuals: employees.filter((e) => e.employment_type === 'eventual').length,
   }), [employees]);
 
-  const handleSaveEmployee = async (data) => {
-    if (editingEmployee) {
-      const updated = await base44.entities.Person.update(editingEmployee.id, data);
-      setEmployees((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
-      await logAudit('empresa-update-employee', 'Person', updated.id, data.full_name);
-      return updated;
-    } else {
-      const created = await base44.entities.Person.create(data);
-      setEmployees((prev) => [created, ...prev]);
-      await logAudit('empresa-create-employee', 'Person', created.id, data.full_name);
-      return created;
+  const syncAccreditations = async (person, eventIds, accessArea, events) => {
+    const existing = await base44.entities.Accreditation.filter({ person_id: person.id });
+    for (const eventId of eventIds) {
+      const ev = events.find((e) => e.event_id === eventId);
+      if (!ev) continue;
+      const existingAccr = existing.find((a) => a.event_id === eventId);
+      if (existingAccr) {
+        if (accessArea) {
+          await base44.entities.Accreditation.update(existingAccr.id, {
+            access_level: accessArea,
+            person_name: person.full_name,
+            person_type: person.person_type || 'provider',
+          });
+        }
+      } else {
+        const allAccrs = await base44.entities.Accreditation.filter({ event_id: eventId }, '-created_date', 200);
+        const existingCodes = allAccrs.map((a) => a.badge_code).filter(Boolean);
+        const badge_code = generateBadgeCode(person.person_type || 'provider', existingCodes);
+        await base44.entities.Accreditation.create({
+          event_id: eventId,
+          event_name: ev.event_name,
+          company: ev.productora,
+          person_id: person.id,
+          person_name: person.full_name,
+          person_type: person.person_type || 'provider',
+          person_email: person.email || '',
+          badge_code,
+          access_level: accessArea || 'general',
+          status: 'active',
+          has_biometric: false,
+        });
+      }
     }
+    for (const acc of existing) {
+      if (!eventIds.includes(acc.event_id) && acc.status === 'active') {
+        await base44.entities.Accreditation.update(acc.id, { status: 'revoked' });
+      }
+    }
+  };
+
+  const handleSaveEmployee = async (data) => {
+    const firstEvent = approvedEventList.find((e) => e.event_id === data.event_ids?.[0]);
+    const personData = { ...data, productora: firstEvent?.productora || '' };
+    let person;
+    if (editingEmployee) {
+      person = await base44.entities.Person.update(editingEmployee.id, personData);
+      setEmployees((prev) => prev.map((e) => (e.id === person.id ? person : e)));
+      await logAudit('empresa-update-employee', 'Person', person.id, data.full_name);
+    } else {
+      person = await base44.entities.Person.create(personData);
+      setEmployees((prev) => [person, ...prev]);
+      await logAudit('empresa-create-employee', 'Person', person.id, data.full_name);
+    }
+    if (data.event_ids?.length) {
+      try { await syncAccreditations(person, data.event_ids, data.access_area, approvedEventList); } catch {}
+    }
+    return person;
   };
 
   const handleDeleteEmployee = async (emp) => {
@@ -261,7 +307,7 @@ export default function EmpresaPortal() {
             isEmpty={filtered.length === 0}
             emptyIcon={Users}
             emptyMessage={search || filterType !== 'all' ? 'Sin resultados.' : 'No hay empleados cargados. Agregá el primero o importá desde Excel.'}
-            tableClassName="min-w-[760px]"
+            tableClassName="min-w-[840px]"
           >
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
@@ -270,6 +316,7 @@ export default function EmpresaPortal() {
                 <Th>Contacto</Th>
                 <Th>Tipo</Th>
                 <Th>Fases</Th>
+                <Th>Área</Th>
                 <Th>Eventos</Th>
                 <Th />
               </tr>
@@ -301,6 +348,11 @@ export default function EmpresaPortal() {
                           <span key={p} className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">{PHASE_LABELS[p] || p}</span>
                         ))}
                       </div>
+                    ) : '—'}
+                  </Td>
+                  <Td>
+                    {emp.access_area ? (
+                      <span className="rounded bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700 capitalize">{emp.access_area}</span>
                     ) : '—'}
                   </Td>
                   <Td>

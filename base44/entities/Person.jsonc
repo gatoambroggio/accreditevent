@@ -41,6 +41,10 @@
       "default": "fijo",
       "description": "Tipo de contrataci\u00f3n del empleado"
     },
+    "access_area": {
+      "type": "string",
+      "description": "\u00c1rea de acceso asignada (general, backstage, tecnica, vip, etc.)"
+    },
     "event_phases": {
       "type": "array",
       "items": {

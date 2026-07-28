@@ -113,8 +113,8 @@ export default function ProviderCompanies() {
               </Td>
               <Td className="text-right">
                 <div className="inline-flex items-center gap-1">
-                  <button onClick={() => setApprovalModalCompany(c)} className={btnIcon} title="Aprobar para eventos">
-                    <ShieldCheck className="h-3.5 w-3.5" />
+                  <button onClick={() => setApprovalModalCompany(c)} className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50">
+                    <ShieldCheck className="h-3.5 w-3.5" /> Eventos
                   </button>
                   <button onClick={() => openEdit(c)} className={btnIcon}>
                     <Pencil className="h-3.5 w-3.5" />

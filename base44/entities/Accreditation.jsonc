@@ -137,6 +137,11 @@
           "data.event_id": {
             "$in": "{{user.data.assigned_event_ids}}"
           }
+        },
+        {
+          "user_condition": {
+            "role": "empresa"
+          }
         }
       ]
     },
@@ -172,6 +177,11 @@
         {
           "data.event_id": {
             "$in": "{{user.data.assigned_event_ids}}"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "empresa"
           }
         }
       ]

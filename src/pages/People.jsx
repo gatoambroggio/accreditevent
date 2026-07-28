@@ -192,13 +192,14 @@ export default function People() {
         loading={loading}
         isEmpty={filtered.length === 0}
         emptyMessage={query ? 'Sin resultados para tu búsqueda.' : 'No hay personas registradas todavía.'}
-        tableClassName="min-w-[720px]"
+        tableClassName="min-w-[800px]"
       >
         <thead>
           <tr className="border-b border-slate-100 bg-slate-50">
             <Th>Persona</Th>
             <Th>Tipo</Th>
             <Th>Empresa</Th>
+            <Th>Área</Th>
             <Th>Contacto</Th>
             <Th>Estado</Th>
             <Th />
@@ -213,6 +214,11 @@ export default function People() {
               </Td>
               <Td className="text-sm text-slate-500">{personTypes.find((t) => t.value === p.person_type)?.label || p.person_type}</Td>
               <Td className="text-sm text-slate-500">{p.company || '—'}</Td>
+              <Td>
+                {p.access_area ? (
+                  <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700 capitalize">{p.access_area}</span>
+                ) : <span className="text-sm text-slate-400">—</span>}
+              </Td>
               <Td className="text-sm text-slate-500">{p.phone || p.email || '—'}</Td>
               <Td><StatusBadge status={p.status} /></Td>
               <Td className="text-right">

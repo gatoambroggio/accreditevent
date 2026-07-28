@@ -198,9 +198,14 @@ export default function PersonDetailModal({ person, onClose }) {
               )}
               {person.event_phases?.map((p) => (
                 <span key={p} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-                  {{ armado: 'Armado', dia_evento: 'Día', desarme: 'Desarme' }[p] || p}
+                  {{ armado: 'Armado', dia_evento: 'Show', desarme: 'Desarme' }[p] || p}
                 </span>
               ))}
+              {person.access_area && (
+                <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 ring-1 ring-inset ring-indigo-200 capitalize">
+                  {person.access_area}
+                </span>
+              )}
             </div>
           </div>
           <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">

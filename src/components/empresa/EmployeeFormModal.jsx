@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, UserPlus, FileImage, ScanFace, CheckCircle2, FileText, CalendarDays } from 'lucide-react';
+import { X, Loader2, UserPlus, FileImage, ScanFace, CheckCircle2, FileText, CalendarDays, MapPin } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Image } from '@/components/ui/image';
 import FaceCapture from '@/components/FaceCapture';
+import { useZones } from '@/lib/useZones';
 
-const EMPTY = { first_name: '', last_name: '', document: '', phone: '', employment_type: 'fijo', event_phases: [], event_ids: [], notes: '' };
+const EMPTY = { first_name: '', last_name: '', document: '', phone: '', employment_type: 'fijo', access_area: '', event_phases: [], event_ids: [], notes: '' };
 const normalizeType = (v) => (v === 'eventual' || v === 'esporadico' ? 'eventual' : 'fijo');
 
 const PHASES = [
@@ -22,6 +23,7 @@ function buildForm(editing) {
     document: editing.document || '',
     phone: editing.phone || '',
     employment_type: normalizeType(editing.employment_type),
+    access_area: editing.access_area || '',
     event_phases: Array.isArray(editing.event_phases) ? editing.event_phases : [],
     event_ids: Array.isArray(editing.event_ids) ? editing.event_ids : [],
     notes: editing.notes || '',
@@ -29,6 +31,7 @@ function buildForm(editing) {
 }
 
 export default function EmployeeFormModal({ open, onClose, onSubmit, editing, companyName, approvedEvents = [] }) {
+  const { zones } = useZones();
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
@@ -97,6 +100,7 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
         document: form.document,
         phone: form.phone,
         employment_type: form.employment_type,
+        access_area: form.access_area,
         event_phases: form.event_phases,
         event_ids: form.event_ids,
         event_names,
@@ -205,24 +209,31 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
                 <option value="eventual">Eventual</option>
               </select>
             </label>
-            <div>
-              <span className="mb-1.5 block text-xs font-semibold text-slate-600">Fases del evento</span>
-              <div className="flex flex-wrap gap-1.5">
-                {PHASES.map(({ value, label }) => {
-                  const active = form.event_phases.includes(value);
-                  return (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => togglePhase(value)}
-                      className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}
-                    >
-                      {active && <CheckCircle2 className="mr-1 inline h-3 w-3" />}
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
+            <label className="block">
+              <span className="mb-1.5 flex items-center gap-1 text-xs font-semibold text-slate-600"><MapPin className="h-3 w-3" /> Área de acceso</span>
+              <select value={form.access_area} onChange={(e) => setField('access_area', e.target.value)} className={inputCls}>
+                <option value="">Sin asignar</option>
+                {zones.map((z) => (<option key={z.value} value={z.value}>{z.label}</option>))}
+              </select>
+            </label>
+          </div>
+          <div>
+            <span className="mb-1.5 block text-xs font-semibold text-slate-600">Fases del evento</span>
+            <div className="flex flex-wrap gap-1.5">
+              {PHASES.map(({ value, label }) => {
+                const active = form.event_phases.includes(value);
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => togglePhase(value)}
+                    className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}
+                  >
+                    {active && <CheckCircle2 className="mr-1 inline h-3 w-3" />}
+                    {label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -232,7 +243,7 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
               <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
                 <CalendarDays className="h-4 w-4" /> Eventos asignados
               </p>
-              <p className="mb-3 text-xs text-slate-400">Seleccioná a qué eventos va a asistir este empleado.</p>
+              <p className="mb-3 text-xs text-slate-400">Seleccioná a qué eventos va a asistir este empleado. Se generará la acreditación automáticamente con el área de acceso seleccionada.</p>
               <div className="flex flex-wrap gap-1.5">
                 {approvedEvents.map((ev) => {
                   const active = form.event_ids.includes(ev.event_id);

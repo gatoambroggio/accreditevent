@@ -12,12 +12,15 @@ export default function EventApprovalModal({ providerCompany, onClose }) {
   const [saving, setSaving] = useState(null);
 
   const productoraCompany = user?.data?.company || user?.company || '';
+  const isAdmin = ['admin', 'superadmin'].includes(user?.data?.role || user?.role);
 
   useEffect(() => {
     (async () => {
       try {
         const [evts, apprs] = await Promise.all([
-          base44.entities.Event.filter({ company: productoraCompany }, '-start_at', 100),
+          isAdmin
+            ? base44.entities.Event.list('-start_at', 200)
+            : base44.entities.Event.filter({ company: productoraCompany }, '-start_at', 100),
           base44.entities.EventCompanyApproval.filter({ provider_company: providerCompany.name }),
         ]);
         setEvents(evts);
@@ -43,7 +46,7 @@ export default function EventApprovalModal({ providerCompany, onClose }) {
         const created = await base44.entities.EventCompanyApproval.create({
           event_id: event.id,
           event_name: event.name,
-          company: productoraCompany,
+          company: event.company || productoraCompany,
           provider_company: providerCompany.name,
           status,
           approved_by: user?.full_name || user?.email,
