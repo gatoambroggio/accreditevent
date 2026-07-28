@@ -32,6 +32,7 @@ export default function BiometricButton({ accreditation, onRegistered }) {
         person_id: accreditation.person_id,
         person_name: accreditation.person_name,
         event_id: accreditation.event_id,
+        company: accreditation.company || '',
         face_photo_url: file_url,
         face_descriptor: descriptor,
         status: 'active',
