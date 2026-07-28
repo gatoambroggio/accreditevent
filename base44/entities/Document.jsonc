@@ -4,7 +4,7 @@
   "properties": {
     "person_id": {
       "type": "string",
-      "description": "Persona due\u00f1a del documento"
+      "description": "Persona due\u00f1a del documento (opcional para documentos a nivel de empresa)"
     },
     "person_name": {
       "type": "string",
@@ -74,7 +74,6 @@
     }
   },
   "required": [
-    "person_id",
     "document_type",
     "original_name",
     "file_url"
@@ -102,6 +101,18 @@
             {
               "user_condition": {
                 "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "empresa"
               }
             },
             {
@@ -141,6 +152,18 @@
             {
               "user_condition": {
                 "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "empresa"
               }
             },
             {
@@ -190,6 +213,18 @@
           ]
         },
         {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "empresa"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
           "data.event_id": {
             "$in": "{{user.data.assigned_event_ids}}"
           }
@@ -221,6 +256,18 @@
             {
               "user_condition": {
                 "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "empresa"
               }
             },
             {
