@@ -191,30 +191,35 @@ export default function Accreditations() {
       }
     }
     const evt = events.find((e) => e.id === data.event_id);
-    const person = people.find((p) => p.id === data.person_id);
+    let person = people.find((p) => p.id === data.person_id);
+    if (!person && data.person_id) {
+      try { person = await base44.entities.Person.get(data.person_id); } catch {}
+    }
     const zoneValue = person?.access_area || data.access_level || 'general';
     const phasesFromForm = typeof data.event_phases === 'string'
       ? data.event_phases.split(',').map((s) => s.trim()).filter(Boolean)
       : (Array.isArray(data.event_phases) ? data.event_phases : []);
     const personPhases = Array.isArray(person?.event_phases) ? person.event_phases : [];
-    const enriched = {
-      ...data,
+    const finalPhases = phasesFromForm.length > 0 ? phasesFromForm : personPhases;
+    const payload = {
+      event_id: data.event_id,
+      person_id: data.person_id,
       event_name: evt?.name || '',
       company: evt?.company || '',
       person_name: person?.full_name || '',
       person_type: zoneValue,
       person_email: person?.email || '',
+      badge_code: editing ? data.badge_code : generateBadgeCode(person?.person_type, items.map((a) => a.badge_code), typePrefixes),
       area: zoneValue,
       access_level: zoneValue,
-      event_phases: phasesFromForm.length > 0 ? phasesFromForm : personPhases,
+      event_phases: finalPhases,
+      status: data.status || 'active',
+      has_biometric: data.has_biometric || false,
     };
-    if (!editing) {
-      enriched.badge_code = generateBadgeCode(person?.person_type, items.map((a) => a.badge_code), typePrefixes);
-    }
     if (editing) {
-      await update(editing.id, enriched);
+      await update(editing.id, payload);
     } else {
-      await create(enriched);
+      await create(payload);
       if (evt?.pickup_address) {
         const mapsUrl = evt.pickup_lat && evt.pickup_lng
           ? `https://www.google.com/maps?q=${evt.pickup_lat},${evt.pickup_lng}`
