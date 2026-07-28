@@ -190,6 +190,18 @@ export default function PersonDetailModal({ person, onClose }) {
             <p className="font-mono text-[10px] font-medium uppercase tracking-wider text-emerald-600">DOCUMENTACIÓN</p>
             <h2 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900">{person.full_name}</h2>
             <p className="mt-0.5 text-xs text-slate-400">{person.document || 'Sin documento'} · {person.company || 'Sin empresa'}</p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {person.employment_type && (
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${person.employment_type === 'eventual' ? 'bg-amber-50 text-amber-700 ring-amber-200' : 'bg-emerald-50 text-emerald-700 ring-emerald-200'}`}>
+                  {person.employment_type === 'eventual' ? 'Eventual' : 'Fijo'}
+                </span>
+              )}
+              {person.event_phases?.map((p) => (
+                <span key={p} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                  {{ armado: 'Armado', dia_evento: 'Día', desarme: 'Desarme' }[p] || p}
+                </span>
+              ))}
+            </div>
           </div>
           <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
             <X className="h-5 w-5" />

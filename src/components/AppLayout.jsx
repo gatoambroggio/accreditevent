@@ -41,7 +41,7 @@ const NAV_ITEMS = [
   // Personas y proveedores
   { path: '/people', label: 'Personas', icon: Users, minLevel: 1 },
   { path: '/registered-people', label: 'Personas registradas', icon: UserSearch, minLevel: 1 },
-  { path: '/provider-companies', label: 'Empresas proveedoras', icon: Briefcase, minLevel: 1 },
+  { path: '/provider-companies', label: 'Empresas de servicios', icon: Briefcase, minLevel: 1 },
   // Acreditaciones
   { path: '/accreditations', label: 'Acreditaciones', icon: IdCard, minLevel: 0 },
   { path: '/access-levels', label: 'Niveles de acceso', icon: Layers, minLevel: 1 },
