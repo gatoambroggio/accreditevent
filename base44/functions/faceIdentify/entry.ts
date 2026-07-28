@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 
 const BATCH_SIZE = 8;
+const CONFIDENCE_THRESHOLD = 0.7;
 
 export default async function (req) {
   try {
@@ -9,15 +10,20 @@ export default async function (req) {
     if (!user) return Response.json({ error: 'No autorizado' }, { status: 401 });
 
     const body = await req.json();
-    const { captured_photo_url } = body;
+    const { captured_photo_url, event_id } = body;
 
     if (!captured_photo_url) {
-      return Response.json({ error: 'Faltan parámetros' }, { status: 400 });
+      return Response.json({ error: 'Faltan parámetros: captured_photo_url es obligatorio.' }, { status: 400 });
     }
 
-    // Get all active biometrics with face photos
+    // Build the biometric query filter — scope by event_id if provided
+    const bioFilter = { status: 'active' };
+    if (event_id) {
+      bioFilter.event_id = event_id;
+    }
+
     const bios = await base44.asServiceRole.entities.Biometric.filter(
-      { status: 'active' },
+      bioFilter,
       '-created_date',
       500
     );
@@ -26,22 +32,38 @@ export default async function (req) {
     if (withPhotos.length === 0) {
       return Response.json({
         verified: false,
-        message: 'No hay rostros registrados en el sistema.',
+        message: 'No hay rostros registrados en el sistema para este evento.',
       });
     }
 
-    // Get all active accreditations (for access check)
+    // Get active accreditations — scope by event_id if provided
+    const accredFilter = { status: 'active' };
+    if (event_id) {
+      accredFilter.event_id = event_id;
+    }
     const accreditations = await base44.asServiceRole.entities.Accreditation.filter(
-      { status: 'active' },
+      accredFilter,
       '-created_date',
       500
     );
 
+    // Build set of person_ids that have an active accreditation
+    const accreditedPersonIds = new Set(accreditations.map((a) => a.person_id));
+
+    // Only attempt to match biometrics belonging to accredited persons
+    const matchableBios = withPhotos.filter((b) => accreditedPersonIds.has(b.person_id));
+    if (matchableBios.length === 0) {
+      return Response.json({
+        verified: false,
+        message: 'No hay personas acreditadas con biometría registrada para este evento.',
+      });
+    }
+
     // Batch identification: send captured photo + up to BATCH_SIZE stored photos
     let matchedBiometric = null;
 
-    for (let i = 0; i < withPhotos.length; i += BATCH_SIZE) {
-      const batch = withPhotos.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < matchableBios.length; i += BATCH_SIZE) {
+      const batch = matchableBios.slice(i, i + BATCH_SIZE);
       const fileUrls = [captured_photo_url, ...batch.map((b) => b.face_photo_url)];
 
       const prompt =
@@ -83,7 +105,7 @@ export default async function (req) {
 
       const matchIndex = Number(result.match_index) || 0;
       const confidence = Number(result.confidence) || 0;
-      if (matchIndex >= 2 && confidence >= 0.7) {
+      if (matchIndex >= 2 && confidence >= CONFIDENCE_THRESHOLD) {
         matchedBiometric = batch[matchIndex - 2];
         if (matchedBiometric) break;
       }
@@ -96,7 +118,7 @@ export default async function (req) {
       });
     }
 
-    // Find the active accreditation for this person
+    // Find the active accreditation for this person (already filtered to active + event_id)
     const accred = accreditations.find((a) => a.person_id === matchedBiometric.person_id);
     if (!accred) {
       return Response.json({
