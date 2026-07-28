@@ -28,7 +28,42 @@
     "name"
   ],
   "rls": {
-    "read": {},
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "productora"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "empresa"
+              }
+            },
+            {
+              "data.name": "{{user.company}}"
+            }
+          ]
+        }
+      ]
+    },
     "create": {
       "$or": [
         {
@@ -74,6 +109,18 @@
           "user_condition": {
             "role": "coordinator"
           }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "empresa"
+              }
+            },
+            {
+              "data.name": "{{user.company}}"
+            }
+          ]
         }
       ]
     },
