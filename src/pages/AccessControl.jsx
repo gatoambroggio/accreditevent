@@ -121,28 +121,6 @@ export default function AccessControl({ standalone = false }) {
     setVerifying(true);
     setResult(null);
     try {
-      if (!descriptor) {
-        const me = await base44.auth.me();
-        await base44.entities.AccessLog.create({
-          accreditation_id: found.id,
-          person_name: found.person_name,
-          badge_code: found.badge_code,
-          event_name: found.event_name,
-          event_id: found.event_id,
-          company: found.company,
-          verified_by: me?.full_name || me?.email || 'Sistema',
-          method: 'biometric',
-          zone: selectedZones.join(', '),
-          result: 'denied',
-          access_level: found.access_level,
-        });
-        setResult({ ok: false, message: 'No se detectó un rostro humano en la captura.', accred: found });
-        setFound(null);
-        setBadgeCode('');
-        await loadRecent();
-        return;
-      }
-
       // Fetch the stored biometric for this person
       const bios = await base44.entities.Biometric.filter(
         { person_id: found.person_id, status: 'active' },
@@ -150,7 +128,7 @@ export default function AccessControl({ standalone = false }) {
         1
       );
 
-      if (bios.length === 0 || !bios[0].face_descriptor) {
+      if (bios.length === 0) {
         const me = await base44.auth.me();
         await base44.entities.AccessLog.create({
           accreditation_id: found.id,
@@ -165,18 +143,24 @@ export default function AccessControl({ standalone = false }) {
           result: 'denied',
           access_level: found.access_level,
         });
-        setResult({ ok: false, message: 'Sin descriptor facial registrado para esta persona.', accred: found });
+        setResult({ ok: false, message: 'Sin biometría registrada para esta persona.', accred: found });
         setFound(null);
         setBadgeCode('');
         await loadRecent();
         return;
       }
 
-      // Compare descriptors client-side (real face recognition algorithm)
-      const distance = compareDescriptors(descriptor, bios[0].face_descriptor);
-      const isMatch = distance < MATCH_THRESHOLD;
+      const storedBio = bios[0];
 
-      if (isMatch) {
+      // Try fast client-side descriptor comparison first
+      let descriptorMatch = false;
+      if (descriptor && storedBio.face_descriptor && storedBio.face_descriptor.length > 0) {
+        const distance = compareDescriptors(descriptor, storedBio.face_descriptor);
+        descriptorMatch = distance < MATCH_THRESHOLD;
+      }
+
+      // If descriptor matched, handle zone check + log locally
+      if (descriptorMatch) {
         const me = await base44.auth.me();
         const zoneLabel = selectedZones.map((z) => zones.find((zz) => zz.value === z)?.label || z).join(', ');
         if (!canAccessAnyZone(found.access_level, selectedZones)) {
@@ -186,7 +170,7 @@ export default function AccessControl({ standalone = false }) {
             badge_code: found.badge_code,
             event_name: found.event_name,
             event_id: found.event_id,
-          company: found.company,
+            company: found.company,
             verified_by: me?.full_name || me?.email || 'Sistema',
             method: 'biometric',
             zone: selectedZones.join(', '),
@@ -194,30 +178,44 @@ export default function AccessControl({ standalone = false }) {
             access_level: found.access_level,
           });
           setResult({ ok: false, message: `Acceso restringido para la zona: ${zoneLabel}.`, accred: found });
-          setFound(null);
-          setBadgeCode('');
-          await loadRecent();
-          return;
+        } else {
+          await base44.entities.AccessLog.create({
+            accreditation_id: found.id,
+            person_name: found.person_name,
+            badge_code: found.badge_code,
+            event_name: found.event_name,
+            event_id: found.event_id,
+            company: found.company,
+            verified_by: me?.full_name || me?.email || 'Sistema',
+            method: 'biometric',
+            zone: selectedZones.join(', '),
+            result: 'granted',
+            access_level: found.access_level,
+          });
+          setResult({ ok: true, method: 'biometric', accred: found });
         }
-        await base44.entities.AccessLog.create({
-          accreditation_id: found.id,
-          person_name: found.person_name,
-          badge_code: found.badge_code,
-          event_name: found.event_name,
-          event_id: found.event_id,
-          company: found.company,
-          verified_by: me?.full_name || me?.email || 'Sistema',
-          method: 'biometric',
-          zone: selectedZones.join(', '),
-          result: 'granted',
-          access_level: found.access_level,
-        });
-        setResult({ ok: true, method: 'biometric', accred: found });
         setFound(null);
         setBadgeCode('');
         await loadRecent();
-      } else {
+        return;
+      }
+
+      // Descriptor didn't match or no descriptor — fall back to LLM visual comparison
+      // (handles DNI-based biometrics where descriptor quality may be poor)
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const verifyRes = await base44.functions.invoke('faceVerify', {
+        accreditation_id: found.id,
+        captured_photo_url: file_url,
+      });
+      const llmVerified = verifyRes.data?.verified === true;
+
+      if (llmVerified && canAccessAnyZone(found.access_level, selectedZones)) {
+        // faceVerify already logged 'granted'
+        setResult({ ok: true, method: 'biometric', accred: found });
+      } else if (llmVerified) {
+        // Face matched but zone denied — log the zone denial
         const me = await base44.auth.me();
+        const zoneLabel = selectedZones.map((z) => zones.find((zz) => zz.value === z)?.label || z).join(', ');
         await base44.entities.AccessLog.create({
           accreditation_id: found.id,
           person_name: found.person_name,
@@ -231,15 +229,19 @@ export default function AccessControl({ standalone = false }) {
           result: 'denied',
           access_level: found.access_level,
         });
+        setResult({ ok: false, message: `Acceso restringido para la zona: ${zoneLabel}.`, accred: found });
+      } else {
+        // faceVerify already logged 'denied'
         setResult({
           ok: false,
-          message: `El rostro no coincide con el registrado (distancia: ${distance.toFixed(2)}).`,
+          message: verifyRes.data?.reason || 'El rostro no coincide con el registrado.',
           accred: found,
         });
-        setFound(null);
-        setBadgeCode('');
-        await loadRecent();
       }
+
+      setFound(null);
+      setBadgeCode('');
+      await loadRecent();
     } catch (err) {
       setResult({ ok: false, message: err.message || 'Error en la verificación.' });
     } finally {
