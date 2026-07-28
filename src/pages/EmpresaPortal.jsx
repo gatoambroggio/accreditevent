@@ -75,7 +75,7 @@ export default function EmpresaPortal() {
   const stats = useMemo(() => ({
     total: employees.length,
     fijos: employees.filter((e) => (e.employment_type || 'fijo') === 'fijo').length,
-    esporadicos: employees.filter((e) => e.employment_type === 'esporadico').length,
+    eventuals: employees.filter((e) => e.employment_type === 'eventual').length,
   }), [employees]);
 
   const handleSaveEmployee = async (data) => {
@@ -197,8 +197,8 @@ export default function EmpresaPortal() {
               <p className="text-xl font-bold text-white">{stats.fijos}</p>
             </div>
             <div className="rounded-lg bg-white/10 px-4 py-2">
-              <p className="font-mono text-[10px] uppercase tracking-wider text-emerald-300">Esporádicos</p>
-              <p className="text-xl font-bold text-white">{stats.esporadicos}</p>
+              <p className="font-mono text-[10px] uppercase tracking-wider text-emerald-300">Eventuales</p>
+              <p className="text-xl font-bold text-white">{stats.eventuals}</p>
             </div>
           </div>
         </div>
@@ -232,7 +232,7 @@ export default function EmpresaPortal() {
             <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-500">
               <option value="all">Todos</option>
               <option value="fijo">Fijos</option>
-              <option value="esporadico">Esporádicos</option>
+              <option value="eventual">Eventuales</option>
             </select>
           </div>
 
@@ -266,7 +266,7 @@ export default function EmpresaPortal() {
                   </Td>
                   <Td>
                     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${(emp.employment_type || 'fijo') === 'fijo' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-amber-50 text-amber-700 ring-amber-200'}`}>
-                      {(emp.employment_type || 'fijo') === 'fijo' ? 'Fijo' : 'Esporádico'}
+                      {(emp.employment_type || 'fijo') === 'fijo' ? 'Fijo' : 'Eventual'}
                     </span>
                   </Td>
                   <Td className="text-right">

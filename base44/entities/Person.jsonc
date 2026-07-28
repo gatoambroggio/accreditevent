@@ -36,7 +36,7 @@
       "type": "string",
       "enum": [
         "fijo",
-        "esporadico"
+        "eventual"
       ],
       "default": "fijo",
       "description": "Tipo de contrataci\u00f3n del empleado"

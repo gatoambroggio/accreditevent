@@ -1,24 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Loader2, UserPlus } from 'lucide-react';
+
+const EMPTY = { first_name: '', last_name: '', document: '', phone: '', employment_type: 'fijo', notes: '' };
 
 export default function EmployeeFormModal({ open, onClose, onSubmit, editing, companyName }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [form, setForm] = useState(() => {
+  const [form, setForm] = useState(EMPTY);
+
+  useEffect(() => {
+    if (!open) return;
     if (editing) {
       const parts = (editing.full_name || '').split(' ');
-      return {
+      setForm({
         first_name: parts[0] || '',
         last_name: parts.slice(1).join(' '),
         document: editing.document || '',
         phone: editing.phone || '',
-        email: editing.email || '',
         employment_type: editing.employment_type || 'fijo',
         notes: editing.notes || '',
-      };
+      });
+    } else {
+      setForm(EMPTY);
     }
-    return { first_name: '', last_name: '', document: '', phone: '', email: '', employment_type: 'fijo', notes: '' };
-  });
+  }, [editing, open]);
 
   const setField = (name, value) => setForm((f) => ({ ...f, [name]: value }));
 
@@ -36,7 +41,6 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
         full_name,
         document: form.document,
         phone: form.phone,
-        email: form.email,
         employment_type: form.employment_type,
         notes: form.notes,
         company: companyName,
@@ -94,14 +98,10 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
             </label>
           </div>
           <label className="block">
-            <span className="mb-1.5 block text-xs font-semibold text-slate-600">Email</span>
-            <input value={form.email} onChange={(e) => setField('email', e.target.value)} type="email" className={inputCls} placeholder="empleado@email.com" />
-          </label>
-          <label className="block">
             <span className="mb-1.5 block text-xs font-semibold text-slate-600">Tipo de contratación</span>
             <select value={form.employment_type} onChange={(e) => setField('employment_type', e.target.value)} className={inputCls}>
               <option value="fijo">Fijo</option>
-              <option value="esporadico">Esporádico</option>
+              <option value="eventual">Eventual</option>
             </select>
           </label>
           <label className="block">

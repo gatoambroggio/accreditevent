@@ -13,8 +13,8 @@ export default function EmployeeExcelImport({ open, onClose, onImport, companyNa
   if (!open) return null;
 
   const downloadTemplate = () => {
-    const headers = ['Nombre', 'Apellido', 'Documento', 'Telefono', 'Email', 'Tipo (Fijo/Esporadico)'];
-    const example = ['Juan', 'Pérez', '12345678', '11 12345678', 'juan@email.com', 'Fijo'];
+    const headers = ['Nombre', 'Apellido', 'Documento', 'Telefono', 'Tipo (Fijo/Eventual)'];
+    const example = ['Juan', 'Pérez', '12345678', '11 12345678', 'Fijo'];
     const ws = XLSX.utils.aoa_to_sheet([headers, example]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Empleados');
@@ -35,13 +35,12 @@ export default function EmployeeExcelImport({ open, onClose, onImport, companyNa
       const mapped = data.map((row) => {
         const nombre = String(row['Nombre'] || row['nombre'] || '').trim();
         const apellido = String(row['Apellido'] || row['apellido'] || '').trim();
-        const tipoRaw = String(row['Tipo'] || row['Tipo (Fijo/Esporadico)'] || row['tipo'] || '').toLowerCase().trim();
+        const tipoRaw = String(row['Tipo'] || row['Tipo (Fijo/Eventual)'] || row['tipo'] || '').toLowerCase().trim();
         return {
           full_name: `${nombre} ${apellido}`.trim(),
           document: String(row['Documento'] || row['documento'] || row['DNI'] || row['dni'] || '').replace(/\D/g, ''),
           phone: String(row['Telefono'] || row['Teléfono'] || row['telefono'] || '').trim(),
-          email: String(row['Email'] || row['email'] || row['Correo'] || '').trim(),
-          employment_type: tipoRaw.startsWith('esp') ? 'esporadico' : 'fijo',
+          employment_type: tipoRaw.startsWith('eve') ? 'eventual' : 'fijo',
           company: companyName,
           person_type: 'provider',
           status: 'active',
@@ -80,8 +79,6 @@ export default function EmployeeExcelImport({ open, onClose, onImport, companyNa
     if (fileRef.current) fileRef.current.value = '';
     onClose();
   };
-
-  const inputCls = 'w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20';
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-sm sm:p-6">
@@ -152,7 +149,7 @@ export default function EmployeeExcelImport({ open, onClose, onImport, companyNa
                             <td className="px-3 py-2 text-sm text-slate-500">{r.phone || '—'}</td>
                             <td className="px-3 py-2">
                               <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${r.employment_type === 'fijo' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
-                                {r.employment_type === 'fijo' ? 'Fijo' : 'Esporádico'}
+                                {r.employment_type === 'fijo' ? 'Fijo' : 'Eventual'}
                               </span>
                             </td>
                           </tr>
