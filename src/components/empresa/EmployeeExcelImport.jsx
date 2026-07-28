@@ -13,8 +13,8 @@ export default function EmployeeExcelImport({ open, onClose, onImport, companyNa
   if (!open) return null;
 
   const downloadTemplate = () => {
-    const headers = ['Nombre', 'Apellido', 'Documento', 'Telefono', 'Tipo (Fijo/Eventual)', 'Fases (Armado/Show/Desarme)'];
-    const example = ['Juan', 'Pérez', '12345678', '11 12345678', 'Fijo', 'Armado, Show'];
+    const headers = ['Nombre', 'Apellido', 'Documento', 'Telefono', 'Tipo (Fijo/Eventual)', 'Área de acceso', 'Fases (Armado/Show/Desarme)'];
+    const example = ['Juan', 'Pérez', '12345678', '11 12345678', 'Fijo', 'general', 'Armado, Show'];
     const ws = XLSX.utils.aoa_to_sheet([headers, example]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Empleados');
@@ -46,9 +46,10 @@ export default function EmployeeExcelImport({ open, onClose, onImport, companyNa
           document: String(row['Documento'] || row['documento'] || row['DNI'] || row['dni'] || '').replace(/\D/g, ''),
           phone: String(row['Telefono'] || row['Teléfono'] || row['telefono'] || '').trim(),
           employment_type: tipoRaw.startsWith('eve') ? 'eventual' : 'fijo',
+          access_area: String(row['Área de acceso'] || row['Área'] || row['area'] || 'general').trim().toLowerCase(),
           event_phases,
           company: companyName,
-          person_type: 'provider',
+          person_type: String(row['Área de acceso'] || row['Área'] || row['area'] || 'general').trim().toLowerCase(),
           status: 'active',
         };
       }).filter((r) => r.full_name);

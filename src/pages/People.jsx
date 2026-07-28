@@ -3,7 +3,6 @@ import { useCrud } from '@/lib/crud';
 import { Plus, Pencil, Download } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
 import { base44 } from '@/api/base44Client';
-import { usePersonTypes } from '@/lib/usePersonTypes';
 import { useZones } from '@/lib/useZones';
 import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
@@ -19,7 +18,7 @@ import { usePagination } from '@/lib/usePagination';
 const validatePerson = (data) => {
   const e = {};
   if (!data.full_name?.trim()) e.full_name = 'El nombre es obligatorio';
-  if (!data.person_type) e.person_type = 'Seleccioná un tipo';
+  if (!data.access_area) e.access_area = 'Seleccioná un área';
   if (!data.document?.trim()) e.document = 'El documento es obligatorio';
   else if (!/^\d{7,8}$/.test(data.document.trim())) e.document = 'Debe tener 7 u 8 dígitos numéricos';
   if (!data.company?.trim()) e.company = 'La empresa es obligatoria';
@@ -39,12 +38,11 @@ const STATUS_OPTIONS = [
 
 export default function People() {
   const { items, loading, error, create, update, remove, reload } = useCrud('Person');
-  const { personTypes } = usePersonTypes();
   const { zones } = useZones();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [query, setQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
+  const [areaFilter, setAreaFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [companyFilter, setCompanyFilter] = useState('');
   const [detailPerson, setDetailPerson] = useState(null);
@@ -72,20 +70,20 @@ export default function People() {
         `${p.full_name} ${p.company || ''} ${p.document || ''}`.toLowerCase().includes(q)
       );
     }
-    if (typeFilter) result = result.filter((p) => p.person_type === typeFilter);
+    if (areaFilter) result = result.filter((p) => p.access_area === areaFilter);
     if (statusFilter) result = result.filter((p) => p.status === statusFilter);
     if (companyFilter) result = result.filter((p) => p.company === companyFilter);
     return result;
-  }, [items, query, typeFilter, statusFilter, companyFilter]);
+  }, [items, query, areaFilter, statusFilter, companyFilter]);
 
   const { page, setPage, totalPages, paginated } = usePagination(filtered, 15);
 
   const handleExport = () => {
     exportToExcel(
-      ['Nombre', 'Tipo', 'Documento', 'Empresa', 'Teléfono', 'Email', 'Estado', 'Notas'],
+      ['Nombre', 'Área', 'Documento', 'Empresa', 'Teléfono', 'Email', 'Estado', 'Notas'],
       filtered.map((p) => [
         p.full_name || '',
-        personTypes.find((t) => t.value === p.person_type)?.label || p.person_type || '',
+        zones.find((z) => z.value === p.access_area)?.label || p.access_area || '',
         p.document || '',
         p.company || '',
         p.phone || '',
@@ -121,11 +119,7 @@ export default function People() {
         options: activeEvents.map((e) => ({ value: e.id, label: e.name })),
       },
     {
-      name: 'person_type', label: 'Tipo', type: 'select', required: true,
-      options: personTypes.map((t) => ({ value: t.value, label: t.label })),
-    },
-    {
-      name: 'access_area', label: 'Área de acceso', type: 'select',
+      name: 'access_area', label: 'Tipo / Área de acceso', type: 'select', required: true,
       options: zones.map((z) => ({ value: z.value, label: z.label })),
     },
     { name: 'document', label: 'Documento', type: 'dni', required: true, placeholder: 'Ej: 12345678' },
@@ -140,7 +134,7 @@ export default function People() {
       { name: 'notes', label: 'Notas', type: 'textarea', full: true, placeholder: 'Ej: Responsable de montaje audiovisual' },
       { name: '_face', label: 'Registro facial', type: 'face-capture', full: true },
     ];
-  }, [personTypes, zones, events, editing, companies]);
+  }, [zones, events, editing, companies]);
 
   const openNew = () => { setEditing(null); setModalOpen(true); };
   const openEdit = async (item) => {
@@ -159,6 +153,7 @@ export default function People() {
   };
   const handleSubmit = async (data) => {
     const { face_photo_url, face_descriptor, ...personData } = data;
+    personData.person_type = personData.access_area || 'general';
     let personId;
     if (editing) {
       await update(editing.id, personData);
@@ -203,7 +198,7 @@ export default function People() {
 
       <div className="flex flex-wrap items-center gap-3">
         <SearchInput value={query} onChange={setQuery} placeholder="Buscar por nombre, empresa o documento…" />
-        <FilterSelect value={typeFilter} onChange={setTypeFilter} options={personTypes.map((t) => ({ value: t.value, label: t.label }))} placeholder="Todos los tipos" />
+        <FilterSelect value={areaFilter} onChange={setAreaFilter} options={zones.map((z) => ({ value: z.value, label: z.label }))} placeholder="Todas las áreas" />
         <FilterSelect value={companyFilter} onChange={setCompanyFilter} options={companies.map((c) => ({ value: c.name, label: c.name }))} placeholder="Todas las empresas" />
         <FilterSelect value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} placeholder="Todos los estados" />
       </div>
@@ -218,9 +213,8 @@ export default function People() {
         <thead>
           <tr className="border-b border-slate-100 bg-slate-50">
             <Th>Persona</Th>
-            <Th>Tipo</Th>
+            <Th>Tipo / Área</Th>
             <Th>Empresa</Th>
-            <Th>Área</Th>
             <Th>Contacto</Th>
             <Th>Estado</Th>
             <Th />
@@ -233,13 +227,12 @@ export default function People() {
                 <button onClick={() => setDetailPerson(p)} className="text-left text-sm font-semibold text-slate-900 hover:text-emerald-600">{p.full_name}</button>
                 <p className="text-xs text-slate-400">{p.document || 'Sin documento'}</p>
               </Td>
-              <Td className="text-sm text-slate-500">{personTypes.find((t) => t.value === p.person_type)?.label || p.person_type}</Td>
-              <Td className="text-sm text-slate-500">{p.company || '—'}</Td>
               <Td>
                 {p.access_area ? (
-                  <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700 capitalize">{p.access_area}</span>
+                  <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700">{zones.find((z) => z.value === p.access_area)?.label || p.access_area}</span>
                 ) : <span className="text-sm text-slate-400">—</span>}
               </Td>
+              <Td className="text-sm text-slate-500">{p.company || '—'}</Td>
               <Td className="text-sm text-slate-500">{p.phone || p.email || '—'}</Td>
               <Td><StatusBadge status={p.status} /></Td>
               <Td className="text-right">

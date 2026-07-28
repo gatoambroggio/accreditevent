@@ -172,6 +172,7 @@ export default function EmpresaPortal() {
       event_ids: eventIds,
       event_names: eventNames,
       access_area: r.access_area || 'general',
+      person_type: r.access_area || 'general',
       productora,
     }));
     const created = await base44.entities.Person.bulkCreate(enrichedRows);

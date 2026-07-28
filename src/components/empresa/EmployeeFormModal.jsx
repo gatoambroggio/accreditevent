@@ -106,7 +106,7 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
         event_names,
         notes: form.notes,
         company: companyName,
-        person_type: 'provider',
+        person_type: form.access_area || 'general',
         status: 'active',
       });
 
