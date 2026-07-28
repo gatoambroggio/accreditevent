@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { logAudit } from '@/lib/audit';
 import {
   Loader2, Upload, FileText, Building2, Users, UserPlus, Pencil, Trash2,
-  FileSpreadsheet, CheckCircle2, LogOut, ShieldCheck,
+  FileSpreadsheet, CheckCircle2, LogOut, ShieldCheck, ShieldAlert,
 } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
 import DocumentViewer from '@/components/DocumentViewer';
@@ -37,8 +37,11 @@ export default function EmpresaPortal() {
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
   const [viewingDoc, setViewingDoc] = useState(null);
+  const [approvals, setApprovals] = useState([]);
 
   const companyName = user?.company || user?.data?.company || '';
+  const approvedEvents = approvals.filter((a) => a.status === 'approved').map((a) => a.event_name);
+  const isApproved = approvedEvents.length > 0;
 
   const load = useCallback(async () => {
     try {
@@ -48,12 +51,14 @@ export default function EmpresaPortal() {
       if (!comp) { setLoading(false); return; }
       const companies = await base44.entities.ProviderCompany.filter({ name: comp });
       if (companies[0]) setCompany(companies[0]);
-      const [emps, docs] = await Promise.all([
+      const [emps, docs, apprs] = await Promise.all([
         base44.entities.Person.filter({ company: comp }, '-created_date', 500),
         base44.entities.Document.filter({ company: comp }, '-created_date', 100),
+        base44.entities.EventCompanyApproval.filter({ provider_company: comp }),
       ]);
       setEmployees(emps);
       setDocuments(docs);
+      setApprovals(apprs);
     } catch {
       // silent
     } finally {
@@ -204,6 +209,20 @@ export default function EmpresaPortal() {
           </div>
         </div>
 
+        {!isApproved && (
+          <div className="mb-6 flex items-start gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm ring-1 ring-amber-200">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <div>
+              <p className="font-semibold text-amber-800">Tu empresa aún no fue aprobada para cargar empleados.</p>
+              <p className="mt-0.5 text-amber-700">La productora debe aprobar tu empresa para al menos un evento. Contactate con el organizador.</p>
+            </div>
+          </div>
+        )}
+        {isApproved && (
+          <div className="mb-6 flex items-center gap-2 rounded-lg bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">
+            <CheckCircle2 className="h-4 w-4" /> Aprobada para: {approvedEvents.join(', ')}
+          </div>
+        )}
         {msg && (
           <div className="mb-6 flex items-center gap-2 rounded-lg bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">
             <CheckCircle2 className="h-4 w-4" /> {msg}
@@ -217,10 +236,10 @@ export default function EmpresaPortal() {
               <Users className="h-5 w-5 text-emerald-600" /> Empleados
             </h3>
             <div className="flex flex-wrap items-center gap-2">
-              <button onClick={() => { setEditingEmployee(null); setFormOpen(true); }} className={btnPrimary}>
+              <button onClick={() => { setEditingEmployee(null); setFormOpen(true); }} disabled={!isApproved} className={`${btnPrimary} disabled:cursor-not-allowed disabled:opacity-50`}>
                 <UserPlus className="h-4 w-4" /> Nuevo empleado
               </button>
-              <button onClick={() => setImportOpen(true)} className={btnOutline}>
+              <button onClick={() => setImportOpen(true)} disabled={!isApproved} className={`${btnOutline} disabled:cursor-not-allowed disabled:opacity-50`}>
                 <FileSpreadsheet className="h-4 w-4" /> Importar Excel
               </button>
             </div>

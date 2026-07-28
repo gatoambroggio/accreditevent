@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { useCrud } from '@/lib/crud';
-import { Plus, Pencil, Briefcase, Download } from 'lucide-react';
+import { Plus, Pencil, Briefcase, Download, ShieldCheck } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { exportToExcel } from '@/lib/exportUtils';
 import EntityModal from '@/components/EntityModal';
 import ProviderCompanyPeopleModal from '@/components/ProviderCompanyPeopleModal';
+import EventApprovalModal from '@/components/EventApprovalModal';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
 import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
@@ -16,6 +17,7 @@ export default function ProviderCompanies() {
   const [editing, setEditing] = useState(null);
   const [query, setQuery] = useState('');
   const [peopleModalCompany, setPeopleModalCompany] = useState(null);
+  const [approvalModalCompany, setApprovalModalCompany] = useState(null);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -110,9 +112,14 @@ export default function ProviderCompanies() {
                 {!c.contact_phone && !c.contact_email && '—'}
               </Td>
               <Td className="text-right">
-                <button onClick={() => openEdit(c)} className={btnIcon}>
-                  <Pencil className="h-3.5 w-3.5" />
-                </button>
+                <div className="inline-flex items-center gap-1">
+                  <button onClick={() => setApprovalModalCompany(c)} className={btnIcon} title="Aprobar para eventos">
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                  </button>
+                  <button onClick={() => openEdit(c)} className={btnIcon}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </Td>
             </Tr>
           ))}
@@ -136,6 +143,13 @@ export default function ProviderCompanies() {
         <ProviderCompanyPeopleModal
           company={peopleModalCompany}
           onClose={() => setPeopleModalCompany(null)}
+        />
+      )}
+
+      {approvalModalCompany && (
+        <EventApprovalModal
+          providerCompany={approvalModalCompany}
+          onClose={() => setApprovalModalCompany(null)}
         />
       )}
     </div>

@@ -5,7 +5,7 @@ import { Image } from '@/components/ui/image';
 import FaceCapture from '@/components/FaceCapture';
 
 const EMPTY = { first_name: '', last_name: '', document: '', phone: '', employment_type: 'fijo', event_phases: [], notes: '' };
-const normalizeType = (v) => (v === 'eventual' ? 'eventual' : 'fijo');
+const normalizeType = (v) => (v === 'eventual' || v === 'esporadico' ? 'eventual' : 'fijo');
 
 const PHASES = [
   { value: 'armado', label: 'Armado' },
@@ -13,11 +13,25 @@ const PHASES = [
   { value: 'desarme', label: 'Desarme' },
 ];
 
+function buildForm(editing) {
+  if (!editing) return EMPTY;
+  const parts = (editing.full_name || '').split(' ');
+  return {
+    first_name: parts[0] || '',
+    last_name: parts.slice(1).join(' '),
+    document: editing.document || '',
+    phone: editing.phone || '',
+    employment_type: normalizeType(editing.employment_type),
+    event_phases: Array.isArray(editing.event_phases) ? editing.event_phases : [],
+    notes: editing.notes || '',
+  };
+}
+
 export default function EmployeeFormModal({ open, onClose, onSubmit, editing, companyName }) {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
-  const [form, setForm] = useState(EMPTY);
+  const [form, setForm] = useState(() => buildForm(editing));
   const [dniFile, setDniFile] = useState(null);
   const [faceFile, setFaceFile] = useState(null);
   const [faceDescriptor, setFaceDescriptor] = useState(null);
@@ -26,17 +40,11 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
 
   useEffect(() => {
     if (!open) return;
-    if (editing) {
-      const parts = (editing.full_name || '').split(' ');
-      setForm({
-        first_name: parts[0] || '',
-        last_name: parts.slice(1).join(' '),
-        document: editing.document || '',
-        phone: editing.phone || '',
-        employment_type: normalizeType(editing.employment_type),
-        event_phases: Array.isArray(editing.event_phases) ? editing.event_phases : [],
-        notes: editing.notes || '',
-      });
+    setForm(buildForm(editing));
+    setDniFile(null);
+    setFaceFile(null);
+    setFaceDescriptor(null);
+    if (editing?.id) {
       base44.entities.Document.filter({ person_id: editing.id, document_type: 'dni' })
         .then((docs) => setExistingDni(docs[0] || null))
         .catch(() => setExistingDni(null));
@@ -44,13 +52,9 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
         .then((existing) => setExistingFaceUrl(existing[0]?.face_photo_url || null))
         .catch(() => setExistingFaceUrl(null));
     } else {
-      setForm(EMPTY);
       setExistingDni(null);
       setExistingFaceUrl(null);
     }
-    setDniFile(null);
-    setFaceFile(null);
-    setFaceDescriptor(null);
   }, [editing, open]);
 
   const setField = (name, value) => setForm((f) => ({ ...f, [name]: value }));
