@@ -50,6 +50,11 @@ export default function Login() {
             <Link to="/provider-register" className="text-primary font-medium hover:underline">
               Registrate acá
             </Link>
+            <br />
+            ¿Sos una empresa?{" "}
+            <Link to="/registro-empresa" className="text-primary font-medium hover:underline">
+              Registro de empresas
+            </Link>
           </span>
         </>
       }
