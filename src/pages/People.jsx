@@ -232,10 +232,12 @@ export default function People() {
           { $set: { status: 'revoked' } }
         );
       }
+      const evt = events.find((e) => e.id === personData.event_id);
       await base44.entities.Biometric.create({
         person_id: personId,
         person_name: personData.full_name,
         event_id: personData.event_id,
+        company: evt?.company || personData.productora || '',
         face_photo_url,
         face_descriptor,
         status: 'active',

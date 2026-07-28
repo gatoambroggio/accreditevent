@@ -79,7 +79,7 @@ export default function DniToBiometric({ person, onSaved, onClose }) {
       await base44.entities.Biometric.create({
         person_id: person.id,
         person_name: person.full_name,
-        company: person.company || person.productora || '',
+        company: person.productora || person.company || '',
         face_photo_url: file_url,
         face_descriptor: Array.from(detection.descriptor),
         status: 'active',
