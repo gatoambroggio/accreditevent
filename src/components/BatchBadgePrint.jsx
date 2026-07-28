@@ -85,10 +85,7 @@ function BadgeCard({ accreditation, event }) {
           Área de acceso
         </p>
         <p style={{ fontSize: '1rem', fontWeight: 700, color: 'white', marginTop: '0.1rem', margin: 0 }}>
-          {accreditation?.area || 'General'}
-        </p>
-        <p style={{ fontSize: '0.6rem', color: '#a7f3d0', margin: 0 }}>
-          Nivel: {accreditation?.access_level}
+          {accreditation?.access_level || accreditation?.area || 'General'}
         </p>
       </div>
 

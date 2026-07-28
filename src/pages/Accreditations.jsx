@@ -99,14 +99,13 @@ export default function Accreditations() {
 
   const handleExport = () => {
     exportToExcel(
-      ['Persona', 'Tipo', 'Evento', 'Código', 'Área', 'Nivel de acceso', 'Estado', 'Biometría'],
+      ['Persona', 'Tipo', 'Evento', 'Código', 'Área de acceso', 'Estado', 'Biometría'],
       filtered.map((a) => [
         a.person_name || '',
-        a.person_type || '',
+        zones.find((z) => z.value === a.person_type)?.label || a.person_type || '',
         a.event_name || '',
         a.badge_code || '',
-        a.area || '',
-        a.access_level || '',
+        zones.find((z) => z.value === (a.access_level || a.area))?.label || a.access_level || a.area || '',
         a.status || '',
         a.has_biometric ? 'Sí' : 'No',
       ]),
@@ -124,7 +123,7 @@ export default function Accreditations() {
     { name: 'person_id', label: 'Persona', type: 'searchable-select', options: personOptions, required: true, placeholder: 'Buscar por nombre o documento…', full: true },
     ...(editing ? [{ name: 'badge_code', label: 'Código de credencial', type: 'text', required: true }] : []),
     {
-      name: 'area', label: 'Área de acceso', type: 'select',
+      name: 'access_level', label: 'Área de acceso', type: 'select',
       options: zones.map((z) => ({ value: z.value, label: z.label })),
     },
     { name: 'status', label: 'Estado', type: 'select', options: STATUS_OPTIONS },
@@ -132,7 +131,7 @@ export default function Accreditations() {
   ];
 
   const openNew = () => { setEditing(null); setModalOpen(true); };
-  const openEdit = (item) => { setEditing(item); setModalOpen(true); };
+  const openEdit = (item) => { setEditing({ ...item, access_level: item.access_level || item.area || '' }); setModalOpen(true); };
 
   const handleFieldChange = async (name, value, setField) => {
     if (name === 'person_id' && value) {
@@ -140,7 +139,7 @@ export default function Accreditations() {
         const bios = await base44.entities.Biometric.filter({ person_id: value, status: 'active' }, '-created_date', 1);
         setField('has_biometric', bios.length > 0);
         const p = people.find((p) => p.id === value);
-        if (p?.access_area) setField('area', p.access_area);
+        if (p?.access_area) setField('access_level', p.access_area);
       } catch {}
     }
   };
@@ -169,7 +168,8 @@ export default function Accreditations() {
       person_name: person?.full_name || '',
       person_type: person?.person_type || '',
       person_email: person?.email || '',
-      access_level: data.area || 'general',
+      area: data.access_level || 'general',
+      access_level: data.access_level || 'general',
     };
     if (!editing) {
       enriched.badge_code = generateBadgeCode(person?.person_type, items.map((a) => a.badge_code), typePrefixes);
@@ -290,7 +290,7 @@ export default function Accreditations() {
             <Th>Persona</Th>
             <Th>Evento</Th>
             <Th>Código</Th>
-            <Th>Área</Th>
+            <Th>Área de acceso</Th>
             <Th>Estado</Th>
             <Th>Bio</Th>
             <Th />
@@ -309,11 +309,11 @@ export default function Accreditations() {
               </Td>
               <Td>
                 <p className="text-sm font-semibold text-slate-900">{a.person_name || '—'}</p>
-                <p className="text-xs text-slate-400">{a.person_type}</p>
+                <p className="text-xs text-slate-400">{zones.find((z) => z.value === a.person_type)?.label || a.person_type}</p>
               </Td>
               <Td className="text-sm text-slate-500">{a.event_name || '—'}</Td>
               <Td><code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700">{a.badge_code}</code></Td>
-              <Td className="text-sm text-slate-500">{zones.find((z) => z.value === a.area)?.label || a.area || '—'}</Td>
+              <Td className="text-sm text-slate-500">{zones.find((z) => z.value === (a.access_level || a.area))?.label || a.access_level || a.area || '—'}</Td>
               <Td><StatusBadge status={a.status} /></Td>
               <Td>
                 <BiometricButton accreditation={a} onRegistered={reload} />
