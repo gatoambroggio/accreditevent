@@ -58,7 +58,7 @@
               }
             },
             {
-              "data.name": "{{user.company}}"
+              "data.name": "{{user.data.company}}"
             }
           ]
         }
@@ -118,7 +118,7 @@
               }
             },
             {
-              "data.name": "{{user.company}}"
+              "data.name": "{{user.data.company}}"
             }
           ]
         }
