@@ -156,18 +156,18 @@ export default function Events() {
     }
     const payload = { ...data, assigned_user_ids: assignedIds };
     let eventId;
+    let newEvent = null;
     if (editing?.id) {
       await update(editing.id, payload);
       eventId = editing.id;
     } else {
-      const created = await create(payload);
-      eventId = created.id;
+      newEvent = await create(payload);
+      eventId = newEvent.id;
     }
     await syncUserEvents(eventId, assignedIds);
     await logAudit(editing ? 'update' : 'create', 'Event', eventId, `Usuarios: ${assignedIds.length}`);
-    if (!editing) {
-      const created = items.find((e) => e.id === eventId) || { id: eventId, name: data.name };
-      setShareEvent(created);
+    if (!editing && newEvent) {
+      setShareEvent(newEvent);
     }
   };
 

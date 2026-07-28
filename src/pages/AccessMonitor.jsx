@@ -3,30 +3,11 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { CheckCircle2, XCircle, Loader2, Radio, Users, TrendingUp, AlertTriangle } from 'lucide-react';
 import { formatTimeWithSeconds } from '@/lib/formatDate';
-
-const userEventIdsRef = { current: [] };
-const userCompanyRef = { current: '' };
-const isProductoraRef = { current: false };
-
-const shouldShowLog = (log) => {
-  if (isProductoraRef.current) {
-    if (!userCompanyRef.current) return false;
-    return log.company === userCompanyRef.current;
-  }
-  const ids = userEventIdsRef.current;
-  if (!ids || ids.length === 0) return true;
-  return ids.includes(log.event_id);
-};
-
-const ZONE_LABELS = {
-  general: 'General',
-  backstage: 'Backstage',
-  technical: 'Técnica',
-  vip: 'VIP',
-};
+import { useZones } from '@/lib/useZones';
 
 export default function AccessMonitor() {
   const { user } = useAuth();
+  const { zones } = useZones();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ granted: 0, denied: 0, total: 0 });
@@ -35,9 +16,17 @@ export default function AccessMonitor() {
 
   useEffect(() => {
     const isProductora = user?.role === 'productora';
-    isProductoraRef.current = isProductora;
-    userCompanyRef.current = user?.company || user?.data?.company || '';
-    userEventIdsRef.current = isProductora ? (user?.assigned_event_ids || user?.data?.assigned_event_ids || []) : [];
+    const userCompany = user?.company || user?.data?.company || '';
+    const userEventIds = isProductora ? (user?.assigned_event_ids || user?.data?.assigned_event_ids || []) : [];
+
+    const shouldShowLog = (log) => {
+      if (isProductora) {
+        if (!userCompany) return false;
+        return log.company === userCompany;
+      }
+      if (!userEventIds || userEventIds.length === 0) return true;
+      return userEventIds.includes(log.event_id);
+    };
 
     (async () => {
       try {
@@ -170,7 +159,7 @@ export default function AccessMonitor() {
                     <p className="text-sm font-bold text-slate-900">{log.person_name || 'Desconocido'}</p>
                     <p className="text-xs text-slate-500">
                       {log.event_name || 'Sin evento'}
-                      {log.zone ? ` · ${ZONE_LABELS[log.zone] || log.zone}` : ''}
+                      {log.zone ? ` · ${log.zone.split(',').map((z) => zones.find((zz) => zz.value === z.trim())?.label || z.trim()).join(', ')}` : ''}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-3">

@@ -28,9 +28,9 @@ export default function Home() {
     (async () => {
       try {
         const [people, events, accreds, logs] = await Promise.all([
-          base44.entities.Person.list('-created_date', 500),
-          base44.entities.Event.list('-created_date', 500),
-          base44.entities.Accreditation.filter({ status: 'active' }, '-created_date', 500),
+          base44.entities.Person.list('-created_date', 200),
+          base44.entities.Event.list('-created_date', 200),
+          base44.entities.Accreditation.filter({ status: 'active' }, '-created_date', 200),
           base44.entities.AccessLog.list('-created_date', 12),
         ]);
         const today = new Date().toDateString();

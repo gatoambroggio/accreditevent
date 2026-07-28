@@ -32,7 +32,6 @@ export default async function (req) {
       base44.asServiceRole.entities.Biometric.deleteMany({ person_id }),
       base44.asServiceRole.entities.Document.deleteMany({ person_id }),
       base44.asServiceRole.entities.Vehicle.deleteMany({ person_id }),
-      base44.asServiceRole.entities.ProviderRequest.deleteMany({ person_id }),
       base44.asServiceRole.entities.ZKTecoCommand.deleteMany({ person_id }),
       base44.asServiceRole.entities.Accreditation.deleteMany({ person_id }),
       ...accredIds.map((id) =>
@@ -50,7 +49,7 @@ export default async function (req) {
       action: 'delete-person-cascade',
       entity: 'Person',
       entity_id: person_id,
-      detail: `${person.full_name} — eliminado con biometría, acreditaciones, documentos, vehículos, solicitudes y logs`,
+      detail: `${person.full_name} — eliminado con biometría, acreditaciones, documentos, vehículos y logs`,
     });
 
     return Response.json({ success: true, person_name: person.full_name });

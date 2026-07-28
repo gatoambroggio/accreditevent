@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Loader2, CheckCircle2, XCircle, Calendar, Clock, AlertTriangle } from 'lucide-react';
@@ -6,26 +6,7 @@ import FaceCapture from '@/components/FaceCapture';
 import { findBestMatch } from '@/lib/faceRecognition';
 import { canAccessAnyZone } from '@/lib/accessZones';
 import { useZones } from '@/lib/useZones';
-
-function getEventStatus(event) {
-  const now = Date.now();
-  const start = event.start_at ? new Date(event.start_at).getTime() : 0;
-  const end = event.end_at ? new Date(event.end_at).getTime() : 0;
-  const grace = (event.grace_hours ?? 4) * 3600000;
-  const graceEnd = end + grace;
-
-  if (start && now < start) return 'upcoming';
-  if (end && now > graceEnd) return 'ended';
-  if (end && now > end) return 'grace';
-  return 'active';
-}
-
-const STATUS_INFO = {
-  upcoming: { label: 'Próximo a iniciar', cls: 'bg-amber-50 text-amber-700 ring-amber-200' },
-  active: { label: 'En curso', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
-  grace: { label: 'Período de gracia', cls: 'bg-amber-50 text-amber-700 ring-amber-200' },
-  ended: { label: 'Finalizado', cls: 'bg-red-50 text-red-700 ring-red-200' },
-};
+import { getEventStatus, EVENT_STATUS_INFO, speakResult } from '@/lib/accessUtils';
 
 export default function AccessStation() {
   const [phase, setPhase] = useState('select');
@@ -66,62 +47,65 @@ export default function AccessStation() {
     setVerifying(false);
   };
 
-  const speak = useCallback((text) => {
-    try {
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = 'es-AR';
-      u.rate = 0.9;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(u);
-    } catch {}
-  }, []);
-
   const handleCaptured = async (file, descriptor) => {
     setVerifying(true);
     setResult(null);
     try {
-      if (!descriptor) {
-        const me = await base44.auth.me();
+      const me = await base44.auth.me();
+      const verifier = me?.full_name || me?.email || 'Sistema';
+
+      const logAccess = async (result, accred = {}, extra = {}) => {
         await base44.entities.AccessLog.create({
-          accreditation_id: 'unknown',
-          person_name: 'Desconocido',
-          badge_code: '',
+          accreditation_id: accred.id || 'unknown',
+          person_name: accred.person_name || extra.person_name || 'Desconocido',
+          badge_code: accred.badge_code || '',
           event_name: selectedEvent.name,
           event_id: selectedEvent.id,
-          company: selectedEvent.company,
-          verified_by: me?.full_name || me?.email || 'Sistema',
+          company: accred.company || selectedEvent.company,
+          verified_by: verifier,
           method: 'biometric',
           zone: selectedZones.join(', '),
-          result: 'denied',
-          access_level: '',
+          result,
+          access_level: accred.access_level || '',
         });
+      };
+
+      // Validate event is within valid time window
+      const status = getEventStatus(selectedEvent);
+      if (status === 'upcoming' || status === 'ended') {
+        await logAccess('denied');
+        setResult({
+          ok: false,
+          message: status === 'upcoming' ? 'El evento aún no ha comenzado.' : 'El evento ha finalizado.',
+        });
+        return;
+      }
+
+      if (!descriptor) {
+        await logAccess('denied');
         setResult({ ok: false, message: 'No se detectó un rostro humano en la captura.' });
         return;
       }
 
-      // Fetch all active biometrics with descriptors
-      const bios = await base44.entities.Biometric.filter(
-        { status: 'active' },
+      // Fetch active biometrics for this event first, fallback to all
+      let bios = await base44.entities.Biometric.filter(
+        { status: 'active', event_id: selectedEvent.id },
         '-created_date',
         500
       );
+      let withDescriptors = bios.filter((b) => b.face_descriptor && b.face_descriptor.length > 0);
 
-      const withDescriptors = bios.filter((b) => b.face_descriptor && b.face_descriptor.length > 0);
       if (withDescriptors.length === 0) {
-        const me = await base44.auth.me();
-        await base44.entities.AccessLog.create({
-          accreditation_id: 'unknown',
-          person_name: 'Desconocido',
-          badge_code: '',
-          event_name: selectedEvent.name,
-          event_id: selectedEvent.id,
-          company: selectedEvent.company,
-          verified_by: me?.full_name || me?.email || 'Sistema',
-          method: 'biometric',
-          zone: selectedZones.join(', '),
-          result: 'denied',
-          access_level: '',
-        });
+        bios = await base44.entities.Biometric.filter(
+          { status: 'active' },
+          '-created_date',
+          500
+        );
+        withDescriptors = bios.filter((b) => b.face_descriptor && b.face_descriptor.length > 0);
+      }
+
+      if (withDescriptors.length === 0) {
+        await logAccess('denied');
         setResult({ ok: false, message: 'No hay rostros registrados en el sistema.' });
         return;
       }
@@ -137,20 +121,7 @@ export default function AccessStation() {
       const { match, distance } = findBestMatch(descriptor, withDescriptors);
 
       if (!match) {
-        const me = await base44.auth.me();
-        await base44.entities.AccessLog.create({
-          accreditation_id: 'unknown',
-          person_name: 'Desconocido',
-          badge_code: '',
-          event_name: selectedEvent.name,
-          event_id: selectedEvent.id,
-          company: selectedEvent.company,
-          verified_by: me?.full_name || me?.email || 'Sistema',
-          method: 'biometric',
-          zone: selectedZones.join(', '),
-          result: 'denied',
-          access_level: '',
-        });
+        await logAccess('denied');
         setResult({ ok: false, message: `No se encontró coincidencia facial (distancia: ${distance.toFixed(2)}).` });
         return;
       }
@@ -158,20 +129,7 @@ export default function AccessStation() {
       // Find the active accreditation for this person in this event
       const accred = accreditations.find((a) => a.person_id === match.person_id);
       if (!accred) {
-        const me = await base44.auth.me();
-        await base44.entities.AccessLog.create({
-          accreditation_id: 'unknown',
-          person_name: match.person_name || 'Desconocido',
-          badge_code: '',
-          event_name: selectedEvent.name,
-          event_id: selectedEvent.id,
-          company: selectedEvent.company,
-          verified_by: me?.full_name || me?.email || 'Sistema',
-          method: 'biometric',
-          zone: selectedZones.join(', '),
-          result: 'denied',
-          access_level: '',
-        });
+        await logAccess('denied', {}, { person_name: match.person_name });
         setResult({
           ok: false,
           message: 'Persona identificada pero sin acreditación para este evento.',
@@ -180,23 +138,10 @@ export default function AccessStation() {
         return;
       }
 
-      const me = await base44.auth.me();
       const zoneLabel = selectedZones.map((z) => zones.find((zz) => zz.value === z)?.label || z).join(', ');
 
       if (!canAccessAnyZone(accred.access_level, selectedZones)) {
-        await base44.entities.AccessLog.create({
-          accreditation_id: accred.id,
-          person_name: accred.person_name,
-          badge_code: accred.badge_code,
-          event_name: accred.event_name,
-          event_id: accred.event_id,
-          company: accred.company || selectedEvent.company,
-          verified_by: me?.full_name || me?.email || 'Sistema',
-          method: 'biometric',
-          zone: selectedZones.join(', '),
-          result: 'denied',
-          access_level: accred.access_level,
-        });
+        await logAccess('denied', accred);
         setResult({
           ok: false,
           person_name: accred.person_name,
@@ -206,20 +151,7 @@ export default function AccessStation() {
         return;
       }
 
-      await base44.entities.AccessLog.create({
-        accreditation_id: accred.id,
-        person_name: accred.person_name,
-        badge_code: accred.badge_code,
-        event_name: accred.event_name,
-        event_id: accred.event_id,
-          company: accred.company || selectedEvent.company,
-        verified_by: me?.full_name || me?.email || 'Sistema',
-        method: 'biometric',
-        zone: selectedZones.join(', '),
-        result: 'granted',
-        access_level: accred.access_level,
-      });
-
+      await logAccess('granted', accred);
       setResult({ ok: true, person_name: accred.person_name, access_level: accred.access_level, accred });
     } catch (err) {
       setResult({ ok: false, message: err.message || 'Error en la verificación.' });
@@ -230,13 +162,13 @@ export default function AccessStation() {
 
   useEffect(() => {
     if (!result) return;
-    speak(result.ok ? 'Aceptado' : 'Denegado');
+    speakResult(result.ok);
     const timer = setTimeout(() => {
       setResult(null);
       setCycle((c) => c + 1);
     }, 2500);
     return () => clearTimeout(timer);
-  }, [result, speak]);
+  }, [result]);
 
   const eventStatus = selectedEvent ? getEventStatus(selectedEvent) : null;
 
@@ -293,7 +225,7 @@ export default function AccessStation() {
                 <div className="space-y-2">
                   {events.map((evt) => {
                     const st = getEventStatus(evt);
-                    const info = STATUS_INFO[st];
+                    const info = EVENT_STATUS_INFO[st];
                     const isSelected = selectedEventId === evt.id;
                     return (
                       <button

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Loader2, CheckCircle2, XCircle, Calendar, Clock, AlertTriangle, Car, User } from 'lucide-react';
@@ -6,26 +6,7 @@ import QrScanner from '@/components/QrScanner';
 import { canAccessAnyZone } from '@/lib/accessZones';
 import { useZones } from '@/lib/useZones';
 import { useParkingSectors } from '@/lib/useParkingSectors';
-
-function getEventStatus(event) {
-  const now = Date.now();
-  const start = event.start_at ? new Date(event.start_at).getTime() : 0;
-  const end = event.end_at ? new Date(event.end_at).getTime() : 0;
-  const grace = (event.grace_hours ?? 4) * 3600000;
-  const graceEnd = end + grace;
-
-  if (start && now < start) return 'upcoming';
-  if (end && now > graceEnd) return 'ended';
-  if (end && now > end) return 'grace';
-  return 'active';
-}
-
-const STATUS_INFO = {
-  upcoming: { label: 'Próximo a iniciar', cls: 'bg-amber-50 text-amber-700 ring-amber-200' },
-  active: { label: 'En curso', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
-  grace: { label: 'Período de gracia', cls: 'bg-amber-50 text-amber-700 ring-amber-200' },
-  ended: { label: 'Finalizado', cls: 'bg-red-50 text-red-700 ring-red-200' },
-};
+import { getEventStatus, EVENT_STATUS_INFO, speakResult } from '@/lib/accessUtils';
 
 export default function AccessQrStation({ mode = 'person' }) {
   const [phase, setPhase] = useState('select');
@@ -74,16 +55,6 @@ export default function AccessQrStation({ mode = 'person' }) {
     setPhase('select');
   };
 
-  const speak = useCallback((text) => {
-    try {
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = 'es-AR';
-      u.rate = 0.9;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(u);
-    } catch {}
-  }, []);
-
   const handleQrDetected = async (code) => {
     if (qrCooldown.current || verifying || result) return;
     qrCooldown.current = true;
@@ -94,8 +65,24 @@ export default function AccessQrStation({ mode = 'person' }) {
       const verifier = me?.full_name || me?.email || 'Sistema';
       const zoneLabel = selectedZones.map((z) => zones.find((zz) => zz.value === z)?.label || z).join(', ');
 
+      const logAccess = async (result, opts = {}) => {
+        await base44.entities.AccessLog.create({
+          accreditation_id: opts.id || 'unknown',
+          person_name: opts.person_name || 'Desconocido',
+          badge_code: opts.badge_code || code,
+          event_name: selectedEvent.name,
+          event_id: selectedEvent.id,
+          company: opts.company || selectedEvent.company,
+          verified_by: verifier,
+          method: 'manual',
+          resource_type: mode,
+          zone: opts.zone || selectedZones.join(', '),
+          result,
+          access_level: opts.access_level || '',
+        });
+      };
+
       if (mode === 'person') {
-        // --- Person validation ---
         const accreditations = await base44.entities.Accreditation.filter(
           { status: 'active', event_id: selectedEvent.id },
           '-created_date',
@@ -104,63 +91,18 @@ export default function AccessQrStation({ mode = 'person' }) {
         const accred = accreditations.find((a) => a.id === code);
 
         if (!accred) {
-          await base44.entities.AccessLog.create({
-            accreditation_id: 'unknown',
-            person_name: 'Desconocido',
-            badge_code: code,
-            event_name: selectedEvent.name,
-            event_id: selectedEvent.id,
-          company: selectedEvent.company,
-            verified_by: verifier,
-            method: 'manual',
-            resource_type: mode,
-            zone: selectedZones.join(', '),
-            result: 'denied',
-            access_level: '',
-          });
+          await logAccess('denied');
           setResult({ ok: false, type: 'person', message: 'Credencial no válida para este evento.' });
           return;
         }
 
         if (!canAccessAnyZone(accred.access_level, selectedZones)) {
-          await base44.entities.AccessLog.create({
-            accreditation_id: accred.id,
-            person_name: accred.person_name,
-            badge_code: accred.badge_code,
-            event_name: accred.event_name,
-            event_id: accred.event_id,
-          company: accred.company || selectedEvent.company,
-            verified_by: verifier,
-            method: 'manual',
-            resource_type: mode,
-            zone: selectedZones.join(', '),
-            result: 'denied',
-            access_level: accred.access_level,
-          });
-          setResult({
-            ok: false,
-            person_name: accred.person_name,
-            type: 'person',
-            message: `Acceso restringido para la zona: ${zoneLabel}.`,
-          });
+          await logAccess('denied', { id: accred.id, person_name: accred.person_name, badge_code: accred.badge_code, company: accred.company, access_level: accred.access_level });
+          setResult({ ok: false, person_name: accred.person_name, type: 'person', message: `Acceso restringido para la zona: ${zoneLabel}.` });
           return;
         }
 
-        await base44.entities.AccessLog.create({
-          accreditation_id: accred.id,
-          person_name: accred.person_name,
-          badge_code: accred.badge_code,
-          event_name: accred.event_name,
-          event_id: accred.event_id,
-          company: accred.company || selectedEvent.company,
-          verified_by: verifier,
-          method: 'manual',
-            resource_type: mode,
-          zone: selectedZones.join(', '),
-          result: 'granted',
-          access_level: accred.access_level,
-        });
-
+        await logAccess('granted', { id: accred.id, person_name: accred.person_name, badge_code: accred.badge_code, company: accred.company, access_level: accred.access_level });
         setResult({ ok: true, person_name: accred.person_name, type: 'person', accred });
         return;
       }
@@ -172,20 +114,7 @@ export default function AccessQrStation({ mode = 'person' }) {
       } catch {}
 
       if (!vehicle) {
-        await base44.entities.AccessLog.create({
-          accreditation_id: 'unknown',
-          person_name: 'Desconocido',
-          badge_code: code,
-          event_name: selectedEvent.name,
-          event_id: selectedEvent.id,
-          company: selectedEvent.company,
-          verified_by: verifier,
-          method: 'manual',
-            resource_type: mode,
-          zone: selectedZones.join(', '),
-          result: 'denied',
-          access_level: '',
-        });
+        await logAccess('denied');
         setResult({ ok: false, type: 'vehicle', message: 'Vehículo no registrado.' });
         return;
       }
@@ -193,96 +122,26 @@ export default function AccessQrStation({ mode = 'person' }) {
       const isAssigned = vehicle.event_ids?.includes(selectedEvent.id);
 
       if (!isAssigned) {
-        await base44.entities.AccessLog.create({
-          accreditation_id: vehicle.id,
-          person_name: vehicle.person_name || '—',
-          badge_code: vehicle.plate || code,
-          event_name: selectedEvent.name,
-          event_id: selectedEvent.id,
-          company: selectedEvent.company,
-          verified_by: verifier,
-          method: 'manual',
-            resource_type: mode,
-          zone: selectedZones.join(', '),
-          result: 'denied',
-          access_level: '',
-        });
-        setResult({
-          ok: false,
-          person_name: vehicle.person_name,
-          type: 'vehicle',
-          vehicle,
-          message: 'Vehículo no asignado a este evento.',
-        });
+        await logAccess('denied', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate });
+        setResult({ ok: false, person_name: vehicle.person_name, type: 'vehicle', vehicle, message: 'Vehículo no asignado a este evento.' });
         return;
       }
 
       if (vehicle.status !== 'approved') {
-        await base44.entities.AccessLog.create({
-          accreditation_id: vehicle.id,
-          person_name: vehicle.person_name || '—',
-          badge_code: vehicle.plate || code,
-          event_name: selectedEvent.name,
-          event_id: selectedEvent.id,
-          company: selectedEvent.company,
-          verified_by: verifier,
-          method: 'manual',
-            resource_type: mode,
-          zone: selectedSectors.join(', '),
-          result: 'denied',
-          access_level: vehicle.parking_sector || '',
-        });
-        setResult({
-          ok: false,
-          person_name: vehicle.person_name,
-          type: 'vehicle',
-          vehicle,
-          message: 'Vehículo no autorizado. El estado no es aprobado.',
-        });
+        await logAccess('denied', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, zone: selectedSectors.join(', ') });
+        setResult({ ok: false, person_name: vehicle.person_name, type: 'vehicle', vehicle, message: 'Vehículo no autorizado. El estado no es aprobado.' });
         return;
       }
 
       const sectorLabel = parkingSectors.find((s) => s.value === vehicle.parking_sector)?.label || vehicle.parking_sector || 'Sin sector';
 
       if (selectedSectors.length > 0 && vehicle.parking_sector && !selectedSectors.includes(vehicle.parking_sector)) {
-        await base44.entities.AccessLog.create({
-          accreditation_id: vehicle.id,
-          person_name: vehicle.person_name || '—',
-          badge_code: vehicle.plate || code,
-          event_name: selectedEvent.name,
-          event_id: selectedEvent.id,
-          company: selectedEvent.company,
-          verified_by: verifier,
-          method: 'manual',
-            resource_type: mode,
-          zone: selectedSectors.join(', '),
-          result: 'denied',
-          access_level: vehicle.parking_sector,
-        });
-        setResult({
-          ok: false,
-          person_name: vehicle.person_name,
-          type: 'vehicle',
-          vehicle,
-          message: `Sector de estacionamiento no permitido: ${sectorLabel}.`,
-        });
+        await logAccess('denied', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, zone: selectedSectors.join(', ') });
+        setResult({ ok: false, person_name: vehicle.person_name, type: 'vehicle', vehicle, message: `Sector de estacionamiento no permitido: ${sectorLabel}.` });
         return;
       }
 
-      await base44.entities.AccessLog.create({
-        accreditation_id: vehicle.id,
-        person_name: vehicle.person_name || '—',
-        badge_code: vehicle.plate || code,
-        event_name: selectedEvent.name,
-        event_id: selectedEvent.id,
-          company: selectedEvent.company,
-        verified_by: verifier,
-        method: 'manual',
-        zone: selectedSectors.join(', '),
-        result: 'granted',
-        access_level: vehicle.parking_sector || '',
-      });
-
+      await logAccess('granted', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, zone: selectedSectors.join(', ') });
       setResult({ ok: true, person_name: vehicle.person_name, type: 'vehicle', vehicle });
     } catch (err) {
       setResult({ ok: false, message: err.message || 'Error en la verificación.' });
@@ -294,13 +153,13 @@ export default function AccessQrStation({ mode = 'person' }) {
 
   useEffect(() => {
     if (!result) return;
-    speak(result.ok ? 'Aceptado' : 'Denegado');
+    speakResult(result.ok);
     const timer = setTimeout(() => {
       setResult(null);
       setCycle((c) => c + 1);
     }, 2500);
     return () => clearTimeout(timer);
-  }, [result, speak]);
+  }, [result]);
 
   const eventStatus = selectedEvent ? getEventStatus(selectedEvent) : null;
 
@@ -359,7 +218,7 @@ export default function AccessQrStation({ mode = 'person' }) {
                 <div className="space-y-2">
                   {events.map((evt) => {
                     const st = getEventStatus(evt);
-                    const info = STATUS_INFO[st];
+                    const info = EVENT_STATUS_INFO[st];
                     const isSelected = selectedEventId === evt.id;
                     return (
                       <button

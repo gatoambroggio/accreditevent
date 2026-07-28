@@ -52,8 +52,8 @@ export default function Accreditations() {
     (async () => {
       try {
         const [evs, ps] = await Promise.all([
-          base44.entities.Event.list('-created_date', 500),
-          base44.entities.Person.list('-created_date', 500),
+          base44.entities.Event.list('-created_date', 200),
+          base44.entities.Person.list('-created_date', 200),
         ]);
         setEvents(evs);
         setPeople(ps);

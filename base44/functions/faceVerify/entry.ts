@@ -70,20 +70,20 @@ export default async function (req) {
     const confidence = Number(result.confidence) || 0;
     const verified = match && confidence >= 0.7;
 
-    if (verified) {
-      await base44.asServiceRole.entities.AccessLog.create({
-        accreditation_id: accreditation.id,
-        person_name: accreditation.person_name,
-        badge_code: accreditation.badge_code,
-        event_id: accreditation.event_id,
-        event_name: accreditation.event_name,
-        company: accreditation.company,
-        verified_by: user.full_name || user.email,
-        method: 'biometric',
-        result: 'granted',
-        access_level: accreditation.access_level,
-      });
+    await base44.asServiceRole.entities.AccessLog.create({
+      accreditation_id: accreditation.id,
+      person_name: accreditation.person_name,
+      badge_code: accreditation.badge_code,
+      event_id: accreditation.event_id,
+      event_name: accreditation.event_name,
+      company: accreditation.company,
+      verified_by: user.full_name || user.email,
+      method: 'biometric',
+      result: verified ? 'granted' : 'denied',
+      access_level: accreditation.access_level,
+    });
 
+    if (verified) {
       await base44.asServiceRole.entities.AuditLog.create({
         actor_name: user.full_name || user.email,
         actor_id: user.id,
