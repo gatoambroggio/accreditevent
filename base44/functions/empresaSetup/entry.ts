@@ -8,6 +8,10 @@ export default async function (req) {
 
     const body = await req.json();
 
+    if (!body.company_name) {
+      return Response.json({ error: 'El nombre de la empresa es obligatorio' }, { status: 400 });
+    }
+
     // Create or find ProviderCompany
     const existing = await base44.asServiceRole.entities.ProviderCompany.filter({ name: body.company_name });
     let company;

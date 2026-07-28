@@ -8,6 +8,10 @@ export default async function (req) {
 
     const body = await req.json();
 
+    if (!body.full_name || !body.event_id) {
+      return Response.json({ error: 'Faltan campos requeridos (full_name, event_id)' }, { status: 400 });
+    }
+
     // Look up the event to get the productora company for RLS
     const event = await base44.asServiceRole.entities.Event.get(body.event_id);
     const productora = event?.company || '';

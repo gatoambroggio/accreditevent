@@ -44,11 +44,9 @@ export default async function(req: Request): Promise<Response> {
           '-created_date',
           500
         );
-        for (const acc of accs) {
-          try {
-            await base44.asServiceRole.entities.Accreditation.delete(acc.id);
-            accreditationsDeleted++;
-          } catch {}
+        if (accs.length > 0) {
+          await base44.asServiceRole.entities.Accreditation.deleteMany({ event_id: evtId });
+          accreditationsDeleted += accs.length;
         }
       } catch {}
 

@@ -111,9 +111,13 @@ export default async function (req) {
       accreditation_id: accred.id,
       person_name: accred.person_name,
       badge_code: accred.badge_code,
+      event_id: accred.event_id,
       event_name: accred.event_name,
+      company: accred.company,
       verified_by: user.full_name || user.email,
       method: 'biometric',
+      result: 'granted',
+      access_level: accred.access_level,
     });
 
     await base44.asServiceRole.entities.AuditLog.create({
