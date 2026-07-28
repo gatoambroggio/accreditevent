@@ -25,8 +25,6 @@ import {
   SquareParking,
   Building2,
   Briefcase,
-  Boxes,
-  ClipboardCheck,
   UserSearch,
   ClipboardList,
 } from 'lucide-react';
@@ -56,11 +54,9 @@ const NAV_ITEMS = [
   { path: '/vehicles', label: 'Vehículos acreditados', icon: Car, minLevel: 1 },
   { path: '/parking-sectors', label: 'Estacionamiento', icon: SquareParking, minLevel: 1 },
   // Logística
-  { path: '/requirement-items', label: 'Ítems de logística', icon: Boxes, minLevel: 1 },
-  { path: '/provider-requests', label: 'Solicitudes', icon: ClipboardCheck, minLevel: 1 },
   // Reportes y comunicación
   { path: '/reports', label: 'Reportes', icon: BarChart3, minLevel: 1 },
-  { path: '/messages', label: 'Mensajes', icon: MessageSquare, minLevel: 1 },
+  { path: '/messages', label: 'Mensajes', icon: MessageSquare, minLevel: 1, module: 'whatsapp' },
   // Administración
   { path: '/companies', label: 'Empresas', icon: Building2, minLevel: 2 },
   { path: '/users', label: 'Usuarios y roles', icon: ShieldCheck, minLevel: 2 },
@@ -107,6 +103,7 @@ export default function AppLayout() {
   }, [location.pathname]);
 
   const visibleItems = NAV_ITEMS.filter((item) => {
+    if (item.module && !settings?.enabled_modules?.[item.module]) return false;
     if (item.providerOnly) return isProvider;
     if (isProvider) return false;
     if (isEmpresa) return false;

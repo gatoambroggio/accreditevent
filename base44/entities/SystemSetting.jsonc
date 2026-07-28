@@ -110,6 +110,13 @@
       "type": "number",
       "default": 4,
       "description": "Horas de gracia por defecto para nuevos eventos"
+    },
+    "enabled_modules": {
+      "type": "object",
+      "description": "Mapa de m\u00f3dulos activables/desactivables desde configuraci\u00f3n (whatsapp, etc.)",
+      "default": {
+        "whatsapp": false
+      }
     }
   },
   "required": [],

@@ -47,7 +47,6 @@ const DEFAULT_PERSON_TYPES = [
 const CATALOG_LINKS = [
   { to: '/access-levels', label: 'Niveles de acceso' },
   { to: '/parking-sectors', label: 'Estacionamiento' },
-  { to: '/requirement-items', label: 'Ítems de logística' },
   { to: '/documents', label: 'Documentos' },
   { to: '/companies', label: 'Empresas' },
   { to: '/provider-companies', label: 'Empresas de servicios' },
@@ -76,6 +75,7 @@ export default function Settings() {
             person_types: DEFAULT_PERSON_TYPES,
             default_grace_hours: 4,
             zones: [],
+            enabled_modules: { whatsapp: false },
           });
           setSettings(created);
         }
@@ -129,6 +129,7 @@ export default function Settings() {
         person_types: settings.person_types,
         default_grace_hours: settings.default_grace_hours ? Number(settings.default_grace_hours) : null,
         zones: settings.zones,
+        enabled_modules: settings.enabled_modules,
       });
       setSettings(updated);
       setSuccess(true);
@@ -238,6 +239,23 @@ export default function Settings() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Token de acceso" type="password" value={settings.whatsapp_token} onChange={(v) => update('whatsapp_token', v)} placeholder="EAAxxxxxxxxx" />
           <Field label="Phone Number ID" value={settings.whatsapp_phone_id} onChange={(v) => update('whatsapp_phone_id', v)} placeholder="123456789" />
+        </div>
+      </Section>
+
+      <Section title="Módulos del sistema" description="Activá o desactivá módulos del sistema desde aquí">
+        <div className="space-y-3">
+          <label className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">Mensajería WhatsApp</p>
+              <p className="text-xs text-slate-500">Activa el módulo de mensajes y notificaciones por WhatsApp</p>
+            </div>
+            <input
+              type="checkbox"
+              checked={settings.enabled_modules?.whatsapp ?? false}
+              onChange={(e) => update('enabled_modules', { ...(settings.enabled_modules || {}), whatsapp: e.target.checked })}
+              className="h-5 w-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+            />
+          </label>
         </div>
       </Section>
 
