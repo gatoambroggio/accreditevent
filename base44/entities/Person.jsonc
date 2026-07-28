@@ -58,27 +58,6 @@
       "default": [],
       "description": "Fases del evento en las que participa el empleado"
     },
-    "phase_dates": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "phase": {
-            "type": "string"
-          },
-          "start_date": {
-            "type": "string",
-            "format": "date"
-          },
-          "end_date": {
-            "type": "string",
-            "format": "date"
-          }
-        }
-      },
-      "default": [],
-      "description": "Rangos de fecha por fase de evento (armado, show, desarme)"
-    },
     "event_id": {
       "type": "string",
       "description": "Evento al que pertenece la persona"

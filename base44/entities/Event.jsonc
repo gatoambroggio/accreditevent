@@ -21,12 +21,32 @@
     "start_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Fecha y hora de inicio"
+      "description": "Show - fecha y hora de inicio"
     },
     "end_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Fecha y hora de fin"
+      "description": "Show - fecha y hora de fin"
+    },
+    "armado_start": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Armado - inicio"
+    },
+    "armado_end": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Armado - fin"
+    },
+    "desarme_start": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Desarme - inicio"
+    },
+    "desarme_end": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Desarme - fin"
     },
     "grace_hours": {
       "type": "number",

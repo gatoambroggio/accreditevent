@@ -6,7 +6,7 @@ import FaceCapture from '@/components/FaceCapture';
 import { findBestMatch } from '@/lib/faceRecognition';
 import { canAccessAnyZone } from '@/lib/accessZones';
 import { useZones } from '@/lib/useZones';
-import { getEventStatus, EVENT_STATUS_INFO, speakResult, isWithinPhaseDates } from '@/lib/accessUtils';
+import { getEventStatus, EVENT_STATUS_INFO, speakResult, isWithinEventPhases } from '@/lib/accessUtils';
 
 export default function AccessStation() {
   const [phase, setPhase] = useState('select');
@@ -151,7 +151,7 @@ export default function AccessStation() {
         return;
       }
 
-      if (!isWithinPhaseDates(accred.phase_dates)) {
+      if (!isWithinEventPhases(selectedEvent, accred.event_phases)) {
         await logAccess('denied', accred);
         setResult({
           ok: false,

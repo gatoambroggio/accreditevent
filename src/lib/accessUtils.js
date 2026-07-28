@@ -18,14 +18,25 @@ export const EVENT_STATUS_INFO = {
   ended: { label: 'Finalizado', cls: 'bg-red-50 text-red-700 ring-red-200' },
 };
 
-export function isWithinPhaseDates(phaseDates, date = new Date()) {
-  if (!phaseDates || phaseDates.length === 0) return true;
-  const today = date.toISOString().slice(0, 10);
-  return phaseDates.some((p) => {
-    if (!p.start_date && !p.end_date) return true;
-    const start = p.start_date || p.end_date;
-    const end = p.end_date || p.start_date;
-    return today >= start && today <= end;
+export function isWithinEventPhases(event, eventPhases, date = new Date()) {
+  if (!event) return true;
+  const now = date.getTime();
+  if (!eventPhases || eventPhases.length === 0) {
+    const start = event.start_at ? new Date(event.start_at).getTime() : 0;
+    const end = event.end_at ? new Date(event.end_at).getTime() + (event.grace_hours || 0) * 3600000 : Infinity;
+    return now >= start && now <= end;
+  }
+  const PHASE_DATES = {
+    armado: ['armado_start', 'armado_end'],
+    dia_evento: ['start_at', 'end_at'],
+    desarme: ['desarme_start', 'desarme_end'],
+  };
+  return eventPhases.some((phase) => {
+    const [startField, endField] = PHASE_DATES[phase] || [];
+    const start = event[startField];
+    const end = event[endField];
+    if (!start || !end) return false;
+    return now >= new Date(start).getTime() && now <= new Date(end).getTime();
   });
 }
 

@@ -174,7 +174,6 @@ export default function People() {
         ],
         full: true,
       },
-      { name: 'phase_dates', label: 'Rangos de fecha por fase', type: 'phase-dates', full: true },
     {
       name: 'access_area', label: 'Tipo / Área de acceso', type: 'select', required: true,
       options: zones.map((z) => ({ value: z.value, label: z.label })),
@@ -210,31 +209,6 @@ export default function People() {
         setEditing({ ...normalized, face_photo_url: bios[0].face_photo_url });
       }
     } catch {}
-  };
-  const handleFieldChange = (name, value, setField, formData) => {
-    if (name === 'event_id' || name === 'event_phases') {
-      const eventId = name === 'event_id' ? value : formData?.event_id;
-      const phasesRaw = name === 'event_phases' ? value : formData?.event_phases;
-      const phases = Array.isArray(phasesRaw) ? phasesRaw : (typeof phasesRaw === 'string' ? phasesRaw.split(',').map((s) => s.trim()).filter(Boolean) : []);
-      if (eventId && phases.length > 0) {
-        const evt = events.find((e) => e.id === eventId);
-        if (evt?.start_at) {
-          const startDate = evt.start_at.slice(0, 10);
-          const endDate = (evt.end_at || evt.start_at).slice(0, 10);
-          const existing = formData?.phase_dates || [];
-          const next = phases.map((phase) => {
-            const prev = existing.find((p) => p.phase === phase);
-            if (prev && prev.start_date) return prev;
-            const defaultStart = phase === 'desarme' ? endDate : startDate;
-            const defaultEnd = phase === 'armado' ? startDate : endDate;
-            return { phase, start_date: prev?.start_date || defaultStart, end_date: prev?.end_date || defaultEnd };
-          });
-          setField('phase_dates', next);
-        }
-      } else if (phases.length === 0) {
-        setField('phase_dates', []);
-      }
-    }
   };
   const handleSubmit = async (data) => {
     const { face_photo_url, face_descriptor, ...personData } = data;
@@ -368,7 +342,6 @@ export default function People() {
         onDelete={editing ? handleDelete : null}
         canDelete={!!editing}
         submitLabel={editing ? 'Guardar cambios' : 'Crear persona'}
-        onFieldChange={handleFieldChange}
       />
 
       {detailPerson && (

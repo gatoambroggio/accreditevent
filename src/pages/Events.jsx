@@ -64,8 +64,12 @@ export default function Events() {
       });
     }
     baseFields.push(
-      { name: 'start_at', label: 'Inicio', type: 'datetime-local' },
-      { name: 'end_at', label: 'Fin', type: 'datetime-local' },
+      { name: 'start_at', label: 'Show - Inicio', type: 'datetime-local' },
+      { name: 'end_at', label: 'Show - Fin', type: 'datetime-local' },
+      { name: 'armado_start', label: 'Armado - Inicio', type: 'datetime-local' },
+      { name: 'armado_end', label: 'Armado - Fin', type: 'datetime-local' },
+      { name: 'desarme_start', label: 'Desarme - Inicio', type: 'datetime-local' },
+      { name: 'desarme_end', label: 'Desarme - Fin', type: 'datetime-local' },
       { name: 'grace_hours', label: 'Horas extra post-evento', type: 'number' },
       { name: 'pickup_date', label: 'Fecha de retiro', type: 'date' },
       { name: 'pickup_start_time', label: 'Retiro desde', type: 'time' },

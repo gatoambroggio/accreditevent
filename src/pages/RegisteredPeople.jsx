@@ -138,7 +138,7 @@ export default function RegisteredPeople() {
             <Th>Empresa</Th>
             <Th>Email</Th>
             <Th>Evento</Th>
-            <Th>Fases / Fechas</Th>
+            <Th>Fases</Th>
             <Th>Estado</Th>
             <Th>Registrado</Th>
           </tr>
@@ -157,15 +157,9 @@ export default function RegisteredPeople() {
                 {p.event_id ? (eventMap[p.event_id]?.name || '—') : '—'}
               </Td>
               <Td className="text-xs text-slate-500">
-                {(p.phase_dates && p.phase_dates.length > 0) ? (
-                  <div className="space-y-0.5">
-                    {p.phase_dates.map((pd) => (
-                      <div key={pd.phase}>
-                        <span className="font-semibold text-slate-600">{PHASE_LABELS[pd.phase] || pd.phase}:</span> {pd.start_date || '—'} → {pd.end_date || '—'}
-                      </div>
-                    ))}
-                  </div>
-                ) : '—'}
+                {(p.event_phases && p.event_phases.length > 0)
+                  ? p.event_phases.map((ph) => PHASE_LABELS[ph] || ph).join(', ')
+                  : '—'}
               </Td>
               <Td><StatusBadge status={p.status} /></Td>
               <Td className="text-xs text-slate-400">
