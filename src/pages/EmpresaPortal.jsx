@@ -12,6 +12,8 @@ import EmployeeExcelImport from '@/components/empresa/EmployeeExcelImport';
 import SearchInput from '@/components/ui/search-input';
 import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
 import { btnPrimary, btnOutline, btnIcon } from '@/components/ui/button-styles';
+import Pagination from '@/components/ui/pagination';
+import { usePagination } from '@/lib/usePagination';
 import { generateBadgeCode } from '@/lib/badgeCode';
 
 const DOC_TYPES = {
@@ -82,6 +84,8 @@ export default function EmpresaPortal() {
     return list;
   }, [employees, search, filterType]);
 
+  const { page, setPage, totalPages, paginated } = usePagination(filtered, 15);
+
   const stats = useMemo(() => ({
     total: employees.length,
     fijos: employees.filter((e) => (e.employment_type || 'fijo') === 'fijo').length,
@@ -121,10 +125,11 @@ export default function EmpresaPortal() {
         });
       }
     }
-    for (const acc of existing) {
-      if (!eventIds.includes(acc.event_id) && acc.status === 'active') {
-        await base44.entities.Accreditation.update(acc.id, { status: 'revoked' });
-      }
+    const toRevoke = existing.filter((acc) => !eventIds.includes(acc.event_id) && acc.status === 'active');
+    if (toRevoke.length > 0) {
+      await base44.entities.Accreditation.bulkUpdate(
+        toRevoke.map((acc) => ({ id: acc.id, status: 'revoked' }))
+      );
     }
   };
 
@@ -322,7 +327,7 @@ export default function EmpresaPortal() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((emp) => (
+              {paginated.map((emp) => (
                 <Tr key={emp.id}>
                   <Td>
                     <button onClick={() => { setEditingEmployee(emp); setFormOpen(true); }} className="text-left text-sm font-semibold text-slate-900 transition hover:text-emerald-700 hover:underline">
@@ -378,6 +383,10 @@ export default function EmpresaPortal() {
               ))}
             </tbody>
           </DataTable>
+
+          {filtered.length > 15 && (
+            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} totalItems={filtered.length} pageSize={15} />
+          )}
         </div>
 
         {/* Insurance documents */}

@@ -12,6 +12,8 @@ import SearchInput from '@/components/ui/search-input';
 import FilterSelect from '@/components/ui/filter-select';
 import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
 import { btnPrimary, btnOutline, btnIcon } from '@/components/ui/button-styles';
+import Pagination from '@/components/ui/pagination';
+import { usePagination } from '@/lib/usePagination';
 
 const validatePerson = (data) => {
   const e = {};
@@ -35,7 +37,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function People() {
-  const { items, loading, create, update, remove } = useCrud('Person');
+  const { items, loading, error, create, update, remove } = useCrud('Person');
   const { personTypes } = usePersonTypes();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -73,6 +75,8 @@ export default function People() {
     if (companyFilter) result = result.filter((p) => p.company === companyFilter);
     return result;
   }, [items, query, typeFilter, statusFilter, companyFilter]);
+
+  const { page, setPage, totalPages, paginated } = usePagination(filtered, 15);
 
   const handleExport = () => {
     exportToExcel(
@@ -155,8 +159,11 @@ export default function People() {
     }
     if (face_photo_url && face_descriptor?.length) {
       const existing = await base44.entities.Biometric.filter({ person_id: personId, status: 'active' });
-      for (const b of existing) {
-        await base44.entities.Biometric.update(b.id, { status: 'revoked' });
+      if (existing.length > 0) {
+        await base44.entities.Biometric.updateMany(
+          { person_id: personId, status: 'active' },
+          { $set: { status: 'revoked' } }
+        );
       }
       await base44.entities.Biometric.create({
         person_id: personId,
@@ -190,6 +197,7 @@ export default function People() {
 
       <DataTable
         loading={loading}
+        error={error}
         isEmpty={filtered.length === 0}
         emptyMessage={query ? 'Sin resultados para tu búsqueda.' : 'No hay personas registradas todavía.'}
         tableClassName="min-w-[800px]"
@@ -206,7 +214,7 @@ export default function People() {
           </tr>
         </thead>
         <tbody>
-          {filtered.map((p) => (
+          {paginated.map((p) => (
             <Tr key={p.id}>
               <Td>
                 <button onClick={() => setDetailPerson(p)} className="text-left text-sm font-semibold text-slate-900 hover:text-emerald-600">{p.full_name}</button>
@@ -230,6 +238,10 @@ export default function People() {
           ))}
         </tbody>
       </DataTable>
+
+      {filtered.length > 15 && (
+        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} totalItems={filtered.length} pageSize={15} />
+      )}
 
       <EntityModal
         open={modalOpen}

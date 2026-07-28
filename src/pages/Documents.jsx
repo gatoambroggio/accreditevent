@@ -14,6 +14,8 @@ import SearchInput from '@/components/ui/search-input';
 import FilterSelect from '@/components/ui/filter-select';
 import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
 import { btnOutline, btnIcon } from '@/components/ui/button-styles';
+import Pagination from '@/components/ui/pagination';
+import { usePagination } from '@/lib/usePagination';
 
 const TYPE_FIELDS = [
   { name: 'label', label: 'Nombre', type: 'text', required: true, placeholder: 'Ej: Seguro de trabajo' },
@@ -42,7 +44,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function Documents() {
-  const { items, loading, update } = useCrud('Document');
+  const { items, loading, error, update } = useCrud('Document');
   const { docTypes, rawItems, refetch: refetchTypes } = useDocumentTypes();
   const [reviewing, setReviewing] = useState(null);
   const [query, setQuery] = useState('');
@@ -71,6 +73,8 @@ export default function Documents() {
     if (statusFilter) result = result.filter((d) => d.status === statusFilter);
     return result;
   }, [items, query, typeFilter, statusFilter]);
+
+  const { page, setPage, totalPages, paginated } = usePagination(filtered, 15);
 
   const docTypeLabel = (value) => docTypes.find((t) => t.value === value)?.label || value;
 
@@ -183,6 +187,7 @@ export default function Documents() {
 
       <DataTable
         loading={loading}
+        error={error}
         isEmpty={filtered.length === 0}
         emptyMessage={query || typeFilter || statusFilter ? 'Sin resultados para tu búsqueda.' : 'No hay documentos cargados.'}
         tableClassName="min-w-[800px]"
@@ -198,7 +203,7 @@ export default function Documents() {
           </tr>
         </thead>
         <tbody>
-          {filtered.map((d) => (
+          {paginated.map((d) => (
             <Tr key={d.id}>
               <Td className="text-sm font-semibold text-slate-900">{d.person_name || '—'}</Td>
               <Td className="text-sm text-slate-500">{docTypeLabel(d.document_type)}</Td>
@@ -220,6 +225,10 @@ export default function Documents() {
           ))}
         </tbody>
       </DataTable>
+
+      {filtered.length > 15 && (
+        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} totalItems={filtered.length} pageSize={15} />
+      )}
 
       <EntityModal
         open={!!reviewing}

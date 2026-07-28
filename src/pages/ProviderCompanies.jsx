@@ -10,9 +10,11 @@ import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
 import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
 import { btnPrimary, btnOutline, btnIcon } from '@/components/ui/button-styles';
+import Pagination from '@/components/ui/pagination';
+import { usePagination } from '@/lib/usePagination';
 
 export default function ProviderCompanies() {
-  const { items, loading, create, update, remove } = useCrud('ProviderCompany');
+  const { items, loading, error, create, update, remove } = useCrud('ProviderCompany');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [query, setQuery] = useState('');
@@ -31,6 +33,8 @@ export default function ProviderCompanies() {
     if (!q) return items;
     return items.filter((c) => `${c.name} ${c.description || ''}`.toLowerCase().includes(q));
   }, [items, query]);
+
+  const { page, setPage, totalPages, paginated } = usePagination(filtered, 15);
 
   const fields = [
     { name: 'name', label: 'Nombre de la empresa', type: 'text', required: true, full: true, placeholder: 'Ej: Audiovisuales del Sur SA' },
@@ -78,6 +82,7 @@ export default function ProviderCompanies() {
 
       <DataTable
         loading={loading}
+        error={error}
         isEmpty={filtered.length === 0}
         emptyIcon={Briefcase}
         emptyMessage={query ? 'Sin resultados para tu búsqueda.' : 'No hay empresas proveedoras registradas. Creá la primera.'}
@@ -92,7 +97,7 @@ export default function ProviderCompanies() {
           </tr>
         </thead>
         <tbody>
-          {filtered.map((c) => (
+          {paginated.map((c) => (
             <Tr key={c.id}>
               <Td>
                 <div className="flex items-center gap-3">
@@ -151,6 +156,10 @@ export default function ProviderCompanies() {
           ))}
         </tbody>
       </DataTable>
+
+      {filtered.length > 15 && (
+        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} totalItems={filtered.length} pageSize={15} />
+      )}
 
       <EntityModal
         open={modalOpen}

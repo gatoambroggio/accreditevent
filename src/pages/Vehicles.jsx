@@ -14,6 +14,8 @@ import SearchInput from '@/components/ui/search-input';
 import FilterSelect from '@/components/ui/filter-select';
 import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
 import { btnPrimary, btnOutline, btnIconSm } from '@/components/ui/button-styles';
+import Pagination from '@/components/ui/pagination';
+import { usePagination } from '@/lib/usePagination';
 
 const VEHICLE_STATUS_OPTIONS = [
   { value: 'approved', label: 'Aprobado' },
@@ -37,7 +39,7 @@ const validateVehicle = (data) => {
 };
 
 export default function Vehicles() {
-  const { items, loading, create, update, remove, reload } = useCrud('Vehicle');
+  const { items, loading, error, create, update, remove, reload } = useCrud('Vehicle');
   const { user: currentUser } = useAuth();
   const isProductora = currentUser?.role === 'productora';
   const [modalOpen, setModalOpen] = useState(false);
@@ -82,6 +84,8 @@ export default function Vehicles() {
       return `${v.person_name || ''} ${v.brand || ''} ${v.model || ''} ${v.plate || ''} ${personDoc}`.toLowerCase().includes(q);
     });
   }, [items, activeEventIds, isProductora, currentUser, query, statusFilter, people]);
+
+  const { page, setPage, totalPages, paginated } = usePagination(filtered, 15);
 
   const handleStatusChange = async (vehicle, newStatus) => {
     try {
@@ -241,6 +245,7 @@ export default function Vehicles() {
 
       <DataTable
         loading={loading}
+        error={error}
         isEmpty={filtered.length === 0}
         emptyIcon={Car}
         emptyMessage={query ? 'Sin resultados para tu búsqueda.' : 'No hay vehículos registrados todavía.'}
@@ -267,7 +272,7 @@ export default function Vehicles() {
           </tr>
         </thead>
         <tbody>
-          {filtered.map((v) => (
+          {paginated.map((v) => (
             <Tr key={v.id}>
               <Td>
                 <input
@@ -318,6 +323,10 @@ export default function Vehicles() {
           ))}
         </tbody>
       </DataTable>
+
+      {filtered.length > 15 && (
+        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} totalItems={filtered.length} pageSize={15} />
+      )}
 
       <EntityModal
         open={modalOpen}

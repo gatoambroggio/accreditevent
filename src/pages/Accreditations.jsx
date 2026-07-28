@@ -16,6 +16,8 @@ import SearchInput from '@/components/ui/search-input';
 import FilterSelect from '@/components/ui/filter-select';
 import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
 import { btnPrimary, btnOutline, btnIcon } from '@/components/ui/button-styles';
+import Pagination from '@/components/ui/pagination';
+import { usePagination } from '@/lib/usePagination';
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Activa' },
@@ -24,7 +26,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function Accreditations() {
-  const { items, loading, create, update, remove, reload } = useCrud('Accreditation');
+  const { items, loading, error, create, update, remove, reload } = useCrud('Accreditation');
   const { zones } = useZones();
   const { personTypes } = usePersonTypes();
   const typePrefixes = useMemo(() => {
@@ -69,6 +71,8 @@ export default function Accreditations() {
     }
     return result;
   }, [items, eventFilter, statusFilter, query]);
+
+  const { page, setPage, totalPages, paginated } = usePagination(filtered, 15);
 
   const toggleSelect = (id) => {
     setSelected((prev) => {
@@ -268,7 +272,7 @@ export default function Accreditations() {
         <FilterSelect value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} placeholder="Todos los estados" />
       </div>
 
-      <DataTable loading={loading} isEmpty={filtered.length === 0} emptyMessage="No hay acreditaciones registradas." tableClassName="min-w-[800px]">
+      <DataTable loading={loading} error={error} isEmpty={filtered.length === 0} emptyMessage="No hay acreditaciones registradas." tableClassName="min-w-[800px]">
         <thead>
           <tr className="border-b border-slate-100 bg-slate-50">
             <Th>
@@ -289,7 +293,7 @@ export default function Accreditations() {
           </tr>
         </thead>
         <tbody>
-          {filtered.map((a) => (
+          {paginated.map((a) => (
             <Tr key={a.id}>
               <Td>
                 <input
@@ -324,6 +328,10 @@ export default function Accreditations() {
           ))}
         </tbody>
       </DataTable>
+
+      {filtered.length > 15 && (
+        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} totalItems={filtered.length} pageSize={15} />
+      )}
 
       <EntityModal
         open={modalOpen}
