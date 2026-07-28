@@ -1,0 +1,182 @@
+{
+  "name": "EventCompanyApproval",
+  "type": "object",
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "description": "Evento asociado"
+    },
+    "event_name": {
+      "type": "string",
+      "description": "Nombre del evento (denormalizado)"
+    },
+    "company": {
+      "type": "string",
+      "description": "Empresa productora (denormalizado para RLS)"
+    },
+    "provider_company": {
+      "type": "string",
+      "description": "Nombre de la empresa proveedora"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "rejected"
+      ],
+      "default": "pending",
+      "description": "Estado de aprobaci\u00f3n"
+    },
+    "approved_by": {
+      "type": "string",
+      "description": "Usuario que aprob\u00f3/rechaz\u00f3"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas internas"
+    }
+  },
+  "required": [
+    "event_id",
+    "provider_company"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "empresa"
+              }
+            },
+            {
+              "data.provider_company": "{{user.data.company}}"
+            }
+          ]
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
