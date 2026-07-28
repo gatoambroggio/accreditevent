@@ -202,20 +202,8 @@ export default function AccessControl({ standalone = false }) {
 
       // Descriptor didn't match or no descriptor — fall back to LLM visual comparison
       // (handles DNI-based biometrics where descriptor quality may be poor)
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      const verifyRes = await base44.functions.invoke('faceVerify', {
-        accreditation_id: found.id,
-        captured_photo_url: file_url,
-      });
-      const llmVerified = verifyRes.data?.verified === true;
-
-      if (llmVerified && canAccessAnyZone(found.access_level, selectedZones)) {
-        // faceVerify already logged 'granted'
-        setResult({ ok: true, method: 'biometric', accred: found });
-      } else if (llmVerified) {
-        // Face matched but zone denied — log the zone denial
+      if (!storedBio.face_photo_url) {
         const me = await base44.auth.me();
-        const zoneLabel = selectedZones.map((z) => zones.find((zz) => zz.value === z)?.label || z).join(', ');
         await base44.entities.AccessLog.create({
           accreditation_id: found.id,
           person_name: found.person_name,
@@ -229,12 +217,75 @@ export default function AccessControl({ standalone = false }) {
           result: 'denied',
           access_level: found.access_level,
         });
+        setResult({ ok: false, message: 'Sin foto de rostro registrada para esta persona.', accred: found });
+        setFound(null);
+        setBadgeCode('');
+        await loadRecent();
+        return;
+      }
+
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const llmResult = await base44.integrations.Core.InvokeLLM({
+        model: 'claude_sonnet_4_6',
+        prompt:
+          'Sos un sistema de verificación biométrica de identidad.\n' +
+          'IMAGEN 1: foto de registro de la persona (referencia).\n' +
+          'IMAGEN 2: captura en vivo tomada con cámara web.\n\n' +
+          'INSTRUCCIONES:\n' +
+          '1. Verificá que la IMAGEN 2 contenga un ROSTRO HUMANO claramente visible y frontal. ' +
+          'Si NO hay un rostro humano, devolvé match: false y confidence: 0.\n' +
+          '2. Si hay un rostro humano, compará cuidadosamente con la IMAGEN 1 analizando:\n' +
+          '   - Forma y proporciones del rostro\n' +
+          '   - Distancia entre ojos y posición relativa\n' +
+          '   - Forma y tamaño de la nariz\n' +
+          '   - Forma de la boca y grosor de labios\n' +
+          '   - Cejas: forma, grosor, curvatura y posición\n' +
+          '   - Línea mandibular y mentón\n' +
+          '   - Color y estilo de cabello (si visible)\n' +
+          '3. Solo devolvé match: true si estás MUY seguro de que es la misma persona. ' +
+          'Ante la MÍNIMA duda, devolvé match: false.\n' +
+          'Respondé únicamente con el JSON.',
+        file_urls: [storedBio.face_photo_url, file_url],
+        response_json_schema: {
+          type: 'object',
+          properties: {
+            match: { type: 'boolean' },
+            confidence: { type: 'number' },
+            reason: { type: 'string' },
+          },
+          required: ['match', 'confidence'],
+        },
+      });
+
+      const llmMatch = llmResult.match === true || llmResult.match === 'true';
+      const llmVerified = llmMatch && (Number(llmResult.confidence) || 0) >= 0.7;
+
+      const me = await base44.auth.me();
+      const zoneLabel = selectedZones.map((z) => zones.find((zz) => zz.value === z)?.label || z).join(', ');
+      const zoneOk = canAccessAnyZone(found.access_level, selectedZones);
+
+      await base44.entities.AccessLog.create({
+        accreditation_id: found.id,
+        person_name: found.person_name,
+        badge_code: found.badge_code,
+        event_name: found.event_name,
+        event_id: found.event_id,
+        company: found.company,
+        verified_by: me?.full_name || me?.email || 'Sistema',
+        method: 'biometric',
+        zone: selectedZones.join(', '),
+        result: llmVerified && zoneOk ? 'granted' : 'denied',
+        access_level: found.access_level,
+      });
+
+      if (llmVerified && zoneOk) {
+        setResult({ ok: true, method: 'biometric', accred: found });
+      } else if (llmVerified) {
         setResult({ ok: false, message: `Acceso restringido para la zona: ${zoneLabel}.`, accred: found });
       } else {
-        // faceVerify already logged 'denied'
         setResult({
           ok: false,
-          message: verifyRes.data?.reason || 'El rostro no coincide con el registrado.',
+          message: llmResult.reason || 'El rostro no coincide con el registrado.',
           accred: found,
         });
       }
