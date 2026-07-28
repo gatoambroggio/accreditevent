@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, UserPlus, FileImage, ScanFace, CheckCircle2 } from 'lucide-react';
+import { X, Loader2, UserPlus, FileImage, ScanFace, CheckCircle2, FileText } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { Image } from '@/components/ui/image';
 import FaceCapture from '@/components/FaceCapture';
 
 const EMPTY = { first_name: '', last_name: '', document: '', phone: '', employment_type: 'fijo', event_phases: [], notes: '' };
@@ -16,10 +17,18 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
-  const [form, setForm] = useState(() => {
+  const [form, setForm] = useState(EMPTY);
+  const [dniFile, setDniFile] = useState(null);
+  const [faceFile, setFaceFile] = useState(null);
+  const [faceDescriptor, setFaceDescriptor] = useState(null);
+  const [existingDni, setExistingDni] = useState(null);
+  const [existingFaceUrl, setExistingFaceUrl] = useState(null);
+
+  useEffect(() => {
+    if (!open) return;
     if (editing) {
       const parts = (editing.full_name || '').split(' ');
-      return {
+      setForm({
         first_name: parts[0] || '',
         last_name: parts.slice(1).join(' '),
         document: editing.document || '',
@@ -27,22 +36,22 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
         employment_type: normalizeType(editing.employment_type),
         event_phases: Array.isArray(editing.event_phases) ? editing.event_phases : [],
         notes: editing.notes || '',
-      };
-    }
-    return EMPTY;
-  });
-  const [dniFile, setDniFile] = useState(null);
-  const [faceFile, setFaceFile] = useState(null);
-  const [faceDescriptor, setFaceDescriptor] = useState(null);
-  const [hasBiometric, setHasBiometric] = useState(false);
-
-  useEffect(() => {
-    if (editing?.id) {
+      });
+      base44.entities.Document.filter({ person_id: editing.id, document_type: 'dni' })
+        .then((docs) => setExistingDni(docs[0] || null))
+        .catch(() => setExistingDni(null));
       base44.entities.Biometric.filter({ person_id: editing.id, status: 'active' })
-        .then((existing) => setHasBiometric(existing.length > 0))
-        .catch(() => setHasBiometric(false));
+        .then((existing) => setExistingFaceUrl(existing[0]?.face_photo_url || null))
+        .catch(() => setExistingFaceUrl(null));
+    } else {
+      setForm(EMPTY);
+      setExistingDni(null);
+      setExistingFaceUrl(null);
     }
-  }, []);
+    setDniFile(null);
+    setFaceFile(null);
+    setFaceDescriptor(null);
+  }, [editing, open]);
 
   const setField = (name, value) => setForm((f) => ({ ...f, [name]: value }));
 
@@ -129,6 +138,7 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
   if (!open) return null;
 
   const inputCls = 'w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20';
+  const isPdf = existingDni?.file_url?.match(/\.(pdf)$/i);
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-sm sm:p-6">
@@ -201,10 +211,24 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
             <textarea value={form.notes} onChange={(e) => setField('notes', e.target.value)} rows={2} className={inputCls} placeholder="Observaciones internas…" />
           </label>
 
+          {/* DNI */}
           <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
             <p className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
               <FileImage className="h-4 w-4" /> Foto / escane del DNI
             </p>
+            {existingDni && !dniFile && (
+              <div className="mb-3">
+                {isPdf ? (
+                  <a href={existingDni.file_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-emerald-700 hover:underline">
+                    <FileText className="h-4 w-4" /> Ver DNI actual (PDF)
+                  </a>
+                ) : (
+                  <div className="h-28 w-full overflow-hidden rounded-lg border border-slate-200">
+                    <Image src={existingDni.file_url} fittingType="fit" className="h-full w-full" alt="DNI actual" />
+                  </div>
+                )}
+              </div>
+            )}
             <input
               type="file"
               accept="image/jpeg,image/png,application/pdf"
@@ -214,17 +238,23 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
             {dniFile && <p className="mt-2 text-xs text-emerald-700">{dniFile.name}</p>}
           </div>
 
+          {/* Biometric */}
           <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
             <div className="mb-3 flex items-center justify-between">
               <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
                 <ScanFace className="h-4 w-4" /> Foto biométrica
               </p>
-              {hasBiometric && !faceFile && (
+              {existingFaceUrl && !faceFile && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
                   <CheckCircle2 className="h-3 w-3" /> Ya registrada
                 </span>
               )}
             </div>
+            {existingFaceUrl && !faceFile && (
+              <div className="mb-3 h-28 w-full overflow-hidden rounded-lg border border-slate-200">
+                <Image src={existingFaceUrl} fittingType="fit" className="h-full w-full" alt="Foto biométrica actual" />
+              </div>
+            )}
             <FaceCapture
               onCaptured={(file, descriptor) => {
                 setFaceFile(file);

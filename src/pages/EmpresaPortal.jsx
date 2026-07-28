@@ -257,7 +257,9 @@ export default function EmpresaPortal() {
               {filtered.map((emp) => (
                 <Tr key={emp.id}>
                   <Td>
-                    <p className="text-sm font-semibold text-slate-900">{emp.full_name}</p>
+                    <button onClick={() => { setEditingEmployee(emp); setFormOpen(true); }} className="text-left text-sm font-semibold text-slate-900 transition hover:text-emerald-700 hover:underline">
+                      {emp.full_name}
+                    </button>
                     {emp.notes && <p className="text-xs text-slate-400">{emp.notes}</p>}
                   </Td>
                   <Td className="text-sm text-slate-500">{emp.document || '—'}</Td>
