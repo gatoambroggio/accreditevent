@@ -105,10 +105,14 @@ export default function AccreditationFacial() {
 
       let personType = 'guest';
       let personEmail = '';
+      let personAccessArea = 'general';
+      let personPhases = [];
       try {
         const person = await base44.entities.Person.get(personId);
         if (person?.person_type) personType = person.person_type;
         if (person?.email) personEmail = person.email;
+        if (person?.access_area) personAccessArea = person.access_area;
+        if (Array.isArray(person?.event_phases)) personPhases = person.event_phases;
       } catch {}
 
       // Block accreditation if the person has pending/rejected/expired documentation
@@ -134,7 +138,9 @@ export default function AccreditationFacial() {
         person_type: personType,
         person_email: personEmail,
         badge_code: badgeCode,
-        access_level: 'general',
+        area: personAccessArea,
+        access_level: personAccessArea,
+        event_phases: personPhases,
         status: 'active',
         has_biometric: true,
       });
