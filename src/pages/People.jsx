@@ -38,7 +38,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function People() {
-  const { items, loading, error, create, update, remove } = useCrud('Person');
+  const { items, loading, error, create, update, remove, reload } = useCrud('Person');
   const { personTypes } = usePersonTypes();
   const { zones } = useZones();
   const [modalOpen, setModalOpen] = useState(false);
@@ -185,7 +185,10 @@ export default function People() {
       });
     }
   };
-  const handleDelete = async () => { await remove(editing.id); };
+  const handleDelete = async () => {
+    await base44.functions.invoke('deletePerson', { person_id: editing.id });
+    await reload();
+  };
 
   return (
     <div className="space-y-6">
