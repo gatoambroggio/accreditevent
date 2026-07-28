@@ -41,18 +41,20 @@ export function compareDescriptors(d1, d2) {
 export const MATCH_THRESHOLD = 0.7;
 
 export function findBestMatch(capturedDescriptor, storedEntries) {
-  let bestMatch = null;
-  let bestDistance = Infinity;
+  const scored = [];
   for (const entry of storedEntries) {
     if (!entry.face_descriptor || entry.face_descriptor.length === 0) continue;
     const distance = compareDescriptors(capturedDescriptor, entry.face_descriptor);
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      bestMatch = entry;
-    }
+    scored.push({ entry, distance });
   }
-  if (bestDistance < MATCH_THRESHOLD) {
-    return { match: bestMatch, distance: bestDistance, bestEntry: bestMatch };
+  scored.sort((a, b) => a.distance - b.distance);
+
+  const best = scored[0];
+  if (!best) {
+    return { match: null, distance: Infinity, bestEntry: null, topEntries: [] };
   }
-  return { match: null, distance: bestDistance, bestEntry: bestMatch };
+  if (best.distance < MATCH_THRESHOLD) {
+    return { match: best.entry, distance: best.distance, bestEntry: best.entry, topEntries: scored };
+  }
+  return { match: null, distance: best.distance, bestEntry: best.entry, topEntries: scored };
 }

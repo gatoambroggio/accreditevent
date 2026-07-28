@@ -118,49 +118,76 @@ export default function AccessStation() {
       );
 
       // Find best match using face-api.js descriptors
-      const { match, distance, bestEntry } = findBestMatch(descriptor, withDescriptors);
+      const { match, distance, topEntries } = findBestMatch(descriptor, withDescriptors);
 
       let matchedBio = match;
 
-      // If descriptor didn't match but we have a close candidate, try LLM visual comparison
-      // (handles DNI-based biometrics where descriptor quality may be poor)
-      if (!matchedBio && bestEntry && bestEntry.face_photo_url) {
-        const { file_url } = await base44.integrations.Core.UploadFile({ file });
-        const llmResult = await base44.integrations.Core.InvokeLLM({
-          model: 'claude_sonnet_4_6',
-          prompt:
-            'Sos un sistema de verificación biométrica de identidad.\n' +
-            'IMAGEN 1: foto de registro de la persona (referencia).\n' +
-            'IMAGEN 2: captura en vivo tomada con cámara web.\n\n' +
-            'INSTRUCCIONES:\n' +
-            '1. Verificá que la IMAGEN 2 contenga un ROSTRO HUMANO claramente visible y frontal. ' +
-            'Si NO hay un rostro humano, devolvé match: false y confidence: 0.\n' +
-            '2. Si hay un rostro humano, compará cuidadosamente con la IMAGEN 1 analizando:\n' +
-            '   - Forma y proporciones del rostro\n' +
-            '   - Distancia entre ojos y posición relativa\n' +
-            '   - Forma y tamaño de la nariz\n' +
-            '   - Forma de la boca y grosor de labios\n' +
-            '   - Cejas: forma, grosor, curvatura y posición\n' +
-            '   - Línea mandibular y mentón\n' +
-            '   - Color y estilo de cabello (si visible)\n' +
-            '3. Solo devolvé match: true si estás MUY seguro de que es la misma persona. ' +
-            'Ante la MÍNIMA duda, devolvé match: false.\n' +
-            'Respondé únicamente con el JSON.',
-          file_urls: [bestEntry.face_photo_url, file_url],
-          response_json_schema: {
-            type: 'object',
-            properties: {
-              match: { type: 'boolean' },
-              confidence: { type: 'number' },
-              reason: { type: 'string' },
-            },
-            required: ['match', 'confidence'],
-          },
-        });
-        const llmMatch = llmResult.match === true || llmResult.match === 'true';
-        const llmConfidence = Number(llmResult.confidence) || 0;
-        if (llmMatch && llmConfidence >= 0.7) {
-          matchedBio = bestEntry;
+      // If descriptor didn't match, try LLM batch comparison with top candidates
+      // (handles cases where descriptor quality is poor — DNI photos, lighting, angle, etc.)
+      if (!matchedBio) {
+        // Get top 8 candidates with photos (ranked by descriptor distance)
+        let candidates = topEntries
+          .slice(0, 8)
+          .map((t) => t.entry)
+          .filter((e) => e.face_photo_url);
+
+        // If not enough from descriptor ranking, add remaining photo-only biometrics
+        if (candidates.length < 8) {
+          const existingIds = new Set(candidates.map((c) => c.id));
+          const additional = bios
+            .filter((b) => b.face_photo_url && !existingIds.has(b.id))
+            .slice(0, 8 - candidates.length);
+          candidates = [...candidates, ...additional];
+        }
+
+        if (candidates.length > 0) {
+          const { file_url } = await base44.integrations.Core.UploadFile({ file });
+
+          for (let i = 0; i < candidates.length; i += 8) {
+            const batch = candidates.slice(i, i + 8);
+            const fileUrls = [file_url, ...batch.map((b) => b.face_photo_url)];
+
+            const llmResult = await base44.integrations.Core.InvokeLLM({
+              model: 'claude_sonnet_4_6',
+              prompt:
+                `Sos un sistema de identificación biométrica facial. Vas a recibir ${batch.length + 1} imágenes.\n` +
+                `IMAGEN 1 (índice 1): captura en vivo de una cámara.\n` +
+                `IMÁGENES 2 a ${batch.length + 1}: fotos de registro de diferentes personas.\n\n` +
+                `INSTRUCCIONES:\n` +
+                `1. Verificá PRIMERO que la IMAGEN 1 contenga un ROSTRO HUMANO claramente visible y frontal. ` +
+                `Si NO hay un rostro humano, devolvé match_index: 0 y confidence: 0.\n` +
+                `2. Si hay un rostro humano, compará con CADA foto de registro analizando:\n` +
+                `   - Forma y proporciones del rostro\n` +
+                `   - Distancia entre ojos y posición relativa\n` +
+                `   - Forma y tamaño de la nariz\n` +
+                `   - Forma de la boca y grosor de labios\n` +
+                `   - Cejas: forma, grosor, curvatura y posición\n` +
+                `   - Línea mandibular y mentón\n` +
+                `   - Color y estilo de cabello (si visible)\n` +
+                `3. Solo devolvé un match_index distinto de 0 si estás MUY seguro de que es la misma persona. ` +
+                `Ante la MÍNIMA duda, devolvé match_index: 0.\n` +
+                `Respondé únicamente con el JSON.`,
+              file_urls: fileUrls,
+              response_json_schema: {
+                type: 'object',
+                properties: {
+                  match_index: {
+                    type: 'number',
+                    description: 'Índice basado en 1 de la imagen que coincide, o 0 si no hay coincidencia',
+                  },
+                  confidence: { type: 'number', description: 'Nivel de confianza de 0 a 1' },
+                },
+                required: ['match_index', 'confidence'],
+              },
+            });
+
+            const matchIndex = Number(llmResult.match_index) || 0;
+            const confidence = Number(llmResult.confidence) || 0;
+            if (matchIndex >= 2 && confidence >= 0.7) {
+              matchedBio = batch[matchIndex - 2];
+              break;
+            }
+          }
         }
       }
 
