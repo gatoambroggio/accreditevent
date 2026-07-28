@@ -3,6 +3,8 @@ import { base44 } from '@/api/base44Client';
 import { isWithinEventPhases, speakResult } from '@/lib/accessUtils';
 import { canAccessZone } from '@/lib/accessZones';
 import { Search, CheckCircle2, XCircle, ArrowLeft } from 'lucide-react';
+import PageHeader from '@/components/ui/page-header';
+import SearchInput from '@/components/ui/search-input';
 
 const ZONES = [
   { value: 'general', label: 'General' },
@@ -11,8 +13,6 @@ const ZONES = [
   { value: 'vip', label: 'VIP' },
   { value: 'all-access', label: 'All Access' },
 ];
-import PageHeader from '@/components/ui/page-header';
-import SearchInput from '@/components/ui/search-input';
 
 export default function AccessManual() {
   const [events, setEvents] = useState([]);
