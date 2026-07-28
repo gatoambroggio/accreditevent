@@ -1,185 +1,108 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useAuth } from '@/lib/AuthContext';
-import { CheckCircle2, XCircle, Loader2, Radio, Users, TrendingUp, AlertTriangle } from 'lucide-react';
-import { formatTimeWithSeconds } from '@/lib/formatDate';
-import { useZones } from '@/lib/useZones';
+import { formatDateTime } from '@/lib/formatDate';
+import { Radio, CheckCircle2, XCircle } from 'lucide-react';
+import PageHeader from '@/components/ui/page-header';
+import FilterSelect from '@/components/ui/filter-select';
 
 export default function AccessMonitor() {
-  const { user } = useAuth();
-  const { zones } = useZones();
   const [logs, setLogs] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [eventFilter, setEventFilter] = useState('');
+  const [resultFilter, setResultFilter] = useState('');
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ granted: 0, denied: 0, total: 0 });
-  const [flashId, setFlashId] = useState(null);
-  const flashTimer = useRef(null);
 
   useEffect(() => {
-    const isProductora = user?.role === 'productora';
-    const userCompany = user?.company || user?.data?.company || '';
-    const userEventIds = isProductora ? (user?.assigned_event_ids || user?.data?.assigned_event_ids || []) : [];
+    base44.entities.Event.list('-created_date', 50).then(setEvents).catch(() => {});
+  }, []);
 
-    const shouldShowLog = (log) => {
-      if (isProductora) {
-        if (!userCompany) return false;
-        return log.company === userCompany;
-      }
-      if (!userEventIds || userEventIds.length === 0) return true;
-      return userEventIds.includes(log.event_id);
-    };
-
-    (async () => {
+  useEffect(() => {
+    let unsubscribe = null;
+    const load = async () => {
       try {
-        const data = await base44.entities.AccessLog.list('-created_date', 50);
-        const filtered = data.filter(shouldShowLog);
-        setLogs(filtered);
-        computeStats(filtered);
-      } catch {}
-      setLoading(false);
-    })();
-
-    const unsubscribe = base44.entities.AccessLog.subscribe((event) => {
-      if (event.type === 'create' && event.data) {
-        if (!shouldShowLog(event.data)) return;
-        setLogs((prev) => [event.data, ...prev].slice(0, 50));
-        setStats((prev) => ({
-          granted: prev.granted + (event.data.result !== 'denied' ? 1 : 0),
-          denied: prev.denied + (event.data.result === 'denied' ? 1 : 0),
-          total: prev.total + 1,
-        }));
-        setFlashId(event.data.id);
-        if (flashTimer.current) clearTimeout(flashTimer.current);
-        flashTimer.current = setTimeout(() => setFlashId(null), 2000);
-      }
-    });
-
-    return () => {
-      unsubscribe();
-      if (flashTimer.current) clearTimeout(flashTimer.current);
+        const data = await base44.entities.AccessLog.list('-created_date', 100);
+        setLogs(data);
+        setLoading(false);
+        // Subscribe to real-time updates
+        unsubscribe = base44.entities.AccessLog.subscribe((event) => {
+          setLogs((prev) => {
+            if (event.type === 'create') return [event.data, ...prev].slice(0, 100);
+            return prev;
+          });
+        });
+      } catch { setLoading(false); }
     };
-  }, [user]);
+    load();
+    return () => { if (unsubscribe) unsubscribe(); };
+  }, []);
 
-  const computeStats = (data) => {
-    setStats({
-      granted: data.filter((l) => l.result !== 'denied').length,
-      denied: data.filter((l) => l.result === 'denied').length,
-      total: data.length,
-    });
-  };
+  const filtered = logs.filter((l) => {
+    if (eventFilter && l.event_id !== eventFilter) return false;
+    if (resultFilter && l.result !== resultFilter) return false;
+    return true;
+  });
 
-  if (loading) {
-    return (
-      <div className="flex justify-center py-16">
-        <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
-      </div>
-    );
-  }
+  const granted = filtered.filter((l) => l.result === 'granted').length;
+  const denied = filtered.filter((l) => l.result === 'denied').length;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between">
-        <div>
-          <p className="font-mono text-[10px] uppercase tracking-wider text-emerald-600">Monitoreo</p>
-          <h1 className="mt-1 flex items-center gap-2 text-3xl font-extrabold tracking-tight text-slate-900">
-            Monitor en tiempo real
-            <span className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">
-              <Radio className="h-3 w-3 animate-pulse" /> EN VIVO
-            </span>
-          </h1>
+      <PageHeader kicker="Tiempo real" title="Monitor de accesos">
+      </PageHeader>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-slate-500"><Radio className="h-4 w-4" /><span className="text-xs font-semibold">Total</span></div>
+          <p className="mt-1 text-2xl font-extrabold text-slate-900">{filtered.length}</p>
+        </div>
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+          <div className="flex items-center gap-2 text-emerald-700"><CheckCircle2 className="h-4 w-4" /><span className="text-xs font-semibold">Permitidos</span></div>
+          <p className="mt-1 text-2xl font-extrabold text-emerald-700">{granted}</p>
+        </div>
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+          <div className="flex items-center gap-2 text-red-700"><XCircle className="h-4 w-4" /><span className="text-xs font-semibold">Denegados</span></div>
+          <p className="mt-1 text-2xl font-extrabold text-red-700">{denied}</p>
         </div>
       </div>
 
-      {/* Live stats */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
-              <CheckCircle2 className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-3xl font-extrabold text-emerald-600">{stats.granted}</p>
-              <p className="text-xs text-slate-500">Ingresos concedidos</p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-red-50 text-red-600">
-              <XCircle className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-3xl font-extrabold text-red-600">{stats.denied}</p>
-              <p className="text-xs text-slate-500">Accesos denegados</p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-600">
-              <TrendingUp className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-3xl font-extrabold text-slate-900">{stats.total}</p>
-              <p className="text-xs text-slate-500">Total de eventos</p>
-            </div>
-          </div>
-        </div>
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <FilterSelect value={eventFilter} onChange={setEventFilter} options={events.map((e) => ({ value: e.id, label: e.name }))} placeholder="Todos los eventos" />
+        <FilterSelect value={resultFilter} onChange={setResultFilter} options={[
+          { value: 'granted', label: 'Permitidos' },
+          { value: 'denied', label: 'Denegados' },
+        ]} placeholder="Todos los resultados" />
       </div>
 
-      {/* Live feed */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-          <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900">
-            <Radio className="h-4 w-4 animate-pulse text-emerald-600" /> Flujo de accesos
-          </h2>
-          <span className="text-xs text-slate-400">Actualización automática</span>
-        </div>
-
-        {logs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16">
-            <Users className="h-10 w-10 text-slate-300" />
-            <p className="mt-3 text-sm text-slate-400">Esperando eventos de acceso…</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-50">
-            {logs.map((log) => {
-              const isDenied = log.result === 'denied';
-              const isFlash = flashId === log.id;
-              return (
-                <div
-                  key={log.id}
-                  className={`flex items-center gap-4 px-5 py-4 transition-colors duration-1000 ${
-                    isFlash ? (isDenied ? 'bg-red-50' : 'bg-emerald-50') : ''
-                  }`}
-                >
-                  <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${isDenied ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>
-                    {isDenied ? <XCircle className="h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />}
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="max-h-[60vh] overflow-y-auto divide-y divide-slate-50">
+          {loading ? (
+            <div className="py-16 text-center text-sm text-slate-400">Cargando…</div>
+          ) : filtered.length === 0 ? (
+            <div className="py-16 text-center text-sm text-slate-400">Sin actividad reciente.</div>
+          ) : (
+            filtered.map((log) => (
+              <div key={log.id} className="flex items-center justify-between px-5 py-3.5 transition hover:bg-slate-50">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                    log.result === 'granted' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
+                  }`}>
+                    {log.result === 'granted' ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold text-slate-900">{log.person_name || 'Desconocido'}</p>
-                    <p className="text-xs text-slate-500">
-                      {log.event_name || 'Sin evento'}
-                      {log.zone ? ` · ${log.zone.split(',').map((z) => zones.find((zz) => zz.value === z.trim())?.label || z.trim()).join(', ')}` : ''}
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-900">{log.person_name || log.badge_code}</p>
+                    <p className="text-xs text-slate-400">
+                      {log.event_name} · {log.zone || 'Sin zona'} · {log.method}
                     </p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-3">
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${
-                      isDenied
-                        ? 'bg-red-50 text-red-700 ring-red-200'
-                        : 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-                    }`}>
-                      {isDenied ? 'Denegado' : 'Concedido'}
-                    </span>
-                    <div className="text-right">
-                      <p className="font-mono text-sm font-medium text-slate-700">{formatTimeWithSeconds(log.created_date)}</p>
-                      <p className="text-[10px] text-slate-400">{log.method === 'biometric' ? 'Facial' : 'Manual'}</p>
-                    </div>
-                  </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+                <div className="text-right">
+                  <p className="text-xs font-medium text-slate-500">{formatDateTime(log.created_date)}</p>
+                  <p className="text-[10px] text-slate-400">{log.access_level || ''}</p>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );

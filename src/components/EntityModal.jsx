@@ -1,9 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Trash2, Loader2, Upload } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import AddressInput from '@/components/AddressInput';
 import FaceCapture from '@/components/FaceCapture';
 
+/**
+ * EntityModal — generic entity form modal.
+ *
+ * KEY FIX: Uses a ref to track the latest form data so that onFieldChange
+ * callbacks always receive fresh data, not stale state from the render closure.
+ * This fixes the person→accreditation inheritance bugs where access_area and
+ * event_phases were lost when setField was called multiple times in the same tick.
+ */
 export default function EntityModal({
   open,
   onClose,
@@ -24,10 +32,12 @@ export default function EntityModal({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [errors, setErrors] = useState({});
+  const dataRef = useRef({});
 
   useEffect(() => {
     if (open) {
       setData(initialData || {});
+      dataRef.current = initialData || {};
       setError('');
       setErrors({});
     }
@@ -36,9 +46,11 @@ export default function EntityModal({
   if (!open) return null;
 
   const setField = (name, value) => {
-    setData((d) => ({ ...d, [name]: value }));
+    const next = { ...dataRef.current, [name]: value };
+    dataRef.current = next;
+    setData(next);
     setErrors((e) => ({ ...e, [name]: undefined }));
-    if (onFieldChange) onFieldChange(name, value, setField, data);
+    if (onFieldChange) onFieldChange(name, value, setField, next);
   };
 
   const handleSubmit = async (e) => {
@@ -46,7 +58,7 @@ export default function EntityModal({
     setSaving(true);
     setError('');
     if (validate) {
-      const validationErrors = validate(data);
+      const validationErrors = validate(dataRef.current);
       if (Object.keys(validationErrors).length > 0) {
         setErrors(validationErrors);
         setSaving(false);
@@ -55,7 +67,7 @@ export default function EntityModal({
     }
     setErrors({});
     try {
-      await onSubmit(data);
+      await onSubmit(dataRef.current);
       onClose();
     } catch (err) {
       setError(err.message || 'No se pudo guardar el registro.');
@@ -98,8 +110,8 @@ export default function EntityModal({
       return (
         <label key={f.name} className="block">
           <span className="mb-1.5 block text-xs font-semibold text-slate-600">{f.label}{f.required && ' *'}</span>
-          <select {...common}>
-            <option value="">Seleccionar…</option>
+          <select {...common} disabled={f.disabled}>
+            <option value="">{f.placeholder || 'Seleccionar…'}</option>
             {f.options?.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
@@ -293,7 +305,7 @@ export default function EntityModal({
           <input
             type="text"
             inputMode="numeric"
-            value={value.replace(/\D/g, '')}
+            value={String(value || '').replace(/\D/g, '')}
             onChange={(e) => setField(f.name, e.target.value.replace(/\D/g, ''))}
             placeholder={f.placeholder || 'Ej: 12345678'}
             required={f.required}
@@ -309,8 +321,8 @@ export default function EntityModal({
     }
 
     if (f.type === 'phone-ar') {
-      const value = data[f.name] ?? '';
-      const displayValue = value.startsWith('54') ? value.slice(2) : value;
+      const v = String(value || '');
+      const displayValue = v.startsWith('54') ? v.slice(2) : v;
       return (
         <label key={f.name} className="block">
           <span className="mb-1.5 block text-xs font-semibold text-slate-600">{f.label}{f.required && ' *'}</span>
