@@ -165,12 +165,12 @@ export default function Accreditations() {
 
   const handleFieldChange = async (name, value, setField, formData) => {
     if (name === 'person_id' && value) {
+      const p = people.find((p) => p.id === value);
+      if (p?.access_area) setField('access_level', p.access_area);
+      if (p?.event_phases) setField('event_phases', Array.isArray(p.event_phases) ? p.event_phases.join(',') : p.event_phases);
       try {
         const bios = await base44.entities.Biometric.filter({ person_id: value, status: 'active' }, '-created_date', 1);
         setField('has_biometric', bios.length > 0);
-        const p = people.find((p) => p.id === value);
-        if (p?.access_area) setField('access_level', p.access_area);
-        if (p?.event_phases) setField('event_phases', Array.isArray(p.event_phases) ? p.event_phases.join(',') : p.event_phases);
       } catch {}
     }
   };
@@ -192,7 +192,10 @@ export default function Accreditations() {
     }
     const evt = events.find((e) => e.id === data.event_id);
     const person = people.find((p) => p.id === data.person_id);
-    const zoneValue = person?.access_area || data.access_level || 'general';
+    const zoneValue = data.access_level || person?.access_area || 'general';
+    const phasesFromForm = typeof data.event_phases === 'string'
+      ? data.event_phases.split(',').map((s) => s.trim()).filter(Boolean)
+      : (Array.isArray(data.event_phases) ? data.event_phases : []);
     const enriched = {
       ...data,
       event_name: evt?.name || '',
@@ -202,9 +205,7 @@ export default function Accreditations() {
       person_email: person?.email || '',
       area: zoneValue,
       access_level: zoneValue,
-      event_phases: typeof data.event_phases === 'string'
-        ? data.event_phases.split(',').map((s) => s.trim()).filter(Boolean)
-        : (data.event_phases || person?.event_phases || []),
+      event_phases: phasesFromForm.length > 0 ? phasesFromForm : (person?.event_phases || []),
     };
     if (!editing) {
       enriched.badge_code = generateBadgeCode(person?.person_type, items.map((a) => a.badge_code), typePrefixes);
