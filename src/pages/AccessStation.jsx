@@ -118,22 +118,66 @@ export default function AccessStation() {
       );
 
       // Find best match using face-api.js descriptors
-      const { match, distance } = findBestMatch(descriptor, withDescriptors);
+      const { match, distance, bestEntry } = findBestMatch(descriptor, withDescriptors);
 
-      if (!match) {
+      let matchedBio = match;
+
+      // If descriptor didn't match but we have a close candidate, try LLM visual comparison
+      // (handles DNI-based biometrics where descriptor quality may be poor)
+      if (!matchedBio && bestEntry && bestEntry.face_photo_url) {
+        const { file_url } = await base44.integrations.Core.UploadFile({ file });
+        const llmResult = await base44.integrations.Core.InvokeLLM({
+          model: 'claude_sonnet_4_6',
+          prompt:
+            'Sos un sistema de verificación biométrica de identidad.\n' +
+            'IMAGEN 1: foto de registro de la persona (referencia).\n' +
+            'IMAGEN 2: captura en vivo tomada con cámara web.\n\n' +
+            'INSTRUCCIONES:\n' +
+            '1. Verificá que la IMAGEN 2 contenga un ROSTRO HUMANO claramente visible y frontal. ' +
+            'Si NO hay un rostro humano, devolvé match: false y confidence: 0.\n' +
+            '2. Si hay un rostro humano, compará cuidadosamente con la IMAGEN 1 analizando:\n' +
+            '   - Forma y proporciones del rostro\n' +
+            '   - Distancia entre ojos y posición relativa\n' +
+            '   - Forma y tamaño de la nariz\n' +
+            '   - Forma de la boca y grosor de labios\n' +
+            '   - Cejas: forma, grosor, curvatura y posición\n' +
+            '   - Línea mandibular y mentón\n' +
+            '   - Color y estilo de cabello (si visible)\n' +
+            '3. Solo devolvé match: true si estás MUY seguro de que es la misma persona. ' +
+            'Ante la MÍNIMA duda, devolvé match: false.\n' +
+            'Respondé únicamente con el JSON.',
+          file_urls: [bestEntry.face_photo_url, file_url],
+          response_json_schema: {
+            type: 'object',
+            properties: {
+              match: { type: 'boolean' },
+              confidence: { type: 'number' },
+              reason: { type: 'string' },
+            },
+            required: ['match', 'confidence'],
+          },
+        });
+        const llmMatch = llmResult.match === true || llmResult.match === 'true';
+        const llmConfidence = Number(llmResult.confidence) || 0;
+        if (llmMatch && llmConfidence >= 0.7) {
+          matchedBio = bestEntry;
+        }
+      }
+
+      if (!matchedBio) {
         await logAccess('denied');
         setResult({ ok: false, message: `No se encontró coincidencia facial (distancia: ${distance.toFixed(2)}).` });
         return;
       }
 
       // Find the active accreditation for this person in this event
-      const accred = accreditations.find((a) => a.person_id === match.person_id);
+      const accred = accreditations.find((a) => a.person_id === matchedBio.person_id);
       if (!accred) {
-        await logAccess('denied', {}, { person_name: match.person_name });
+        await logAccess('denied', {}, { person_name: matchedBio.person_name });
         setResult({
           ok: false,
           message: 'Persona identificada pero sin acreditación para este evento.',
-          person_name: match.person_name,
+          person_name: matchedBio.person_name,
         });
         return;
       }

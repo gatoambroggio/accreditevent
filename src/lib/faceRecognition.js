@@ -52,7 +52,7 @@ export function findBestMatch(capturedDescriptor, storedEntries) {
     }
   }
   if (bestDistance < MATCH_THRESHOLD) {
-    return { match: bestMatch, distance: bestDistance };
+    return { match: bestMatch, distance: bestDistance, bestEntry: bestMatch };
   }
-  return { match: null, distance: bestDistance };
+  return { match: null, distance: bestDistance, bestEntry: bestMatch };
 }
