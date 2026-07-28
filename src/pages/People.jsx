@@ -4,6 +4,7 @@ import { Plus, Pencil, Download } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
 import { base44 } from '@/api/base44Client';
 import { usePersonTypes } from '@/lib/usePersonTypes';
+import { useZones } from '@/lib/useZones';
 import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
 import PersonDetailModal from '@/components/PersonDetailModal';
@@ -39,6 +40,7 @@ const STATUS_OPTIONS = [
 export default function People() {
   const { items, loading, error, create, update, remove } = useCrud('Person');
   const { personTypes } = usePersonTypes();
+  const { zones } = useZones();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [query, setQuery] = useState('');
@@ -122,6 +124,10 @@ export default function People() {
       name: 'person_type', label: 'Tipo', type: 'select', required: true,
       options: personTypes.map((t) => ({ value: t.value, label: t.label })),
     },
+    {
+      name: 'access_area', label: 'Área de acceso', type: 'select',
+      options: zones.map((z) => ({ value: z.value, label: z.label })),
+    },
     { name: 'document', label: 'Documento', type: 'dni', required: true, placeholder: 'Ej: 12345678' },
     {
       name: 'company', label: 'Empresa', type: 'searchable-select', required: true,
@@ -134,16 +140,20 @@ export default function People() {
       { name: 'notes', label: 'Notas', type: 'textarea', full: true, placeholder: 'Ej: Responsable de montaje audiovisual' },
       { name: '_face', label: 'Registro facial', type: 'face-capture', full: true },
     ];
-  }, [personTypes, events, editing, companies]);
+  }, [personTypes, zones, events, editing, companies]);
 
   const openNew = () => { setEditing(null); setModalOpen(true); };
   const openEdit = async (item) => {
-    setEditing(item);
+    const normalized = { ...item };
+    if (!normalized.event_id && normalized.event_ids?.length) {
+      normalized.event_id = normalized.event_ids[0];
+    }
+    setEditing(normalized);
     setModalOpen(true);
     try {
       const bios = await base44.entities.Biometric.filter({ person_id: item.id, status: 'active' }, '-created_date', 1);
       if (bios[0]?.face_photo_url) {
-        setEditing({ ...item, face_photo_url: bios[0].face_photo_url });
+        setEditing({ ...normalized, face_photo_url: bios[0].face_photo_url });
       }
     } catch {}
   };

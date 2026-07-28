@@ -101,6 +101,7 @@ export default function EmpresaPortal() {
       if (existingAccr) {
         if (accessArea) {
           await base44.entities.Accreditation.update(existingAccr.id, {
+            area: accessArea,
             access_level: accessArea,
             person_name: person.full_name,
             person_type: person.person_type || 'provider',
@@ -119,6 +120,7 @@ export default function EmpresaPortal() {
           person_type: person.person_type || 'provider',
           person_email: person.email || '',
           badge_code,
+          area: accessArea || 'general',
           access_level: accessArea || 'general',
           status: 'active',
           has_biometric: false,
@@ -162,9 +164,22 @@ export default function EmpresaPortal() {
   };
 
   const handleImport = async (rows) => {
-    const created = await base44.entities.Person.bulkCreate(rows);
+    const eventIds = approvedEventList.map((e) => e.event_id);
+    const eventNames = approvedEventList.map((e) => e.event_name);
+    const productora = approvedEventList[0]?.productora || '';
+    const enrichedRows = rows.map((r) => ({
+      ...r,
+      event_ids: eventIds,
+      event_names: eventNames,
+      access_area: r.access_area || 'general',
+      productora,
+    }));
+    const created = await base44.entities.Person.bulkCreate(enrichedRows);
     setEmployees((prev) => [...created, ...prev]);
     await logAudit('empresa-import-employees', 'Person', '', `${rows.length} empleados`);
+    for (const person of created) {
+      try { await syncAccreditations(person, eventIds, 'general', approvedEventList); } catch {}
+    }
   };
 
   const handleUploadDoc = async (e) => {
