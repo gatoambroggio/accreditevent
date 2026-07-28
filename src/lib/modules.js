@@ -24,7 +24,7 @@ export const MODULES = [
   { path: '/settings', label: 'Configuración' },
 ];
 
-export const ROLES = ['provider', 'control', 'coordinator', 'productora', 'admin', 'superadmin'];
+export const ROLES = ['provider', 'empresa', 'control', 'coordinator', 'productora', 'admin', 'superadmin'];
 
 export const DEFAULT_ROLE_ACCESS = {
   '/': ['control', 'coordinator', 'productora', 'admin', 'superadmin'],
