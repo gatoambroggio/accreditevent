@@ -148,9 +148,6 @@ export default function EmpresaPortal() {
       setEmployees((prev) => [person, ...prev]);
       await logAudit('empresa-create-employee', 'Person', person.id, data.full_name);
     }
-    if (data.event_ids?.length) {
-      try { await syncAccreditations(person, data.event_ids, data.access_area, approvedEventList); } catch {}
-    }
     return person;
   };
 

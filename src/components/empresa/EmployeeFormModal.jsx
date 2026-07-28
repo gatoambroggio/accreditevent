@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { Image } from '@/components/ui/image';
 import FaceCapture from '@/components/FaceCapture';
 import { useZones } from '@/lib/useZones';
+import { extractFaceFromDni } from '@/lib/dniFaceExtract';
 
 const EMPTY = { first_name: '', last_name: '', document: '', phone: '', employment_type: 'fijo', access_area: '', event_phases: [], event_ids: [], notes: '' };
 const normalizeType = (v) => (v === 'eventual' || v === 'esporadico' ? 'eventual' : 'fijo');
@@ -126,6 +127,14 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
             size: dniFile.size,
             status: 'pending',
           });
+          if (dniFile.type.startsWith('image/') && !faceFile) {
+            setStatus('Extrayendo rostro del DNI…');
+            try {
+              await extractFaceFromDni(dniFile, person, companyName);
+            } catch (faceErr) {
+              uploadWarning = uploadWarning || 'No se pudo extraer el rostro del DNI para biometría.';
+            }
+          }
         }
         if (faceFile) {
           setStatus('Procesando biometría…');
@@ -243,7 +252,7 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
               <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
                 <CalendarDays className="h-4 w-4" /> Eventos asignados
               </p>
-              <p className="mb-3 text-xs text-slate-400">Seleccioná a qué eventos va a asistir este empleado. Se generará la acreditación automáticamente con el área de acceso seleccionada.</p>
+              <p className="mb-3 text-xs text-slate-400">Seleccioná a qué eventos va a asistir este empleado. Las acreditaciones serán revisadas y aprobadas por la productora.</p>
               <div className="flex flex-wrap gap-1.5">
                 {approvedEvents.map((ev) => {
                   const active = form.event_ids.includes(ev.event_id);
