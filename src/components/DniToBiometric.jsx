@@ -65,10 +65,11 @@ export default function DniToBiometric({ person, onSaved, onClose }) {
       ctx.drawImage(img, x, y, w, h, 0, 0, w, h);
 
       const faceBlob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+      const faceFile = new File([faceBlob], `dni-face-${person.id}.jpg`, { type: 'image/jpeg' });
       URL.revokeObjectURL(url);
 
       setStatus('Subiendo foto del rostro…');
-      const { file_url } = await base44.integrations.Core.UploadFile({ file: faceBlob });
+      const { file_url } = await base44.integrations.Core.UploadFile({ file: faceFile });
 
       setStatus('Guardando biometría…');
       const existing = await base44.entities.Biometric.filter({ person_id: person.id, status: 'active' });
