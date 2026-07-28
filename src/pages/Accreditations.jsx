@@ -192,10 +192,11 @@ export default function Accreditations() {
     }
     const evt = events.find((e) => e.id === data.event_id);
     const person = people.find((p) => p.id === data.person_id);
-    const zoneValue = data.access_level || person?.access_area || 'general';
+    const zoneValue = person?.access_area || data.access_level || 'general';
     const phasesFromForm = typeof data.event_phases === 'string'
       ? data.event_phases.split(',').map((s) => s.trim()).filter(Boolean)
       : (Array.isArray(data.event_phases) ? data.event_phases : []);
+    const personPhases = Array.isArray(person?.event_phases) ? person.event_phases : [];
     const enriched = {
       ...data,
       event_name: evt?.name || '',
@@ -205,7 +206,7 @@ export default function Accreditations() {
       person_email: person?.email || '',
       area: zoneValue,
       access_level: zoneValue,
-      event_phases: phasesFromForm.length > 0 ? phasesFromForm : (person?.event_phases || []),
+      event_phases: phasesFromForm.length > 0 ? phasesFromForm : personPhases,
     };
     if (!editing) {
       enriched.badge_code = generateBadgeCode(person?.person_type, items.map((a) => a.badge_code), typePrefixes);
