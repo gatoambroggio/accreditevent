@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useCrud } from '@/lib/crud';
 import { Plus, Pencil, Briefcase, Download, ShieldCheck } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
@@ -18,6 +18,13 @@ export default function ProviderCompanies() {
   const [query, setQuery] = useState('');
   const [peopleModalCompany, setPeopleModalCompany] = useState(null);
   const [approvalModalCompany, setApprovalModalCompany] = useState(null);
+  const [approvals, setApprovals] = useState([]);
+
+  useEffect(() => {
+    base44.entities.EventCompanyApproval.list('-created_date', 500)
+      .then(setApprovals)
+      .catch(() => {});
+  }, [items]);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -74,11 +81,12 @@ export default function ProviderCompanies() {
         isEmpty={filtered.length === 0}
         emptyIcon={Briefcase}
         emptyMessage={query ? 'Sin resultados para tu búsqueda.' : 'No hay empresas proveedoras registradas. Creá la primera.'}
-        tableClassName="min-w-[640px]"
+        tableClassName="min-w-[780px]"
       >
         <thead>
           <tr className="border-b border-slate-100 bg-slate-50">
             <Th>Empresa</Th>
+            <Th>Eventos aprobados</Th>
             <Th>Contacto</Th>
             <Th />
           </tr>
@@ -106,6 +114,24 @@ export default function ProviderCompanies() {
                   </div>
                 </div>
               </Td>
+              <Td>
+                {(() => {
+                  const approved = approvals.filter((a) => a.provider_company === c.name && a.status === 'approved');
+                  return approved.length > 0 ? (
+                    <button onClick={() => setApprovalModalCompany(c)} className="text-left">
+                      <div className="flex flex-wrap gap-1">
+                        {approved.map((a) => (
+                          <span key={a.id} className="rounded bg-emerald-50 px-1.5 py-0.5 text-xs text-emerald-700">{a.event_name}</span>
+                        ))}
+                      </div>
+                    </button>
+                  ) : (
+                    <button onClick={() => setApprovalModalCompany(c)} className="text-xs text-slate-400 transition hover:text-emerald-600 hover:underline">
+                      Sin eventos — asignar
+                    </button>
+                  );
+                })()}
+              </Td>
               <Td className="text-sm text-slate-500">
                 {c.contact_phone && <p>{c.contact_phone}</p>}
                 {c.contact_email && <p className="text-xs text-slate-400">{c.contact_email}</p>}
@@ -113,8 +139,8 @@ export default function ProviderCompanies() {
               </Td>
               <Td className="text-right">
                 <div className="inline-flex items-center gap-1">
-                  <button onClick={() => setApprovalModalCompany(c)} className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50">
-                    <ShieldCheck className="h-3.5 w-3.5" /> Eventos
+                  <button onClick={() => setApprovalModalCompany(c)} className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700">
+                    <ShieldCheck className="h-3.5 w-3.5" /> Asignar
                   </button>
                   <button onClick={() => openEdit(c)} className={btnIcon}>
                     <Pencil className="h-3.5 w-3.5" />

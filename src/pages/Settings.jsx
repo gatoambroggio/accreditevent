@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { Loader2, Save, Upload } from 'lucide-react';
+import { Loader2, Save, Upload, ArrowRight } from 'lucide-react';
 import { MODULES, ROLES, DEFAULT_ROLE_ACCESS } from '@/lib/modules';
+import ListEditor from '@/components/ui/list-editor';
 
 function Field({ label, value, onChange, type = 'text', placeholder = '', hint }) {
   return (
@@ -29,6 +31,28 @@ function Section({ title, description, children }) {
   );
 }
 
+const DEFAULT_PHASES = [
+  { value: 'armado', label: 'Armado' },
+  { value: 'dia_evento', label: 'Show' },
+  { value: 'desarme', label: 'Desarme' },
+];
+const DEFAULT_EMPLOYMENT = [
+  { value: 'fijo', label: 'Fijo' },
+  { value: 'eventual', label: 'Eventual' },
+];
+const DEFAULT_PERSON_TYPES = [
+  { value: 'provider', label: 'Proveedor' },
+];
+
+const CATALOG_LINKS = [
+  { to: '/access-levels', label: 'Niveles de acceso' },
+  { to: '/parking-sectors', label: 'Estacionamiento' },
+  { to: '/requirement-items', label: 'Ítems de logística' },
+  { to: '/documents', label: 'Documentos' },
+  { to: '/companies', label: 'Empresas' },
+  { to: '/provider-companies', label: 'Empresas de servicios' },
+];
+
 export default function Settings() {
   const [settings, setSettings] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -47,6 +71,11 @@ export default function Settings() {
             system_name: 'AccreditEvent',
             organization_name: 'Acceso Eventos',
             role_access: DEFAULT_ROLE_ACCESS,
+            event_phases: DEFAULT_PHASES,
+            employment_types: DEFAULT_EMPLOYMENT,
+            person_types: DEFAULT_PERSON_TYPES,
+            default_grace_hours: 4,
+            zones: [],
           });
           setSettings(created);
         }
@@ -95,6 +124,11 @@ export default function Settings() {
         whatsapp_token: settings.whatsapp_token,
         whatsapp_phone_id: settings.whatsapp_phone_id,
         role_access: settings.role_access,
+        event_phases: settings.event_phases,
+        employment_types: settings.employment_types,
+        person_types: settings.person_types,
+        default_grace_hours: settings.default_grace_hours ? Number(settings.default_grace_hours) : null,
+        zones: settings.zones,
       });
       setSettings(updated);
       setSuccess(true);
@@ -148,6 +182,48 @@ export default function Settings() {
         </div>
       </Section>
 
+      <Section title="Fases de evento" description="Configurá las fases disponibles para los eventos (armado, show, desarme, etc.)">
+        <ListEditor
+          items={settings.event_phases || []}
+          onChange={(items) => update('event_phases', items)}
+          valuePlaceholder="armado"
+          labelPlaceholder="Armado"
+        />
+      </Section>
+
+      <Section title="Tipos de contratación" description="Configurá los tipos de contratación de empleados">
+        <ListEditor
+          items={settings.employment_types || []}
+          onChange={(items) => update('employment_types', items)}
+          valuePlaceholder="fijo"
+          labelPlaceholder="Fijo"
+        />
+      </Section>
+
+      <Section title="Tipos de persona" description="Configurá los tipos de persona del sistema">
+        <ListEditor
+          items={settings.person_types || []}
+          onChange={(items) => update('person_types', items)}
+          valuePlaceholder="provider"
+          labelPlaceholder="Proveedor"
+        />
+      </Section>
+
+      <Section title="Zonas de control de acceso" description="Zonas configurables para el control de acceso (también podés gestionarlas desde Niveles de acceso)">
+        <ListEditor
+          items={settings.zones || []}
+          onChange={(items) => update('zones', items)}
+          valuePlaceholder="backstage"
+          labelPlaceholder="Backstage"
+        />
+      </Section>
+
+      <Section title="Configuración de eventos" description="Parámetros por defecto para nuevos eventos">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Horas de gracia por defecto" type="number" value={settings.default_grace_hours} onChange={(v) => update('default_grace_hours', v)} placeholder="4" hint="Horas extra de acceso tras finalizar el evento" />
+        </div>
+      </Section>
+
       <Section title="Servidor de correo" description="Configuración SMTP para envío de notificaciones">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Email remitente" value={settings.mail_from} onChange={(v) => update('mail_from', v)} placeholder="noreply@empresa.com" />
@@ -197,6 +273,16 @@ export default function Settings() {
               ))}
             </tbody>
           </table>
+        </div>
+      </Section>
+
+      <Section title="Catálogos" description="Acceso rápido a la gestión de catálogos del sistema">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {CATALOG_LINKS.map((link) => (
+            <Link key={link.to} to={link.to} className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50">
+              {link.label} <ArrowRight className="h-4 w-4 text-slate-400" />
+            </Link>
+          ))}
         </div>
       </Section>
     </div>

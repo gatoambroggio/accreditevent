@@ -60,6 +60,56 @@
         }
       },
       "description": "Zonas de control de acceso configurables"
+    },
+    "event_phases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Fases de evento configurables (armado, show, desarme, etc.)"
+    },
+    "employment_types": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Tipos de contrataci\u00f3n configurables"
+    },
+    "person_types": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Tipos de persona configurables"
+    },
+    "default_grace_hours": {
+      "type": "number",
+      "default": 4,
+      "description": "Horas de gracia por defecto para nuevos eventos"
     }
   },
   "required": [],
