@@ -87,22 +87,13 @@ export default function AccessStation() {
         return;
       }
 
-      // Fetch active biometrics for this event first, fallback to all
-      let bios = await base44.entities.Biometric.filter(
-        { status: 'active', event_id: selectedEvent.id },
-        '-created_date',
-        500
+      // Fetch ALL active biometrics (not event-scoped — biometrics are tied to persons, not events)
+      const bios = await base44.entities.Biometric.filter({ status: 'active' }, '-created_date', 500);
+      const persons = await base44.entities.Person.list('-created_date', 500);
+      const validPersonIds = new Set(persons.map((p) => p.id));
+      const withDescriptors = bios.filter(
+        (b) => b.face_descriptor && b.face_descriptor.length > 0 && validPersonIds.has(b.person_id)
       );
-      let withDescriptors = bios.filter((b) => b.face_descriptor && b.face_descriptor.length > 0);
-
-      if (withDescriptors.length === 0) {
-        bios = await base44.entities.Biometric.filter(
-          { status: 'active' },
-          '-created_date',
-          500
-        );
-        withDescriptors = bios.filter((b) => b.face_descriptor && b.face_descriptor.length > 0);
-      }
 
       if (withDescriptors.length === 0) {
         await logAccess('denied');
