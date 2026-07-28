@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { X, Loader2, FileText, ExternalLink, User, UploadCloud, Car, Plus, Pencil, Trash2, Printer, Check, XCircle } from 'lucide-react';
+import { X, Loader2, FileText, ExternalLink, User, UploadCloud, Car, Plus, Pencil, Trash2, Printer, Check, XCircle, ScanFace } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
 import { Image } from '@/components/ui/image';
 import { useDocumentTypes } from '@/lib/useDocumentTypes';
@@ -8,6 +8,7 @@ import DocumentViewer from '@/components/DocumentViewer';
 import EntityModal from '@/components/EntityModal';
 import VehicleBadgePrint from '@/components/VehicleBadgePrint';
 import { useParkingSectors } from '@/lib/useParkingSectors';
+import DniToBiometric from '@/components/DniToBiometric';
 
 export default function PersonDetailModal({ person, onClose }) {
   const [docs, setDocs] = useState([]);
@@ -27,6 +28,7 @@ export default function PersonDetailModal({ person, onClose }) {
   const [reviewAction, setReviewAction] = useState('');
   const [reviewExpiresAt, setReviewExpiresAt] = useState('');
   const [savingReview, setSavingReview] = useState(false);
+  const [dniBioOpen, setDniBioOpen] = useState(false);
   const { docTypes } = useDocumentTypes();
   const { sectors } = useParkingSectors();
 
@@ -226,7 +228,7 @@ export default function PersonDetailModal({ person, onClose }) {
                 <User className="h-8 w-8" />
               </div>
             )}
-            <div>
+            <div className="flex-1">
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Rostro registrado</p>
               {bio?.face_photo_url ? (
                 <p className="mt-0.5 text-sm text-emerald-600">✓ Biometría activa</p>
@@ -234,6 +236,14 @@ export default function PersonDetailModal({ person, onClose }) {
                 <p className="mt-0.5 text-sm text-slate-400">Sin biometría registrada</p>
               )}
             </div>
+            {!loading && (
+              <button
+                onClick={() => setDniBioOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50"
+              >
+                <ScanFace className="h-3.5 w-3.5" /> DNI → Bio
+              </button>
+            )}
           </div>
 
           {/* Documents */}
@@ -448,6 +458,17 @@ export default function PersonDetailModal({ person, onClose }) {
           events={events.filter((e) => printingVehicle.event_ids?.includes(e.id))}
           parkingSectors={sectors}
           onClose={() => setPrintingVehicle(null)}
+        />
+      )}
+
+      {dniBioOpen && (
+        <DniToBiometric
+          person={person}
+          onSaved={async () => {
+            const bioData = await base44.entities.Biometric.filter({ person_id: person.id, status: 'active' }, '-created_date', 1);
+            setBio(bioData[0] || null);
+          }}
+          onClose={() => setDniBioOpen(false)}
         />
       )}
     </div>

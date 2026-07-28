@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useCrud } from '@/lib/crud';
-import { Plus, Pencil, Printer, Download } from 'lucide-react';
+import { Plus, Pencil, Printer, Download, ScanFace } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
 import BiometricButton from '@/components/BiometricButton';
 import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
 import BadgePrint from '@/components/BadgePrint';
 import BatchBadgePrint from '@/components/BatchBadgePrint';
+import DniToBiometric from '@/components/DniToBiometric';
 import { useZones } from '@/lib/useZones';
 import { usePersonTypes } from '@/lib/usePersonTypes';
 import { generateBadgeCode } from '@/lib/badgeCode';
@@ -45,6 +46,7 @@ export default function Accreditations() {
   const [badgeAccred, setBadgeAccred] = useState(null);
   const [selected, setSelected] = useState(new Set());
   const [batchOpen, setBatchOpen] = useState(false);
+  const [dniBioAccred, setDniBioAccred] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -121,10 +123,9 @@ export default function Accreditations() {
     { name: 'event_id', label: 'Evento', type: 'select', options: eventOptions, required: true },
     { name: 'person_id', label: 'Persona', type: 'searchable-select', options: personOptions, required: true, placeholder: 'Buscar por nombre o documento…', full: true },
     ...(editing ? [{ name: 'badge_code', label: 'Código de credencial', type: 'text', required: true }] : []),
-    { name: 'area', label: 'Área', type: 'text' },
     {
-      name: 'access_level', label: 'Nivel de acceso', type: 'select',
-      options: accessLevels.map((l) => ({ value: l, label: l })),
+      name: 'area', label: 'Área de acceso', type: 'select',
+      options: zones.map((z) => ({ value: z.value, label: z.label })),
     },
     { name: 'status', label: 'Estado', type: 'select', options: STATUS_OPTIONS },
     { name: 'has_biometric', label: 'Biometría registrada', type: 'checkbox' },
@@ -138,6 +139,8 @@ export default function Accreditations() {
       try {
         const bios = await base44.entities.Biometric.filter({ person_id: value, status: 'active' }, '-created_date', 1);
         setField('has_biometric', bios.length > 0);
+        const p = people.find((p) => p.id === value);
+        if (p?.access_area) setField('area', p.access_area);
       } catch {}
     }
   };
@@ -166,6 +169,7 @@ export default function Accreditations() {
       person_name: person?.full_name || '',
       person_type: person?.person_type || '',
       person_email: person?.email || '',
+      access_level: data.area || 'general',
     };
     if (!editing) {
       enriched.badge_code = generateBadgeCode(person?.person_type, items.map((a) => a.badge_code), typePrefixes);
@@ -286,7 +290,7 @@ export default function Accreditations() {
             <Th>Persona</Th>
             <Th>Evento</Th>
             <Th>Código</Th>
-            <Th>Área / Nivel</Th>
+            <Th>Área</Th>
             <Th>Estado</Th>
             <Th>Bio</Th>
             <Th />
@@ -309,7 +313,7 @@ export default function Accreditations() {
               </Td>
               <Td className="text-sm text-slate-500">{a.event_name || '—'}</Td>
               <Td><code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700">{a.badge_code}</code></Td>
-              <Td className="text-sm text-slate-500">{a.area || '—'} / {a.access_level}</Td>
+              <Td className="text-sm text-slate-500">{zones.find((z) => z.value === a.area)?.label || a.area || '—'}</Td>
               <Td><StatusBadge status={a.status} /></Td>
               <Td>
                 <BiometricButton accreditation={a} onRegistered={reload} />
@@ -318,6 +322,9 @@ export default function Accreditations() {
                 <div className="flex items-center justify-end gap-1">
                   <button onClick={() => setBadgeAccred(a)} className={btnIcon} title="Imprimir credencial">
                     <Printer className="h-3.5 w-3.5" />
+                  </button>
+                  <button onClick={() => setDniBioAccred(a)} className={btnIcon} title="Biometría desde DNI">
+                    <ScanFace className="h-3.5 w-3.5" />
                   </button>
                   <button onClick={() => openEdit(a)} className={btnIcon}>
                     <Pencil className="h-3.5 w-3.5" />
@@ -360,6 +367,14 @@ export default function Accreditations() {
           accreditations={filtered.filter((a) => selected.has(a.id))}
           events={events}
           onClose={() => setBatchOpen(false)}
+        />
+      )}
+
+      {dniBioAccred && (
+        <DniToBiometric
+          person={{ id: dniBioAccred.person_id, full_name: dniBioAccred.person_name, company: dniBioAccred.company }}
+          onSaved={reload}
+          onClose={() => setDniBioAccred(null)}
         />
       )}
     </div>

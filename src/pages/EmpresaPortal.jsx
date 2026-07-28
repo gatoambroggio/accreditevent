@@ -177,9 +177,6 @@ export default function EmpresaPortal() {
     const created = await base44.entities.Person.bulkCreate(enrichedRows);
     setEmployees((prev) => [...created, ...prev]);
     await logAudit('empresa-import-employees', 'Person', '', `${rows.length} empleados`);
-    for (const person of created) {
-      try { await syncAccreditations(person, eventIds, 'general', approvedEventList); } catch {}
-    }
   };
 
   const handleUploadDoc = async (e) => {
