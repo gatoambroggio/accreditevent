@@ -3,8 +3,15 @@ import { base44 } from '@/api/base44Client';
 import { loadModels, getFaceDescriptor, findBestMatch } from '@/lib/faceRecognition';
 import { isWithinEventPhases, speakResult, getEventStatus, EVENT_STATUS_INFO } from '@/lib/accessUtils';
 import { canAccessZone } from '@/lib/accessZones';
-import { useZones } from '@/lib/useZones';
 import { CheckCircle2, XCircle, Camera, Loader2, ArrowLeft, RefreshCw } from 'lucide-react';
+
+const ZONES = [
+  { value: 'general', label: 'General' },
+  { value: 'backstage', label: 'Backstage' },
+  { value: 'technical', label: 'Técnica' },
+  { value: 'vip', label: 'VIP' },
+  { value: 'all-access', label: 'All Access' },
+];
 
 export default function AccessStation() {
   const [events, setEvents] = useState([]);
@@ -18,7 +25,6 @@ export default function AccessStation() {
   const [loadingModels, setLoadingModels] = useState(false);
   const videoRef = useRef(null);
   const streamRef = useRef(null);
-  const { zones } = useZones();
 
   useEffect(() => {
     base44.entities.Event.filter({ status: 'active' }, '-created_date', 50).then(setEvents).catch(() => {});
@@ -178,7 +184,7 @@ export default function AccessStation() {
           <select value={zone} onChange={(e) => setZone(e.target.value)}
             className="rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-sm font-semibold text-white outline-none">
             <option value="">Todas las zonas</option>
-            {zones.map((z) => <option key={z.value} value={z.value}>{z.label}</option>)}
+            {ZONES.map((z) => <option key={z.value} value={z.value}>{z.label}</option>)}
           </select>
         </div>
 

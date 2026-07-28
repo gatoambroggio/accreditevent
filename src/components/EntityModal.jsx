@@ -33,15 +33,18 @@ export default function EntityModal({
   const [error, setError] = useState('');
   const [errors, setErrors] = useState({});
   const dataRef = useRef({});
+  const initialDataRef = useRef(initialData);
+  initialDataRef.current = initialData;
 
   useEffect(() => {
     if (open) {
-      setData(initialData || {});
-      dataRef.current = initialData || {};
+      const initData = initialDataRef.current || {};
+      setData(initData);
+      dataRef.current = initData;
       setError('');
       setErrors({});
     }
-  }, [open, initialData]);
+  }, [open]);
 
   if (!open) return null;
 

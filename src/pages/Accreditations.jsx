@@ -84,7 +84,8 @@ export default function Accreditations() {
       const p = people.find((p) => p.id === value);
       if (p?.access_area) setField('access_level', p.access_area);
       if (p?.event_phases) {
-        const phases = Array.isArray(p.event_phases) ? p.event_phases : [];
+        const raw = p.event_phases;
+        const phases = Array.isArray(raw) ? raw : String(raw).split(',').map((s) => s.trim()).filter(Boolean);
         setField('event_phases', phases);
       }
       // Check biometric status
