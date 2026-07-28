@@ -100,6 +100,18 @@
           ]
         },
         {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "empresa"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
           "data.event_id": {
             "$in": "{{user.data.assigned_event_ids}}"
           }
@@ -131,6 +143,18 @@
             {
               "user_condition": {
                 "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "empresa"
               }
             },
             {
@@ -180,6 +204,18 @@
           ]
         },
         {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "empresa"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
           "data.event_id": {
             "$in": "{{user.data.assigned_event_ids}}"
           }
@@ -211,6 +247,18 @@
             {
               "user_condition": {
                 "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "empresa"
               }
             },
             {
