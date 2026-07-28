@@ -1,29 +1,41 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, UserPlus } from 'lucide-react';
+import { X, Loader2, UserPlus, FileImage, ScanFace, CheckCircle2 } from 'lucide-react';
+import { base44 } from '@/api/base44Client';
+import FaceCapture from '@/components/FaceCapture';
 
 const EMPTY = { first_name: '', last_name: '', document: '', phone: '', employment_type: 'fijo', notes: '' };
+const normalizeType = (v) => (v === 'eventual' ? 'eventual' : 'fijo');
 
 export default function EmployeeFormModal({ open, onClose, onSubmit, editing, companyName }) {
   const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState('');
   const [error, setError] = useState('');
-  const [form, setForm] = useState(EMPTY);
-
-  useEffect(() => {
-    if (!open) return;
+  const [form, setForm] = useState(() => {
     if (editing) {
       const parts = (editing.full_name || '').split(' ');
-      setForm({
+      return {
         first_name: parts[0] || '',
         last_name: parts.slice(1).join(' '),
         document: editing.document || '',
         phone: editing.phone || '',
-        employment_type: editing.employment_type || 'fijo',
+        employment_type: normalizeType(editing.employment_type),
         notes: editing.notes || '',
-      });
-    } else {
-      setForm(EMPTY);
+      };
     }
-  }, [editing, open]);
+    return EMPTY;
+  });
+  const [dniFile, setDniFile] = useState(null);
+  const [faceFile, setFaceFile] = useState(null);
+  const [faceDescriptor, setFaceDescriptor] = useState(null);
+  const [hasBiometric, setHasBiometric] = useState(false);
+
+  useEffect(() => {
+    if (editing?.id) {
+      base44.entities.Biometric.filter({ person_id: editing.id, status: 'active' })
+        .then((existing) => setHasBiometric(existing.length > 0))
+        .catch(() => setHasBiometric(false));
+    }
+  }, []);
 
   const setField = (name, value) => setForm((f) => ({ ...f, [name]: value }));
 
@@ -37,7 +49,8 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
     }
     setSaving(true);
     try {
-      await onSubmit({
+      setStatus('Guardando empleado…');
+      const person = await onSubmit({
         full_name,
         document: form.document,
         phone: form.phone,
@@ -47,11 +60,52 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
         person_type: 'provider',
         status: 'active',
       });
-      onClose();
+
+      let uploadWarning = null;
+      try {
+        if (dniFile) {
+          setStatus('Subiendo DNI…');
+          const { file_url } = await base44.integrations.Core.UploadFile({ file: dniFile });
+          await base44.entities.Document.create({
+            person_id: person.id,
+            person_name: full_name,
+            company: companyName,
+            document_type: 'dni',
+            original_name: dniFile.name,
+            file_url,
+            mime_type: dniFile.type,
+            size: dniFile.size,
+            status: 'pending',
+          });
+        }
+        if (faceFile) {
+          setStatus('Procesando biometría…');
+          const { file_url } = await base44.integrations.Core.UploadFile({ file: faceFile });
+          try {
+            const existing = await base44.entities.Biometric.filter({ person_id: person.id, status: 'active' });
+            for (const b of existing) {
+              await base44.entities.Biometric.update(b.id, { status: 'revoked' });
+            }
+          } catch {}
+          await base44.entities.Biometric.create({
+            person_id: person.id,
+            person_name: full_name,
+            company: companyName,
+            face_photo_url: file_url,
+            face_descriptor: faceDescriptor || [],
+            status: 'active',
+          });
+        }
+      } catch (uploadErr) {
+        uploadWarning = uploadErr.message || 'No se pudo completar la carga de DNI/biometría.';
+      }
+
+      onClose(uploadWarning ? `Empleado guardado. ${uploadWarning}` : 'Empleado guardado correctamente.');
     } catch (err) {
       setError(err.message || 'Error al guardar.');
     } finally {
       setSaving(false);
+      setStatus('');
     }
   };
 
@@ -72,11 +126,11 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
               <h2 className="mt-0.5 text-xl font-bold tracking-tight text-slate-900">{editing ? editing.full_name : 'Cargar empleado'}</h2>
             </div>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
+          <button onClick={() => onClose()} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
             <X className="h-5 w-5" />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
+        <form onSubmit={handleSubmit} className="space-y-5 px-6 py-5">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label className="block">
               <span className="mb-1.5 block text-xs font-semibold text-slate-600">Nombre *</span>
@@ -108,12 +162,46 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
             <span className="mb-1.5 block text-xs font-semibold text-slate-600">Notas (opcional)</span>
             <textarea value={form.notes} onChange={(e) => setField('notes', e.target.value)} rows={2} className={inputCls} placeholder="Observaciones internas…" />
           </label>
+
+          <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+            <p className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+              <FileImage className="h-4 w-4" /> Foto / escane del DNI
+            </p>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,application/pdf"
+              onChange={(e) => setDniFile(e.target.files[0] || null)}
+              className="w-full rounded-lg border border-slate-200 bg-white py-2.5 text-sm file:mr-3 file:rounded file:border-0 file:bg-emerald-50 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-emerald-700"
+            />
+            {dniFile && <p className="mt-2 text-xs text-emerald-700">{dniFile.name}</p>}
+          </div>
+
+          <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+                <ScanFace className="h-4 w-4" /> Foto biométrica
+              </p>
+              {hasBiometric && !faceFile && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
+                  <CheckCircle2 className="h-3 w-3" /> Ya registrada
+                </span>
+              )}
+            </div>
+            <FaceCapture
+              onCaptured={(file, descriptor) => {
+                setFaceFile(file);
+                setFaceDescriptor(descriptor);
+              }}
+              label="Abrir cámara para capturar rostro"
+            />
+          </div>
+
           {error && <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">{error}</div>}
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">Cancelar</button>
+            <button type="button" onClick={() => onClose()} disabled={saving} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-50">Cancelar</button>
             <button type="submit" disabled={saving} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {saving ? 'Guardando…' : 'Guardar'}
+              {saving ? (status || 'Guardando…') : 'Guardar'}
             </button>
           </div>
         </form>

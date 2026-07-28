@@ -14,6 +14,7 @@ import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
 import { btnPrimary, btnOutline, btnIcon } from '@/components/ui/button-styles';
 
 const DOC_TYPES = {
+  dni: 'DNI',
   work_insurance: 'Seguro de trabajo',
   tax_certificate: 'Constancia fiscal',
   contract: 'Contrato',
@@ -83,15 +84,13 @@ export default function EmpresaPortal() {
       const updated = await base44.entities.Person.update(editingEmployee.id, data);
       setEmployees((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
       await logAudit('empresa-update-employee', 'Person', updated.id, data.full_name);
-      setMsg('Empleado actualizado.');
+      return updated;
     } else {
       const created = await base44.entities.Person.create(data);
       setEmployees((prev) => [created, ...prev]);
       await logAudit('empresa-create-employee', 'Person', created.id, data.full_name);
-      setMsg('Empleado cargado correctamente.');
+      return created;
     }
-    setEditingEmployee(null);
-    setTimeout(() => setMsg(''), 3000);
   };
 
   const handleDeleteEmployee = async (emp) => {
@@ -360,8 +359,9 @@ export default function EmpresaPortal() {
       </div>
 
       <EmployeeFormModal
+        key={editingEmployee?.id || 'new'}
         open={formOpen}
-        onClose={() => { setFormOpen(false); setEditingEmployee(null); }}
+        onClose={(success) => { setFormOpen(false); setEditingEmployee(null); if (success) { setMsg(success); setTimeout(() => setMsg(''), 4000); } }}
         onSubmit={handleSaveEmployee}
         editing={editingEmployee}
         companyName={companyName}
