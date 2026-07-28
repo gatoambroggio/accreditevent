@@ -1,141 +1,202 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useAuth } from '@/lib/AuthContext';
-import { Plus, Download, Trash2, Pencil, Printer, ScanFace, IdCard } from 'lucide-react';
-import PageHeader from '@/components/ui/page-header';
-import SearchInput from '@/components/ui/search-input';
-import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
-import Pagination from '@/components/ui/pagination';
-import FilterSelect from '@/components/ui/filter-select';
+import { useCrud } from '@/lib/crud';
+import { Plus, Pencil, Printer, Download, ScanFace, Trash2 } from 'lucide-react';
+import { exportToExcel } from '@/lib/exportUtils';
+import BiometricButton from '@/components/BiometricButton';
 import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
 import BadgePrint from '@/components/BadgePrint';
 import BatchBadgePrint from '@/components/BatchBadgePrint';
 import DniToBiometric from '@/components/DniToBiometric';
-import { useCrud } from '@/lib/crud';
-import { usePagination } from '@/lib/usePagination';
 import { useZones } from '@/lib/useZones';
 import { usePersonTypes } from '@/lib/usePersonTypes';
-import { exportToExcel } from '@/lib/exportUtils';
 import { generateBadgeCode } from '@/lib/badgeCode';
-import { getUserCompany } from '@/lib/userCompany';
-import { logAudit } from '@/lib/audit';
+import PageHeader from '@/components/ui/page-header';
+import SearchInput from '@/components/ui/search-input';
+import FilterSelect from '@/components/ui/filter-select';
+import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
+import { btnPrimary, btnOutline, btnIcon } from '@/components/ui/button-styles';
+import Pagination from '@/components/ui/pagination';
+import { usePagination } from '@/lib/usePagination';
 
-const PHASE_OPTIONS = [
-  { value: 'armado', label: 'Armado' },
-  { value: 'dia_evento', label: 'Show' },
-  { value: 'desarme', label: 'Desarme' },
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Activa' },
+  { value: 'blocked', label: 'Bloqueada' },
+  { value: 'revoked', label: 'Revocada' },
 ];
 
 export default function Accreditations() {
-  const { user } = useAuth();
-  const { items: accreditations, loading, error, create, update, remove } = useCrud('Accreditation');
+  const { items, loading, error, create, update, remove, reload } = useCrud('Accreditation');
   const { zones } = useZones();
   const { personTypes } = usePersonTypes();
-  const [events, setEvents] = useState([]);
-  const [people, setPeople] = useState([]);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [search, setSearch] = useState('');
-  const [eventFilter, setEventFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [printAccred, setPrintAccred] = useState(null);
-  const [batchPrint, setBatchPrint] = useState([]);
-  const [selected, setSelected] = useState(new Set());
-  const [biometricTarget, setBiometricTarget] = useState(null);
-
-  useEffect(() => {
-    Promise.all([
-      base44.entities.Event.list('-created_date', 200),
-      base44.entities.Person.list('-created_date', 200),
-    ]).then(([evs, ps]) => {
-      setEvents(evs);
-      setPeople(ps);
-    }).catch(() => {});
-  }, []);
-
-  const userCompany = getUserCompany(user);
-  const isProductora = user?.role === 'productora';
-
   const typePrefixes = useMemo(() => {
     const map = {};
     personTypes.forEach((t) => { map[t.value] = t.badge_prefix || 'GE'; });
     return map;
   }, [personTypes]);
+  const accessLevels = [...new Set(zones.map((z) => z.value))];
+  const [events, setEvents] = useState([]);
+  const [people, setPeople] = useState([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [eventFilter, setEventFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [query, setQuery] = useState('');
+  const [badgeAccred, setBadgeAccred] = useState(null);
+  const [selected, setSelected] = useState(new Set());
+  const [batchOpen, setBatchOpen] = useState(false);
+  const [dniBioAccred, setDniBioAccred] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [evs, ps] = await Promise.all([
+          base44.entities.Event.list('-created_date', 200),
+          base44.entities.Person.list('-created_date', 200),
+        ]);
+        setEvents(evs);
+        setPeople(ps);
+      } catch {}
+    })();
+  }, []);
 
   const filtered = useMemo(() => {
-    return accreditations.filter((a) => {
-      if (isProductora && a.company !== userCompany) return false;
-      if (eventFilter && a.event_id !== eventFilter) return false;
-      if (statusFilter && a.status !== statusFilter) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        return a.person_name?.toLowerCase().includes(q) ||
-               a.badge_code?.toLowerCase().includes(q);
-      }
-      return true;
-    });
-  }, [accreditations, search, eventFilter, statusFilter, isProductora, userCompany]);
+    let result = items;
+    if (eventFilter) result = result.filter((a) => a.event_id === eventFilter);
+    if (statusFilter) result = result.filter((a) => a.status === statusFilter);
+    const q = query.toLowerCase().trim();
+    if (q) {
+      result = result.filter((a) =>
+        `${a.person_name} ${a.badge_code} ${a.person_type}`.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [items, eventFilter, statusFilter, query]);
 
   const { page, setPage, totalPages, paginated } = usePagination(filtered, 15);
 
-  const handleFieldChange = useCallback((name, value, setField, formData) => {
-    if (name === 'person_id' && value) {
-      const p = people.find((p) => p.id === value);
-      if (p?.access_area) setField('access_level', p.access_area);
-      if (p?.event_phases) {
-        const raw = p.event_phases;
-        const phases = Array.isArray(raw) ? raw : String(raw).split(',').map((s) => s.trim()).filter(Boolean);
-        setField('event_phases', phases);
+  const allFilteredIds = useMemo(() => filtered.map((a) => a.id), [filtered]);
+  const isAllSelected = allFilteredIds.length > 0 && allFilteredIds.every((id) => selected.has(id));
+  const toggleSelect = (id) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAll = () => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (isAllSelected) {
+        allFilteredIds.forEach((id) => next.delete(id));
+      } else {
+        allFilteredIds.forEach((id) => next.add(id));
       }
-      // Check biometric status
-      base44.entities.Biometric.filter({ person_id: value, status: 'active' }, '-created_date', 1)
-        .then((bios) => setField('has_biometric', bios.length > 0))
-        .catch(() => {});
+      return next;
+    });
+  };
+  const handleBulkDelete = async () => {
+    if (!confirm(`¿Eliminar ${selected.size} acreditación(es)? Esta acción no se puede deshacer.`)) return;
+    for (const id of selected) {
+      try { await base44.entities.Accreditation.delete(id); } catch {}
     }
-    if (name === 'event_id' && value) {
-      const evt = events.find((e) => e.id === value);
-      if (evt) setField('company', evt.company);
-    }
-  }, [people, events]);
+    setSelected(new Set());
+    await reload();
+  };
 
-  const fields = useMemo(() => [
-    {
-      name: 'event_id', label: 'Evento', type: 'searchable-select', required: true, full: true,
-      options: events.map((e) => ({ value: e.id, label: e.name })),
-    },
-    {
-      name: 'person_id', label: 'Persona', type: 'searchable-select', required: true, full: true,
-      options: people.map((p) => ({ value: p.id, label: `${p.full_name}${p.document ? ' — ' + p.document : ''}` })),
-    },
+  const handleBatchPrint = () => {
+    const selectedAccreds = filtered.filter((a) => selected.has(a.id));
+    if (selectedAccreds.length === 0) return;
+    setBatchOpen(true);
+  };
+
+  const handleExport = () => {
+    exportToExcel(
+      ['Persona', 'Tipo', 'Evento', 'Código', 'Área de acceso', 'Estado', 'Biometría'],
+      filtered.map((a) => [
+        a.person_name || '',
+        zones.find((z) => z.value === a.person_type)?.label || a.person_type || '',
+        a.event_name || '',
+        a.badge_code || '',
+        zones.find((z) => z.value === (a.access_level || a.area))?.label || a.access_level || a.area || '',
+        a.status || '',
+        a.has_biometric ? 'Sí' : 'No',
+      ]),
+      'acreditaciones'
+    );
+  };
+
+  const eventOptions = events
+    .filter((e) => e.status !== 'closed' || (editing && editing.event_id === e.id))
+    .map((e) => ({ value: e.id, label: e.name }));
+  const personOptions = people.map((p) => ({ value: p.id, label: `${p.full_name} — ${p.document || 'sin doc'} (${p.person_type})` }));
+
+  const fields = [
+    { name: 'event_id', label: 'Evento', type: 'select', options: eventOptions, required: true },
+    { name: 'person_id', label: 'Persona', type: 'searchable-select', options: personOptions, required: true, placeholder: 'Buscar por nombre o documento…', full: true },
+    ...(editing ? [{ name: 'badge_code', label: 'Código de credencial', type: 'text', required: true }] : []),
     {
       name: 'access_level', label: 'Área de acceso', type: 'select',
       options: zones.map((z) => ({ value: z.value, label: z.label })),
     },
     {
-      name: 'event_phases', label: 'Fases del evento', type: 'toggle-group', full: true,
-      options: PHASE_OPTIONS,
+      name: 'event_phases', label: 'Fases del evento', type: 'toggle-group',
+      options: [
+        { value: 'armado', label: 'Armado' },
+        { value: 'dia_evento', label: 'Show' },
+        { value: 'desarme', label: 'Desarme' },
+      ],
+      full: true,
     },
-    { name: 'status', label: 'Estado', type: 'select', options: [
-      { value: 'active', label: 'Activa' },
-      { value: 'blocked', label: 'Bloqueada' },
-      { value: 'revoked', label: 'Revocada' },
-    ], defaultValue: 'active' },
-  ], [events, people, zones]);
+    { name: 'status', label: 'Estado', type: 'select', options: STATUS_OPTIONS },
+    { name: 'has_biometric', label: 'Biometría registrada', type: 'checkbox' },
+  ];
 
   const openNew = () => { setEditing(null); setModalOpen(true); };
-  const openEdit = (a) => { setEditing(a); setModalOpen(true); };
+  const openEdit = (item) => {
+    const normalized = { ...item, access_level: item.access_level || item.area || '' };
+    if (Array.isArray(normalized.event_phases)) {
+      normalized.event_phases = normalized.event_phases.join(',');
+    }
+    setEditing(normalized);
+    setModalOpen(true);
+  };
+
+  const handleFieldChange = async (name, value, setField, formData) => {
+    if (name === 'person_id' && value) {
+      const p = people.find((p) => p.id === value);
+      if (p?.access_area) setField('access_level', p.access_area);
+      if (p?.event_phases) setField('event_phases', Array.isArray(p.event_phases) ? p.event_phases.join(',') : p.event_phases);
+      try {
+        const bios = await base44.entities.Biometric.filter({ person_id: value, status: 'active' }, '-created_date', 1);
+        setField('has_biometric', bios.length > 0);
+      } catch {}
+    }
+  };
 
   const handleSubmit = async (data) => {
+    const existing = await base44.entities.Accreditation.filter(
+      { event_id: data.event_id, person_id: data.person_id },
+      '-created_date',
+      5
+    );
+    if (existing.some((a) => !editing || a.id !== editing.id)) {
+      throw new Error('Esta persona ya tiene una credencial registrada para este evento.');
+    }
+    if (!editing) {
+      const res = await base44.functions.invoke('checkPersonDocuments', { person_id: data.person_id });
+      if (res.data?.has_pending) {
+        throw new Error(`No se puede asignar: la persona tiene documentación pendiente o vencida (${res.data.pending_statuses.join(', ')}).`);
+      }
+    }
     const evt = events.find((e) => e.id === data.event_id);
     const person = people.find((p) => p.id === data.person_id);
-
-    // ALWAYS use the person's access_area and event_phases as primary source
     const zoneValue = person?.access_area || data.access_level || 'general';
+    const phasesFromForm = typeof data.event_phases === 'string'
+      ? data.event_phases.split(',').map((s) => s.trim()).filter(Boolean)
+      : (Array.isArray(data.event_phases) ? data.event_phases : []);
     const personPhases = Array.isArray(person?.event_phases) ? person.event_phases : [];
-    const formPhases = Array.isArray(data.event_phases) ? data.event_phases : [];
-    const finalPhases = formPhases.length > 0 ? formPhases : personPhases;
-
     const enriched = {
       ...data,
       event_name: evt?.name || '',
@@ -145,153 +206,174 @@ export default function Accreditations() {
       person_email: person?.email || '',
       area: zoneValue,
       access_level: zoneValue,
-      event_phases: finalPhases,
+      event_phases: phasesFromForm.length > 0 ? phasesFromForm : personPhases,
     };
-
     if (!editing) {
-      // Generate badge code
-      enriched.badge_code = generateBadgeCode(zoneValue, accreditations.map((a) => a.badge_code), typePrefixes);
+      enriched.badge_code = generateBadgeCode(person?.person_type, items.map((a) => a.badge_code), typePrefixes);
     }
-
     if (editing) {
       await update(editing.id, enriched);
     } else {
-      const created = await create(enriched);
-      // Notify by email if person is registered
-      if (person?.email) {
-        try {
-          await base44.integrations.Core.SendEmail({
-            to: person.email,
-            subject: `Acreditación emitida — ${evt?.name || 'Evento'}`,
-            body: `Hola ${person.full_name},<br><br>Tu acreditación para <strong>${evt?.name}</strong> ha sido emitida.<br><br>Código de credencial: <strong>${enriched.badge_code}</strong><br>Área: ${zones.find((z) => z.value === zoneValue)?.label || zoneValue}<br><br>Retiro de credenciales: ${evt?.pickup_address || 'A confirmar'}${evt?.pickup_date ? ' — ' + evt.pickup_date : ''}<br><br>Saludos.`,
-          });
-        } catch {}
+      await create(enriched);
+      if (evt?.pickup_address) {
+        const mapsUrl = evt.pickup_lat && evt.pickup_lng
+          ? `https://www.google.com/maps?q=${evt.pickup_lat},${evt.pickup_lng}`
+          : `https://www.google.com/maps?q=${encodeURIComponent(evt.pickup_address)}`;
+        const pickupDate = evt.pickup_date
+          ? new Date(evt.pickup_date + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+          : 'a confirmar';
+        const pickupTime = evt.pickup_start_time && evt.pickup_end_time
+          ? `${evt.pickup_start_time} a ${evt.pickup_end_time} hs`
+          : (evt.pickup_start_time || 'a confirmar');
+
+        if (person?.email) {
+          try {
+            const htmlBody = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background-color:#f0fdf4;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0fdf4;padding:32px 16px;">
+<tr><td align="center">
+<table width="560" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
+<tr><td style="background:linear-gradient(135deg,#047857,#065f46);padding:32px 40px;text-align:center;">
+<h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:800;letter-spacing:-0.5px;">AccreditEvent</h1>
+<p style="margin:8px 0 0;color:#a7f3d0;font-size:12px;text-transform:uppercase;letter-spacing:2px;">Tu acreditación está lista</p>
+</td></tr>
+<tr><td style="padding:36px 40px;">
+<p style="margin:0 0 20px;color:#0f172a;font-size:16px;line-height:1.6;">Hola <strong>${person.full_name}</strong>,</p>
+<p style="margin:0 0 28px;color:#475569;font-size:15px;line-height:1.6;">Tu acreditación para <strong style="color:#047857;">${evt.name}</strong> ya está lista. Estos son los datos para el retiro:</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0fdf4;border-radius:12px;border:1px solid #bbf7d0;margin-bottom:28px;">
+<tr><td style="padding:24px;">
+<p style="margin:0 0 6px;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;">📅 Fecha de retiro</p>
+<p style="margin:0 0 20px;color:#0f172a;font-size:15px;font-weight:700;">${pickupDate}</p>
+<p style="margin:0 0 6px;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;">🕐 Horario</p>
+<p style="margin:0;color:#0f172a;font-size:15px;font-weight:700;">${pickupTime}</p>
+</td></tr>
+</table>
+<table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+<a href="${mapsUrl}" style="display:inline-block;background:#047857;color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:10px;font-size:15px;font-weight:700;">🗺️ Ver ubicación en Google Maps</a>
+</td></tr></table>
+<p style="margin:28px 0 0;color:#475569;font-size:14px;line-height:1.6;">¡Te esperamos!</p>
+</td></tr>
+<tr><td style="background-color:#f8fafc;padding:20px 40px;border-top:1px solid #e2e8f0;">
+<p style="margin:0;color:#94a3b8;font-size:12px;text-align:center;">AccreditEvent · Sistema de acreditación de eventos</p>
+</td></tr>
+</table>
+</td></tr>
+</table></body></html>`;
+            await base44.integrations.Core.SendEmail({
+              to: person.email,
+              subject: `Tu acreditación para ${evt.name} está lista`,
+              body: htmlBody,
+            });
+          } catch {}
+        }
+
+        if (person?.phone) {
+          let cleanPhone = person.phone.replace(/\D/g, '');
+          if (!cleanPhone.startsWith('54')) {
+            cleanPhone = '54' + cleanPhone.replace(/^0/, '');
+          }
+          const waMessage = encodeURIComponent(
+            `Hola ${person.full_name},\n\n` +
+            `Tu acreditación para "${evt.name}" ya está lista.\n\n` +
+            `Podés retirarla el día ${pickupDate}, en el horario de ${pickupTime}.\n\n` +
+            `Ver ubicación en el mapa: ${mapsUrl}\n\n` +
+            `Te esperamos.\n\nAccreditEvent`
+          );
+          const waLink = document.createElement('a');
+          waLink.href = `https://wa.me/${cleanPhone}?text=${waMessage}`;
+          waLink.target = '_blank';
+          waLink.rel = 'noopener noreferrer';
+          document.body.appendChild(waLink);
+          waLink.click();
+          document.body.removeChild(waLink);
+        }
       }
-      // Auto-open badge print
-      setPrintAccred({ ...created, event_name: evt?.name, ...enriched });
     }
   };
 
-  const toggleSelect = (id) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const handleBulkPrint = () => {
-    const selectedAccredits = filtered.filter((a) => selected.has(a.id));
-    setBatchPrint(selectedAccredits);
-  };
-
-  const handleBulkDelete = async () => {
-    if (!window.confirm(`¿Eliminar ${selected.size} acreditaciones?`)) return;
-    await Promise.all([...selected].map((id) => remove(id)));
-    setSelected(new Set());
-  };
-
-  const handleExport = () => {
-    const headers = ['Código', 'Persona', 'Evento', 'Área', 'Fases', 'Biometría', 'Estado'];
-    const rows = filtered.map((a) => [
-      a.badge_code, a.person_name, a.event_name,
-      zones.find((z) => z.value === a.access_level)?.label || a.access_level,
-      (Array.isArray(a.event_phases) ? a.event_phases : []).join(', '),
-      a.has_biometric ? 'Sí' : 'No',
-      a.status,
-    ]);
-    exportToExcel(headers, rows, 'acreditaciones');
-  };
+  const handleDelete = async () => { await remove(editing.id); };
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="Gestión" title="Acreditaciones">
-        <button onClick={handleExport} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+      <PageHeader kicker="Control de accesos" title="Acreditaciones">
+        <button onClick={handleExport} className={btnOutline}>
           <Download className="h-4 w-4" /> Exportar
         </button>
-        <button onClick={openNew} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800">
+        <button onClick={openNew} className={btnPrimary}>
           <Plus className="h-4 w-4" /> Nueva acreditación
         </button>
       </PageHeader>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <SearchInput value={search} onChange={setSearch} placeholder="Buscar por nombre o código…" />
+      <div className="flex flex-wrap items-center gap-3">
+        <SearchInput value={query} onChange={setQuery} placeholder="Buscar por persona, código o tipo…" />
         <FilterSelect value={eventFilter} onChange={setEventFilter} options={events.map((e) => ({ value: e.id, label: e.name }))} placeholder="Todos los eventos" />
-        <FilterSelect value={statusFilter} onChange={setStatusFilter} options={[
-          { value: 'active', label: 'Activa' },
-          { value: 'blocked', label: 'Bloqueada' },
-          { value: 'revoked', label: 'Revocada' },
-        ]} placeholder="Todos los estados" />
+        <FilterSelect value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} placeholder="Todos los estados" />
       </div>
 
       {selected.size > 0 && (
-        <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5">
-          <span className="text-sm font-medium text-amber-700">{selected.size} seleccionada(s)</span>
-          <div className="flex items-center gap-2">
-            <button onClick={handleBulkPrint} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700">
-              <Printer className="h-3.5 w-3.5" /> Imprimir credenciales
-            </button>
-            <button onClick={handleBulkDelete} className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-red-700">
-              <Trash2 className="h-3.5 w-3.5" /> Eliminar
-            </button>
-          </div>
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5">
+          <span className="text-sm font-semibold text-emerald-700">{selected.size} seleccionada(s)</span>
+          <button onClick={handleBatchPrint} className={btnOutline}>
+            <Printer className="h-4 w-4" /> Imprimir selección
+          </button>
+          <button onClick={handleBulkDelete} className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700">
+            <Trash2 className="h-4 w-4" /> Eliminar selección
+          </button>
+          <button onClick={() => setSelected(new Set())} className="text-sm text-slate-500 hover:text-slate-700">Limpiar</button>
         </div>
       )}
 
-      <DataTable loading={loading} isEmpty={filtered.length === 0} error={error} emptyMessage="No hay acreditaciones emitidas." skeletonCols={7}>
-        <thead className="border-b border-slate-100 bg-slate-50/50">
-          <tr>
-            <Th className="w-8">
-              <input type="checkbox" checked={selected.size === paginated.length && paginated.length > 0} onChange={() => {
-                if (selected.size === paginated.length) setSelected(new Set());
-                else setSelected(new Set(paginated.map((a) => a.id)));
-              }} className="h-4 w-4 rounded border-slate-300 text-emerald-600" />
+      <DataTable loading={loading} error={error} isEmpty={filtered.length === 0} emptyMessage="No hay acreditaciones registradas." tableClassName="min-w-[800px]">
+        <thead>
+          <tr className="border-b border-slate-100 bg-slate-50">
+            <Th className="w-10">
+              <input
+                type="checkbox"
+                checked={isAllSelected}
+                onChange={toggleSelectAll}
+                className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              />
             </Th>
-            <Th>Código</Th>
             <Th>Persona</Th>
             <Th>Evento</Th>
-            <Th>Área</Th>
-            <Th>Bio</Th>
+            <Th>Código</Th>
+            <Th>Área de acceso</Th>
             <Th>Estado</Th>
-            <Th className="text-right">Acciones</Th>
+            <Th>Bio</Th>
+            <Th />
           </tr>
         </thead>
         <tbody>
           {paginated.map((a) => (
             <Tr key={a.id}>
               <Td>
-                <input type="checkbox" checked={selected.has(a.id)} onChange={() => toggleSelect(a.id)} className="h-4 w-4 rounded border-slate-300 text-emerald-600" />
+                <input
+                  type="checkbox"
+                  checked={selected.has(a.id)}
+                  onChange={() => toggleSelect(a.id)}
+                  className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                />
               </Td>
               <Td>
-                <span className="font-mono text-xs font-bold text-slate-900">{a.badge_code}</span>
+                <p className="text-sm font-semibold text-slate-900">{a.person_name || '—'}</p>
+                <p className="text-xs text-slate-400">{zones.find((z) => z.value === a.person_type)?.label || a.person_type}</p>
               </Td>
-              <Td>
-                <p className="font-semibold text-slate-900">{a.person_name}</p>
-              </Td>
-              <Td className="text-sm text-slate-600">{a.event_name}</Td>
-              <Td>
-                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                  {zones.find((z) => z.value === a.access_level)?.label || a.access_level}
-                </span>
-              </Td>
-              <Td>
-                {a.has_biometric ? (
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><ScanFace className="h-4 w-4" /></span>
-                ) : (
-                  <button onClick={() => setBiometricTarget(a)} className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition hover:bg-amber-50 hover:text-amber-600" title="Registrar biometría">
-                    <ScanFace className="h-4 w-4" />
-                  </button>
-                )}
-              </Td>
+              <Td className="text-sm text-slate-500">{a.event_name || '—'}</Td>
+              <Td><code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700">{a.badge_code}</code></Td>
+              <Td className="text-sm text-slate-500">{zones.find((z) => z.value === (a.access_level || a.area))?.label || a.access_level || a.area || '—'}</Td>
               <Td><StatusBadge status={a.status} /></Td>
+              <Td>
+                <BiometricButton accreditation={a} onRegistered={reload} />
+              </Td>
               <Td className="text-right">
                 <div className="flex items-center justify-end gap-1">
-                  <button onClick={() => setPrintAccred(a)} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-emerald-600" title="Imprimir credencial">
-                    <Printer className="h-4 w-4" />
+                  <button onClick={() => setBadgeAccred(a)} className={btnIcon} title="Imprimir credencial">
+                    <Printer className="h-3.5 w-3.5" />
                   </button>
-                  <button onClick={() => openEdit(a)} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-emerald-600" title="Editar">
-                    <Pencil className="h-4 w-4" />
+                  <button onClick={() => setDniBioAccred(a)} className={btnIcon} title="Biometría desde DNI">
+                    <ScanFace className="h-3.5 w-3.5" />
+                  </button>
+                  <button onClick={() => openEdit(a)} className={btnIcon}>
+                    <Pencil className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </Td>
@@ -300,50 +382,45 @@ export default function Accreditations() {
         </tbody>
       </DataTable>
 
-      {totalPages > 1 && <Pagination page={page} totalPages={totalPages} onPageChange={setPage} totalItems={filtered.length} pageSize={15} />}
+      {filtered.length > 15 && (
+        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} totalItems={filtered.length} pageSize={15} />
+      )}
 
       <EntityModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editing ? `Acreditación ${editing.badge_code}` : 'Nueva acreditación'}
+        title={editing ? 'Editar acreditación' : 'Nueva acreditación'}
         kicker={editing ? 'EDITAR ACREDITACIÓN' : 'CREAR ACREDITACIÓN'}
         fields={fields}
-        initialData={editing || { status: 'active', event_phases: [] }}
+        initialData={editing || {}}
         onSubmit={handleSubmit}
-        onFieldChange={handleFieldChange}
+        onDelete={editing ? handleDelete : null}
         canDelete={!!editing}
-        onDelete={async () => { await remove(editing.id); }}
         submitLabel={editing ? 'Guardar cambios' : 'Crear acreditación'}
+        onFieldChange={handleFieldChange}
       />
 
-      {printAccred && (
+      {badgeAccred && (
         <BadgePrint
-          accreditation={printAccred}
-          event={events.find((e) => e.id === printAccred.event_id)}
-          onClose={() => setPrintAccred(null)}
+          accreditation={badgeAccred}
+          event={events.find((e) => e.id === badgeAccred.event_id)}
+          onClose={() => setBadgeAccred(null)}
         />
       )}
 
-      {batchPrint.length > 0 && (
+      {batchOpen && (
         <BatchBadgePrint
-          accreditations={batchPrint}
+          accreditations={filtered.filter((a) => selected.has(a.id))}
           events={events}
-          onClose={() => { setBatchPrint([]); setSelected(new Set()); }}
+          onClose={() => setBatchOpen(false)}
         />
       )}
 
-      {biometricTarget && (
+      {dniBioAccred && (
         <DniToBiometric
-          accreditation={biometricTarget}
-          person={people.find((p) => p.id === biometricTarget.person_id)}
-          onClose={() => setBiometricTarget(null)}
-          onSaved={() => {
-            // Refresh has_biometric status
-            base44.entities.Accreditation.update(biometricTarget.id, { has_biometric: true }).then(() => {
-              setBiometricTarget(null);
-              window.location.reload();
-            });
-          }}
+          person={{ id: dniBioAccred.person_id, full_name: dniBioAccred.person_name, company: dniBioAccred.company }}
+          onSaved={reload}
+          onClose={() => setDniBioAccred(null)}
         />
       )}
     </div>

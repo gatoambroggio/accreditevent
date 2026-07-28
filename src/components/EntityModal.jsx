@@ -1,17 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Trash2, Loader2, Upload } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import AddressInput from '@/components/AddressInput';
 import FaceCapture from '@/components/FaceCapture';
 
-/**
- * EntityModal — generic entity form modal.
- *
- * KEY FIX: Uses a ref to track the latest form data so that onFieldChange
- * callbacks always receive fresh data, not stale state from the render closure.
- * This fixes the person→accreditation inheritance bugs where access_area and
- * event_phases were lost when setField was called multiple times in the same tick.
- */
 export default function EntityModal({
   open,
   onClose,
@@ -32,28 +24,21 @@ export default function EntityModal({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [errors, setErrors] = useState({});
-  const dataRef = useRef({});
-  const initialDataRef = useRef(initialData);
-  initialDataRef.current = initialData;
 
   useEffect(() => {
     if (open) {
-      const initData = initialDataRef.current || {};
-      setData(initData);
-      dataRef.current = initData;
+      setData(initialData || {});
       setError('');
       setErrors({});
     }
-  }, [open]);
+  }, [open, initialData]);
 
   if (!open) return null;
 
   const setField = (name, value) => {
-    const next = { ...dataRef.current, [name]: value };
-    dataRef.current = next;
-    setData(next);
+    setData((d) => ({ ...d, [name]: value }));
     setErrors((e) => ({ ...e, [name]: undefined }));
-    if (onFieldChange) onFieldChange(name, value, setField, next);
+    if (onFieldChange) onFieldChange(name, value, setField, data);
   };
 
   const handleSubmit = async (e) => {
@@ -61,7 +46,7 @@ export default function EntityModal({
     setSaving(true);
     setError('');
     if (validate) {
-      const validationErrors = validate(dataRef.current);
+      const validationErrors = validate(data);
       if (Object.keys(validationErrors).length > 0) {
         setErrors(validationErrors);
         setSaving(false);
@@ -70,10 +55,7 @@ export default function EntityModal({
     }
     setErrors({});
     try {
-      const cleanData = Object.fromEntries(
-        Object.entries(dataRef.current).filter(([k]) => !k.startsWith('_search_'))
-      );
-      await onSubmit(cleanData);
+      await onSubmit(data);
       onClose();
     } catch (err) {
       setError(err.message || 'No se pudo guardar el registro.');
@@ -116,8 +98,8 @@ export default function EntityModal({
       return (
         <label key={f.name} className="block">
           <span className="mb-1.5 block text-xs font-semibold text-slate-600">{f.label}{f.required && ' *'}</span>
-          <select {...common} disabled={f.disabled}>
-            <option value="">{f.placeholder || 'Seleccionar…'}</option>
+          <select {...common}>
+            <option value="">Seleccionar…</option>
             {f.options?.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
@@ -127,8 +109,7 @@ export default function EntityModal({
     }
 
     if (f.type === 'toggle-group') {
-      const raw = data[f.name];
-      const selectedValues = Array.isArray(raw) ? raw : (raw ? String(raw).split(',').map((v) => v.trim()).filter(Boolean) : []);
+      const selectedValues = value ? String(value).split(',').map((v) => v.trim()).filter(Boolean) : [];
       return (
         <div key={f.name} className={f.full ? 'sm:col-span-2' : ''}>
           <span className="mb-1.5 block text-xs font-semibold text-slate-600">{f.label}{f.required && ' *'}</span>
@@ -143,7 +124,7 @@ export default function EntityModal({
                     const next = active
                       ? selectedValues.filter((v) => v !== o.value)
                       : [...selectedValues, o.value];
-                    setField(f.name, next);
+                    setField(f.name, next.join(','));
                   }}
                   className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                 >
@@ -312,7 +293,7 @@ export default function EntityModal({
           <input
             type="text"
             inputMode="numeric"
-            value={String(value || '').replace(/\D/g, '')}
+            value={value.replace(/\D/g, '')}
             onChange={(e) => setField(f.name, e.target.value.replace(/\D/g, ''))}
             placeholder={f.placeholder || 'Ej: 12345678'}
             required={f.required}
@@ -328,8 +309,8 @@ export default function EntityModal({
     }
 
     if (f.type === 'phone-ar') {
-      const v = String(value || '');
-      const displayValue = v.startsWith('54') ? v.slice(2) : v;
+      const value = data[f.name] ?? '';
+      const displayValue = value.startsWith('54') ? value.slice(2) : value;
       return (
         <label key={f.name} className="block">
           <span className="mb-1.5 block text-xs font-semibold text-slate-600">{f.label}{f.required && ' *'}</span>

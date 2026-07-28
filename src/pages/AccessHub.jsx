@@ -1,76 +1,75 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { ScanFace, QrCode, Hand, Radio, DoorOpen } from 'lucide-react';
-import PageHeader from '@/components/ui/page-header';
+import { useNavigate } from 'react-router-dom';
+import { Hand, ScanFace, QrCode, Car, ArrowRight } from 'lucide-react';
 
 const STATIONS = [
   {
-    path: '/control-acceso',
-    title: 'Reconocimiento facial',
-    desc: 'Estación de acceso por cámara con matching biométrico en tiempo real.',
-    icon: ScanFace,
-    color: 'emerald',
-  },
-  {
-    path: '/control-qr',
-    title: 'Escáner QR — Personas',
-    desc: 'Validación de credenciales mediante código QR de acreditación.',
-    icon: QrCode,
-    color: 'blue',
-  },
-  {
-    path: '/control-vehicular',
-    title: 'Escáner QR — Vehículos',
-    desc: 'Control de acceso vehicular por patente o código QR.',
-    icon: QrCode,
-    color: 'violet',
-  },
-  {
-    path: '/control-manual',
-    title: 'Control manual',
-    desc: 'Búsqueda y validación manual de personas por nombre o DNI.',
+    key: 'manual',
+    label: 'Control Manual',
+    description: 'Ingresá el código de credencial manualmente para validar el acceso.',
     icon: Hand,
-    color: 'amber',
+    to: '/control-manual',
+    accent: 'bg-sky-50 text-sky-600 ring-sky-200',
+    btn: 'bg-sky-600 hover:bg-sky-700',
   },
   {
-    path: '/access-monitor',
-    title: 'Monitor en vivo',
-    desc: 'Visualización en tiempo real de todos los intentos de acceso.',
-    icon: Radio,
-    color: 'rose',
+    key: 'person',
+    label: 'Control de Personas Facial',
+    description: 'Identificación facial de personas acreditadas en el evento.',
+    icon: ScanFace,
+    to: '/control-acceso',
+    accent: 'bg-emerald-50 text-emerald-600 ring-emerald-200',
+    btn: 'bg-emerald-600 hover:bg-emerald-700',
+  },
+  {
+    key: 'person-qr',
+    label: 'Control de Personas QR',
+    description: 'Validación por QR de credenciales de personas acreditadas.',
+    icon: QrCode,
+    to: '/control-qr',
+    accent: 'bg-teal-50 text-teal-600 ring-teal-200',
+    btn: 'bg-teal-600 hover:bg-teal-700',
+  },
+  {
+    key: 'vehicle',
+    label: 'Control Vehicular',
+    description: 'Validación por QR de credenciales vehiculares y sectores de estacionamiento.',
+    icon: Car,
+    to: '/control-vehicular',
+    accent: 'bg-amber-50 text-amber-600 ring-amber-200',
+    btn: 'bg-amber-600 hover:bg-amber-700',
   },
 ];
 
-const COLOR_MAP = {
-  emerald: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
-  blue: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100',
-  violet: 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100',
-  amber: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100',
-  rose: 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100',
-};
-
 export default function AccessHub() {
-  return (
-    <div className="space-y-6">
-      <PageHeader kicker="Control de acceso" title="Estaciones de control">
-      </PageHeader>
+  const navigate = useNavigate();
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+  return (
+    <div className="mx-auto max-w-5xl px-5 py-10">
+      <div className="mb-8">
+        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Control de acceso</h1>
+        <p className="mt-1 text-sm text-slate-500">Elegí el tipo de control para iniciar la estación de validación.</p>
+      </div>
+
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {STATIONS.map((s) => {
           const Icon = s.icon;
           return (
-            <Link
-              key={s.path}
-              to={s.path}
-              className={`group rounded-xl border p-6 transition ${COLOR_MAP[s.color]}`}
+            <button
+              key={s.key}
+              onClick={() => navigate(s.to)}
+              className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:border-slate-300 hover:shadow-md"
             >
-              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-white/60">
-                <Icon className="h-6 w-6" strokeWidth={2} />
+              <div className={`mb-4 grid h-14 w-14 place-items-center rounded-xl ring-1 ring-inset ${s.accent}`}>
+                <Icon className="h-7 w-7" />
               </div>
-              <h3 className="text-lg font-bold text-slate-900">{s.title}</h3>
-              <p className="mt-1 text-sm text-slate-600">{s.desc}</p>
-              <p className="mt-3 text-xs font-semibold opacity-70 group-hover:opacity-100">Abrir estación →</p>
-            </Link>
+              <h2 className="text-lg font-bold text-slate-900">{s.label}</h2>
+              <p className="mt-1 flex-1 text-sm text-slate-500">{s.description}</p>
+              <span className={`mt-4 inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-bold text-white transition ${s.btn}`}>
+                Abrir estación
+                <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+              </span>
+            </button>
           );
         })}
       </div>

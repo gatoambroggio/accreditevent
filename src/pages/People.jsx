@@ -1,134 +1,86 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useCrud } from '@/lib/crud';
+import { Plus, Pencil, Download, Trash2 } from 'lucide-react';
+import { exportToExcel } from '@/lib/exportUtils';
 import { base44 } from '@/api/base44Client';
-import { useAuth } from '@/lib/AuthContext';
-import { Plus, Download, Trash2, Pencil, Eye, Users } from 'lucide-react';
-import PageHeader from '@/components/ui/page-header';
-import SearchInput from '@/components/ui/search-input';
-import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
-import Pagination from '@/components/ui/pagination';
-import FilterSelect from '@/components/ui/filter-select';
+import { useZones } from '@/lib/useZones';
 import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
 import PersonDetailModal from '@/components/PersonDetailModal';
-import { useCrud } from '@/lib/crud';
+import PageHeader from '@/components/ui/page-header';
+import SearchInput from '@/components/ui/search-input';
+import FilterSelect from '@/components/ui/filter-select';
+import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
+import { btnPrimary, btnOutline, btnIcon } from '@/components/ui/button-styles';
+import Pagination from '@/components/ui/pagination';
 import { usePagination } from '@/lib/usePagination';
-import { useZones } from '@/lib/useZones';
-import { exportToExcel } from '@/lib/exportUtils';
-import { getUserCompany } from '@/lib/userCompany';
 
-const PHASE_OPTIONS = [
-  { value: 'armado', label: 'Armado' },
-  { value: 'dia_evento', label: 'Show' },
-  { value: 'desarme', label: 'Desarme' },
-];
+const validatePerson = (data) => {
+  const e = {};
+  if (!data.full_name?.trim()) e.full_name = 'El nombre es obligatorio';
+  if (!data.access_area) e.access_area = 'Seleccioná un área';
+  if (!data.document?.trim()) e.document = 'El documento es obligatorio';
+  else if (!/^\d{7,8}$/.test(data.document.trim())) e.document = 'Debe tener 7 u 8 dígitos numéricos';
+  if (!data.company?.trim()) e.company = 'La empresa es obligatoria';
+  if (!data.phone?.trim()) e.phone = 'El teléfono es obligatorio';
+  else if (data.phone.replace(/\D/g, '').length < 12) e.phone = 'Teléfono incompleto (código de área + número)';
+  if (!data.email?.trim()) e.email = 'El email es obligatorio';
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e.email = 'Email inválido';
+  if (!data.status) e.status = 'Seleccioná un estado';
+  return e;
+};
 
-const EMPLOYMENT_OPTIONS = [
-  { value: 'fijo', label: 'Fijo' },
-  { value: 'eventual', label: 'Eventual' },
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Activo' },
+  { value: 'inactive', label: 'Inactivo' },
+  { value: 'pending', label: 'Pendiente' },
 ];
 
 export default function People() {
-  const { user } = useAuth();
-  const { items: people, loading, error, create, update, remove } = useCrud('Person');
+  const { items, loading, error, create, update, remove, reload } = useCrud('Person');
   const { zones } = useZones();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [query, setQuery] = useState('');
+  const [areaFilter, setAreaFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [companyFilter, setCompanyFilter] = useState('');
+  const [detailPerson, setDetailPerson] = useState(null);
+  const [selected, setSelected] = useState(new Set());
   const [events, setEvents] = useState([]);
   const [companies, setCompanies] = useState([]);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [detailOpen, setDetailOpen] = useState(null);
-  const [editing, setEditing] = useState(null);
-  const [search, setSearch] = useState('');
-  const [eventFilter, setEventFilter] = useState('');
-  const [selected, setSelected] = useState(new Set());
 
-  useEffect(() => {
-    Promise.all([
-      base44.entities.Event.list('-created_date', 200),
-      base44.entities.Company.list('-created_date', 100),
-    ]).then(([evs, comps]) => {
-      setEvents(evs);
-      setCompanies(comps);
-    }).catch(() => {});
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const [evs, comps] = await Promise.all([
+          base44.entities.Event.list('-start_at', 200),
+          base44.entities.ProviderCompany.list('name', 500),
+        ]);
+        setEvents(evs);
+        setCompanies(comps);
+      } catch {}
+    })();
   }, []);
 
-  const userCompany = getUserCompany(user);
-  const isProductora = user?.role === 'productora';
-  const isEmpresa = user?.role === 'empresa';
-
   const filtered = useMemo(() => {
-    return people.filter((p) => {
-      if (isProductora && p.productora !== userCompany && p.company !== userCompany) return false;
-      if (isEmpresa && p.company !== userCompany) return false;
-      if (eventFilter && p.event_id !== eventFilter && !(p.event_ids || []).includes(eventFilter)) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        return p.full_name?.toLowerCase().includes(q) ||
-               p.document?.includes(q) ||
-               p.company?.toLowerCase().includes(q);
-      }
-      return true;
-    });
-  }, [people, search, eventFilter, isProductora, isEmpresa, userCompany]);
+    let result = items;
+    const q = query.toLowerCase().trim();
+    if (q) {
+      result = result.filter((p) =>
+        `${p.full_name} ${p.company || ''} ${p.document || ''}`.toLowerCase().includes(q)
+      );
+    }
+    if (areaFilter) result = result.filter((p) => p.access_area === areaFilter);
+    if (statusFilter) result = result.filter((p) => p.status === statusFilter);
+    if (companyFilter) result = result.filter((p) => p.company === companyFilter);
+    return result;
+  }, [items, query, areaFilter, statusFilter, companyFilter]);
 
   const { page, setPage, totalPages, paginated } = usePagination(filtered, 15);
 
-  const fields = useMemo(() => [
-    { name: 'full_name', label: 'Nombre completo', required: true },
-    { name: 'document', label: 'DNI', type: 'dni' },
-    {
-      name: 'company', label: 'Empresa proveedora', type: 'select',
-      options: companies.map((c) => ({ value: c.name, label: c.name })),
-      defaultValue: isEmpresa ? userCompany : '',
-    },
-    { name: 'phone', label: 'Teléfono', type: 'phone-ar' },
-    { name: 'email', label: 'Email', type: 'email' },
-    {
-      name: 'access_area', label: 'Área de acceso', type: 'select',
-      options: zones.map((z) => ({ value: z.value, label: z.label })),
-    },
-    { name: 'employment_type', label: 'Tipo de contratación', type: 'select', options: EMPLOYMENT_OPTIONS, defaultValue: 'fijo' },
-    {
-      name: 'event_id', label: 'Evento principal', type: 'searchable-select', full: true,
-      options: events.map((e) => ({ value: e.id, label: e.name })),
-    },
-    {
-      name: 'event_phases', label: 'Fases del evento', type: 'toggle-group', full: true,
-      options: PHASE_OPTIONS,
-    },
-    { name: 'notes', label: 'Notas', type: 'textarea', full: true },
-    { name: 'status', label: 'Estado', type: 'select', options: [
-      { value: 'active', label: 'Activo' },
-      { value: 'inactive', label: 'Inactivo' },
-      { value: 'pending', label: 'Pendiente' },
-    ], defaultValue: 'active' },
-  ], [zones, events, companies, isEmpresa, userCompany]);
-
-  const openNew = () => { setEditing(null); setModalOpen(true); };
-  const openEdit = (p) => { setEditing(p); setModalOpen(true); };
-
-  const handleSubmit = async (data) => {
-    // Sync person_type with access_area
-    const personData = {
-      ...data,
-      person_type: data.access_area || 'general',
-    };
-    // Denormalize event name
-    const evt = events.find((e) => e.id === data.event_id);
-    if (evt) {
-      personData.productora = evt.company;
-      if (!personData.event_ids || personData.event_ids.length === 0) {
-        personData.event_ids = [evt.id];
-      }
-      if (!personData.event_names || personData.event_names.length === 0) {
-        personData.event_names = [evt.name];
-      }
-    }
-    if (editing) {
-      await update(editing.id, personData);
-    } else {
-      await create(personData);
-    }
-  };
-
+  const allFilteredIds = useMemo(() => filtered.map((p) => p.id), [filtered]);
+  const isAllSelected = allFilteredIds.length > 0 && allFilteredIds.every((id) => selected.has(id));
   const toggleSelect = (id) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -137,141 +89,263 @@ export default function People() {
       return next;
     });
   };
-
   const toggleSelectAll = () => {
-    if (selected.size === paginated.length) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(paginated.map((p) => p.id)));
-    }
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (isAllSelected) {
+        allFilteredIds.forEach((id) => next.delete(id));
+      } else {
+        allFilteredIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
   };
-
   const handleBulkDelete = async () => {
-    if (!window.confirm(`¿Eliminar ${selected.size} personas? Esta acción no se puede deshacer.`)) return;
-    await Promise.all([...selected].map((id) => remove(id)));
+    if (!confirm(`¿Eliminar ${selected.size} persona(s)? Esta acción no se puede deshacer.`)) return;
+    for (const id of selected) {
+      try { await base44.functions.invoke('deletePerson', { person_id: id }); } catch {}
+    }
     setSelected(new Set());
+    await reload();
+  };
+  const handleExportSelected = () => {
+    exportToExcel(
+      ['Nombre', 'Área', 'Documento', 'Empresa', 'Teléfono', 'Email', 'Estado', 'Notas'],
+      filtered.filter((p) => selected.has(p.id)).map((p) => [
+        p.full_name || '',
+        zones.find((z) => z.value === p.access_area)?.label || p.access_area || '',
+        p.document || '',
+        p.company || '',
+        p.phone || '',
+        p.email || '',
+        p.status || '',
+        p.notes || '',
+      ]),
+      'personas_seleccionadas'
+    );
   };
 
   const handleExport = () => {
-    const headers = ['Nombre', 'DNI', 'Empresa', 'Área', 'Contratación', 'Email', 'Teléfono', 'Estado'];
-    const rows = filtered.map((p) => [
-      p.full_name, p.document, p.company, p.access_area, p.employment_type, p.email, p.phone, p.status,
-    ]);
-    exportToExcel(headers, rows, 'personas');
+    exportToExcel(
+      ['Nombre', 'Área', 'Documento', 'Empresa', 'Teléfono', 'Email', 'Estado', 'Notas'],
+      filtered.map((p) => [
+        p.full_name || '',
+        zones.find((z) => z.value === p.access_area)?.label || p.access_area || '',
+        p.document || '',
+        p.company || '',
+        p.phone || '',
+        p.email || '',
+        p.status || '',
+        p.notes || '',
+      ]),
+      'personas'
+    );
+  };
+
+  const fields = useMemo(() => {
+    const activeEvents = events.filter((e) => {
+      if (e.status === 'closed') return false;
+      // Exclude events past their end + grace period
+      if (e.end_at) {
+        const end = new Date(e.end_at);
+        const graceMs = (e.grace_hours || 0) * 3600 * 1000;
+        if (end.getTime() + graceMs < Date.now()) return false;
+      }
+      return true;
+    });
+    // When editing, keep the currently assigned event visible even if expired
+    const editingEventId = editing?.event_id;
+    if (editingEventId && !activeEvents.find((e) => e.id === editingEventId)) {
+      const current = events.find((e) => e.id === editingEventId);
+      if (current) activeEvents.push(current);
+    }
+    return [
+      { name: 'full_name', label: 'Nombre completo', type: 'text', required: true, full: true, placeholder: 'Ej: Juan Pérez' },
+      {
+        name: 'event_id', label: 'Evento', type: 'select', required: true,
+        options: activeEvents.map((e) => ({ value: e.id, label: e.name })),
+      },
+      {
+        name: 'event_phases', label: 'Fases del evento', type: 'toggle-group',
+        options: [
+          { value: 'armado', label: 'Armado' },
+          { value: 'dia_evento', label: 'Show' },
+          { value: 'desarme', label: 'Desarme' },
+        ],
+        full: true,
+      },
+    {
+      name: 'access_area', label: 'Tipo / Área de acceso', type: 'select', required: true,
+      options: zones.map((z) => ({ value: z.value, label: z.label })),
+    },
+    { name: 'document', label: 'Documento', type: 'dni', required: true, placeholder: 'Ej: 12345678' },
+    {
+      name: 'company', label: 'Empresa', type: 'searchable-select', required: true,
+      options: companies.map((c) => ({ value: c.name, label: c.name })),
+      placeholder: 'Buscar empresa…',
+    },
+    { name: 'phone', label: 'Teléfono', type: 'phone-ar', required: true, hint: 'Código de área sin 0 y número sin 15. Ej: 11 12345678' },
+    { name: 'email', label: 'Email', type: 'email', required: true, placeholder: 'Ej: juan@empresa.com' },
+    { name: 'status', label: 'Estado', type: 'select', required: true, options: STATUS_OPTIONS },
+      { name: 'notes', label: 'Notas', type: 'textarea', full: true, placeholder: 'Ej: Responsable de montaje audiovisual' },
+      { name: '_face', label: 'Registro facial', type: 'face-capture', full: true },
+    ];
+  }, [zones, events, editing, companies]);
+
+  const openNew = () => { setEditing(null); setModalOpen(true); };
+  const openEdit = async (item) => {
+    const normalized = { ...item };
+    if (!normalized.event_id && normalized.event_ids?.length) {
+      normalized.event_id = normalized.event_ids[0];
+    }
+    if (Array.isArray(normalized.event_phases)) {
+      normalized.event_phases = normalized.event_phases.join(',');
+    }
+    setEditing(normalized);
+    setModalOpen(true);
+    try {
+      const bios = await base44.entities.Biometric.filter({ person_id: item.id, status: 'active' }, '-created_date', 1);
+      if (bios[0]?.face_photo_url) {
+        setEditing({ ...normalized, face_photo_url: bios[0].face_photo_url });
+      }
+    } catch {}
+  };
+  const handleSubmit = async (data) => {
+    const { face_photo_url, face_descriptor, ...personData } = data;
+    personData.person_type = personData.access_area || 'general';
+    if (typeof personData.event_phases === 'string') {
+      personData.event_phases = personData.event_phases.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+    let personId;
+    if (editing) {
+      await update(editing.id, personData);
+      personId = editing.id;
+    } else {
+      const created = await create(personData);
+      personId = created.id;
+    }
+    if (face_photo_url && face_descriptor?.length) {
+      const existing = await base44.entities.Biometric.filter({ person_id: personId, status: 'active' });
+      if (existing.length > 0) {
+        await base44.entities.Biometric.updateMany(
+          { person_id: personId, status: 'active' },
+          { $set: { status: 'revoked' } }
+        );
+      }
+      await base44.entities.Biometric.create({
+        person_id: personId,
+        person_name: personData.full_name,
+        event_id: personData.event_id,
+        face_photo_url,
+        face_descriptor,
+        status: 'active',
+      });
+    }
+  };
+  const handleDelete = async () => {
+    await base44.functions.invoke('deletePerson', { person_id: editing.id });
+    await reload();
   };
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="Gestión" title="Personas">
-        <button onClick={handleExport} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+      <PageHeader kicker="Directorio" title="Personas">
+        <button onClick={handleExport} className={btnOutline}>
           <Download className="h-4 w-4" /> Exportar
         </button>
-        <button onClick={openNew} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800">
+        <button onClick={openNew} className={btnPrimary}>
           <Plus className="h-4 w-4" /> Nueva persona
         </button>
       </PageHeader>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <SearchInput value={search} onChange={setSearch} placeholder="Buscar por nombre, DNI o empresa…" />
-        <FilterSelect
-          value={eventFilter}
-          onChange={setEventFilter}
-          options={events.map((e) => ({ value: e.id, label: e.name }))}
-          placeholder="Todos los eventos"
-        />
+      <div className="flex flex-wrap items-center gap-3">
+        <SearchInput value={query} onChange={setQuery} placeholder="Buscar por nombre, empresa o documento…" />
+        <FilterSelect value={areaFilter} onChange={setAreaFilter} options={zones.map((z) => ({ value: z.value, label: z.label }))} placeholder="Todas las áreas" />
+        <FilterSelect value={companyFilter} onChange={setCompanyFilter} options={companies.map((c) => ({ value: c.name, label: c.name }))} placeholder="Todas las empresas" />
+        <FilterSelect value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} placeholder="Todos los estados" />
       </div>
 
       {selected.size > 0 && (
-        <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5">
-          <span className="text-sm font-medium text-amber-700">{selected.size} seleccionada(s)</span>
-          <button onClick={handleBulkDelete} className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-red-700">
-            <Trash2 className="h-3.5 w-3.5" /> Eliminar
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5">
+          <span className="text-sm font-semibold text-emerald-700">{selected.size} seleccionada(s)</span>
+          <button onClick={handleExportSelected} className={btnOutline}>
+            <Download className="h-4 w-4" /> Exportar selección
           </button>
+          <button onClick={handleBulkDelete} className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700">
+            <Trash2 className="h-4 w-4" /> Eliminar selección
+          </button>
+          <button onClick={() => setSelected(new Set())} className="text-sm text-slate-500 hover:text-slate-700">Limpiar</button>
         </div>
       )}
 
       <DataTable
         loading={loading}
-        isEmpty={filtered.length === 0}
         error={error}
-        emptyMessage="No hay personas cargadas."
-        skeletonCols={7}
+        isEmpty={filtered.length === 0}
+        emptyMessage={query ? 'Sin resultados para tu búsqueda.' : 'No hay personas registradas todavía.'}
+        tableClassName="min-w-[800px]"
       >
-        <thead className="border-b border-slate-100 bg-slate-50/50">
-          <tr>
-            <Th className="w-8">
-              <input type="checkbox" checked={selected.size === paginated.length && paginated.length > 0} onChange={toggleSelectAll} className="h-4 w-4 rounded border-slate-300 text-emerald-600" />
+        <thead>
+          <tr className="border-b border-slate-100 bg-slate-50">
+            <Th className="w-10">
+              <input type="checkbox" checked={isAllSelected} onChange={toggleSelectAll} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
             </Th>
-            <Th>Nombre</Th>
-            <Th>DNI</Th>
+            <Th>Persona</Th>
+            <Th>Tipo / Área</Th>
             <Th>Empresa</Th>
-            <Th>Área</Th>
-            <Th>Fases</Th>
+            <Th>Contacto</Th>
             <Th>Estado</Th>
-            <Th className="text-right">Acciones</Th>
+            <Th />
           </tr>
         </thead>
         <tbody>
           {paginated.map((p) => (
             <Tr key={p.id}>
-              <Td>
-                <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} className="h-4 w-4 rounded border-slate-300 text-emerald-600" />
+              <Td className="w-10">
+                <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
               </Td>
               <Td>
-                <button onClick={() => setDetailOpen(p)} className="text-left transition hover:text-emerald-700">
-                  <p className="font-semibold text-slate-900">{p.full_name}</p>
-                  {p.email && <p className="text-xs text-slate-400">{p.email}</p>}
-                </button>
-              </Td>
-              <Td className="text-sm text-slate-600">{p.document || '—'}</Td>
-              <Td className="text-sm text-slate-600">{p.company || '—'}</Td>
-              <Td>
-                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                  {zones.find((z) => z.value === p.access_area)?.label || p.access_area || '—'}
-                </span>
+                <button onClick={() => setDetailPerson(p)} className="text-left text-sm font-semibold text-slate-900 hover:text-emerald-600">{p.full_name}</button>
+                <p className="text-xs text-slate-400">{p.document || 'Sin documento'}</p>
               </Td>
               <Td>
-                <div className="flex flex-wrap gap-1">
-                  {(Array.isArray(p.event_phases) ? p.event_phases : []).map((ph) => (
-                    <span key={ph} className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
-                      {PHASE_OPTIONS.find((o) => o.value === ph)?.label || ph}
-                    </span>
-                  ))}
-                </div>
+                {p.access_area ? (
+                  <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700">{zones.find((z) => z.value === p.access_area)?.label || p.access_area}</span>
+                ) : <span className="text-sm text-slate-400">—</span>}
               </Td>
+              <Td className="text-sm text-slate-500">{p.company || '—'}</Td>
+              <Td className="text-sm text-slate-500">{p.phone || p.email || '—'}</Td>
               <Td><StatusBadge status={p.status} /></Td>
               <Td className="text-right">
-                <div className="flex items-center justify-end gap-1">
-                  <button onClick={() => setDetailOpen(p)} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-emerald-600" title="Ver detalle">
-                    <Eye className="h-4 w-4" />
-                  </button>
-                  <button onClick={() => openEdit(p)} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-emerald-600" title="Editar">
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                </div>
+                <button onClick={() => openEdit(p)} className={btnIcon}>
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
               </Td>
             </Tr>
           ))}
         </tbody>
       </DataTable>
 
-      {totalPages > 1 && <Pagination page={page} totalPages={totalPages} onPageChange={setPage} totalItems={filtered.length} pageSize={15} />}
+      {filtered.length > 15 && (
+        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} totalItems={filtered.length} pageSize={15} />
+      )}
 
       <EntityModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editing ? editing.full_name : 'Nueva persona'}
+        title={editing ? 'Editar persona' : 'Nueva persona'}
         kicker={editing ? 'EDITAR PERSONA' : 'CREAR PERSONA'}
         fields={fields}
-        initialData={editing || { status: 'active', employment_type: 'fijo', event_phases: [] }}
+        initialData={editing || {}}
         onSubmit={handleSubmit}
+        validate={validatePerson}
+        onDelete={editing ? handleDelete : null}
         canDelete={!!editing}
-        onDelete={async () => { await remove(editing.id); }}
         submitLabel={editing ? 'Guardar cambios' : 'Crear persona'}
       />
 
-      {detailOpen && (
-        <PersonDetailModal person={detailOpen} onClose={() => setDetailOpen(null)} />
+      {detailPerson && (
+        <PersonDetailModal person={detailPerson} onClose={() => setDetailPerson(null)} />
       )}
     </div>
   );

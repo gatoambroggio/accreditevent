@@ -1,135 +1,311 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
-import { ShieldCheck, UserPlus, Trash2, Mail } from 'lucide-react';
+import { logAudit } from '@/lib/audit';
+import { UserPlus, Loader2, Pencil, KeyRound, Building2, ShieldCheck } from 'lucide-react';
+import EntityModal from '@/components/EntityModal';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
 import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
-import Pagination from '@/components/ui/pagination';
-import { usePagination } from '@/lib/usePagination';
-import { formatDateTime } from '@/lib/formatDate';
+import { btnPrimary, btnIcon } from '@/components/ui/button-styles';
+import { slugify } from '@/lib/slugify';
 
 const ROLES = [
-  { value: 'admin', label: 'Administrador' },
-  { value: 'superadmin', label: 'Super Admin' },
-  { value: 'coordinator', label: 'Coordinador' },
-  { value: 'productora', label: 'Productora' },
-  { value: 'control', label: 'Control de acceso' },
-  { value: 'empresa', label: 'Empresa' },
   { value: 'provider', label: 'Proveedor' },
+  { value: 'empresa', label: 'Empresa' },
+  { value: 'control', label: 'Control' },
+  { value: 'coordinator', label: 'Coordinador' },
+  { value: 'admin', label: 'Administrador' },
+  { value: 'superadmin', label: 'Superadministrador' },
+  { value: 'productora', label: 'Productora' },
+];
+
+const ROLE_LABELS = {
+  productora: 'Productora',
+  superadmin: 'Superadmin',
+  admin: 'Administrador',
+  coordinator: 'Coordinador',
+  control: 'Control',
+  provider: 'Proveedor',
+  empresa: 'Empresa',
+};
+
+const ROLE_STYLES = {
+  productora: 'bg-amber-50 text-amber-800 ring-amber-300',
+  superadmin: 'bg-purple-50 text-purple-700 ring-purple-200',
+  admin: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  coordinator: 'bg-blue-50 text-blue-700 ring-blue-200',
+  control: 'bg-amber-50 text-amber-700 ring-amber-200',
+  provider: 'bg-slate-100 text-slate-600 ring-slate-200',
+  empresa: 'bg-cyan-50 text-cyan-700 ring-cyan-200',
+};
+
+const EDIT_FIELDS = [
+  { name: 'company', label: 'Empresa', type: 'text', placeholder: 'Ej: Producciones SA', full: true },
+  { name: 'role', label: 'Rol', type: 'select', options: ROLES, required: true },
+  { name: 'password', label: 'Nueva contraseña', type: 'password', placeholder: 'Dejar en blanco para no cambiar', full: true, hint: 'Mínimo 6 caracteres' },
 ];
 
 export default function Users() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState('user');
+  const [inviteRole, setInviteRole] = useState('provider');
   const [inviting, setInviting] = useState(false);
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [resetting, setResetting] = useState(false);
+  const [resetMsg, setResetMsg] = useState('');
 
-  useEffect(() => {
-    loadUsers();
-  }, []);
-
-  const loadUsers = async () => {
+  const load = async () => {
     setLoading(true);
     try {
       const data = await base44.entities.User.list('-created_date', 200);
       setUsers(data);
-    } catch {}
-    setLoading(false);
+    } catch (err) {
+      setError(err.message || 'Error al cargar usuarios.');
+    } finally {
+      setLoading(false);
+    }
   };
 
+  useEffect(() => { load(); }, []);
+
   const filtered = useMemo(() => {
-    if (!search) return users;
-    const q = search.toLowerCase();
+    const q = search.toLowerCase().trim();
+    if (!q) return users;
     return users.filter((u) =>
-      u.full_name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q)
+      `${u.full_name || ''} ${u.email || ''} ${u.company || ''} ${u.role || ''}`.toLowerCase().includes(q)
     );
   }, [users, search]);
 
-  const { page, setPage, totalPages, paginated } = usePagination(filtered, 15);
+  const openEdit = (u) => { setEditing(u); setModalOpen(true); setResetMsg(''); };
 
-  const handleInvite = async () => {
-    if (!inviteEmail) return;
-    setInviting(true);
-    try {
-      await base44.users.inviteUser(inviteEmail, inviteRole);
-      setInviteEmail('');
-      await loadUsers();
-    } catch (err) {
-      alert(err.message || 'No se pudo invitar al usuario.');
+  const syncUserCompany = async (userId, oldCompany, newCompany) => {
+    if ((oldCompany || '').toLowerCase() === (newCompany || '').toLowerCase()) return;
+    if (oldCompany) {
+      const oldComps = await base44.entities.Company.filter({ name: oldCompany });
+      for (const c of oldComps) {
+        const newIds = (c.assigned_user_ids || []).filter((id) => id !== userId);
+        await base44.entities.Company.update(c.id, { assigned_user_ids: newIds });
+      }
     }
-    setInviting(false);
+    if (newCompany) {
+      const existing = await base44.entities.Company.filter({ name: newCompany });
+      if (existing.length > 0) {
+        const c = existing[0];
+        const merged = [...new Set([...(c.assigned_user_ids || []), userId])];
+        await base44.entities.Company.update(c.id, { assigned_user_ids: merged });
+      } else {
+        await base44.entities.Company.create({ name: newCompany, slug: slugify(newCompany), assigned_user_ids: [userId] });
+      }
+    }
   };
 
-  const handleRoleChange = async (userId, newRole) => {
+  const handleUpdate = async (data) => {
+    if (data.password) {
+      try {
+        await base44.functions.invoke('changeUserPassword', { userId: editing.id, newPassword: data.password });
+        await logAudit('change_password', 'User', editing.id, 'Cambio manual de contraseña');
+      } catch (err) {
+        throw new Error('No se pudo cambiar la contraseña: ' + (err.data?.error || err.message || err));
+      }
+    }
+    const oldCompany = editing.company || '';
+    const newCompany = data.company || '';
+    await base44.entities.User.update(editing.id, { role: data.role, company: newCompany });
+    await syncUserCompany(editing.id, oldCompany, newCompany);
+    await logAudit('update', 'User', editing.id, `Rol: ${data.role}, Empresa: ${newCompany || '—'}`);
+    setUsers((prev) => prev.map((u) => (u.id === editing.id ? { ...u, role: data.role, company: newCompany } : u)));
+  };
+
+  const handleDelete = async () => {
+    await base44.entities.User.delete(editing.id);
+    await logAudit('delete', 'User', editing.id, `Email: ${editing.email}`);
+    setUsers((prev) => prev.filter((u) => u.id !== editing.id));
+  };
+
+  const handleResetPassword = async () => {
+    if (!editing?.email) return;
+    if (!window.confirm(`¿Enviar email de reseteo de contraseña a ${editing.email}?`)) return;
+    setResetting(true);
+    setResetMsg('');
     try {
-      await base44.entities.User.update(userId, { role: newRole });
-      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)));
-    } catch {}
+      await base44.auth.resetPasswordRequest(editing.email);
+      setResetMsg(`Se envió un email de reseteo a ${editing.email}.`);
+      await logAudit('reset_password', 'User', editing.id, `Email: ${editing.email}`);
+    } catch {
+      setResetMsg('No se pudo enviar el email de reseteo.');
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const handleResetPasswordRow = async (u) => {
+    if (!u?.email) return;
+    if (!window.confirm(`¿Enviar email de reseteo de contraseña a ${u.email}?`)) return;
+    try {
+      await base44.auth.resetPasswordRequest(u.email);
+      await logAudit('reset_password', 'User', u.id, `Email: ${u.email}`);
+      alert(`Se envió un email de reseteo a ${u.email}.`);
+    } catch {
+      alert('No se pudo enviar el email de reseteo.');
+    }
+  };
+
+  const handleInvite = async (e) => {
+    e.preventDefault();
+    setInviting(true);
+    setError('');
+    try {
+      await base44.users.inviteUser(inviteEmail, inviteRole);
+      await logAudit('invite', 'User', '', `Invitación a ${inviteEmail} (${inviteRole})`);
+      setInviteOpen(false);
+      setInviteEmail('');
+      setInviteRole('provider');
+      await load();
+    } catch (err) {
+      setError(err.message || 'No se pudo enviar la invitación.');
+    } finally {
+      setInviting(false);
+    }
   };
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="Administración" title="Usuarios y roles" />
+      <PageHeader kicker="Administración" title="Usuarios y roles">
+        <button onClick={() => setInviteOpen(true)} className={btnPrimary}>
+          <UserPlus className="h-4 w-4" /> Invitar usuario
+        </button>
+      </PageHeader>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-3 font-bold text-slate-900">Invitar usuario</h2>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <input type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)}
-            placeholder="email@ejemplo.com"
-            className="flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
-          <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}
-            className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500">
-            {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-          </select>
-          <button onClick={handleInvite} disabled={inviting || !inviteEmail}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:opacity-50">
-            <Mail className="h-4 w-4" /> {inviting ? 'Enviando…' : 'Invitar'}
-          </button>
-        </div>
+      <div className="max-w-sm">
+        <SearchInput value={search} onChange={setSearch} placeholder="Buscar por nombre, email o empresa…" />
       </div>
 
-      <SearchInput value={search} onChange={setSearch} placeholder="Buscar por nombre o email…" />
-
-      <DataTable loading={loading} isEmpty={filtered.length === 0} emptyMessage="No hay usuarios.">
-        <thead className="border-b border-slate-100 bg-slate-50/50">
-          <tr>
-            <Th>Usuario</Th>
+      <DataTable
+        loading={loading}
+        isEmpty={filtered.length === 0}
+        emptyMessage={search ? 'No se encontraron usuarios.' : 'No hay usuarios registrados.'}
+        tableClassName="min-w-[720px]"
+      >
+        <thead>
+          <tr className="border-b border-slate-100 bg-slate-50">
+            <Th>Nombre</Th>
+            <Th>Email</Th>
+            <Th>Empresa</Th>
             <Th>Rol</Th>
-            <Th>Registrado</Th>
-            <Th className="text-right">Acciones</Th>
+            <Th>Eventos</Th>
+            <Th />
           </tr>
         </thead>
         <tbody>
-          {paginated.map((u) => (
-            <Tr key={u.id}>
-              <Td>
-                <p className="font-semibold text-slate-900">{u.full_name || 'Sin nombre'}</p>
-                <p className="text-xs text-slate-400">{u.email}</p>
-              </Td>
-              <Td>
-                <select value={u.role || 'user'} onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                  className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 outline-none focus:border-emerald-500">
-                  {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-                </select>
-              </Td>
-              <Td className="text-sm text-slate-600">{formatDateTime(u.created_date)}</Td>
-              <Td className="text-right">
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${
-                  u.role === 'admin' || u.role === 'superadmin'
-                    ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-                    : 'bg-slate-100 text-slate-600 ring-slate-200'
-                }`}>
-                  {ROLES.find((r) => r.value === u.role)?.label || u.role}
-                </span>
-              </Td>
-            </Tr>
-          ))}
+          {filtered.map((u) => {
+            const roleStyle = ROLE_STYLES[u.role] || ROLE_STYLES.provider;
+            const roleLabel = ROLE_LABELS[u.role] || u.role;
+            const eventCount = u.assigned_event_ids?.length || 0;
+            return (
+              <Tr key={u.id}>
+                <Td className="text-sm font-semibold text-slate-900">{u.full_name || '—'}</Td>
+                <Td className="text-sm text-slate-500">{u.email}</Td>
+                <Td className="text-sm text-slate-600">
+                  {u.company ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Building2 className="h-3.5 w-3.5 text-slate-400" /> {u.company}
+                    </span>
+                  ) : (
+                    <span className="text-slate-300">—</span>
+                  )}
+                </Td>
+                <Td>
+                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${roleStyle}`}>
+                    <ShieldCheck className="h-3 w-3" /> {roleLabel}
+                  </span>
+                </Td>
+                <Td className="text-sm text-slate-500">
+                  {eventCount > 0 ? (
+                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{eventCount}</span>
+                  ) : (
+                    <span className="text-slate-300">—</span>
+                  )}
+                </Td>
+                <Td className="text-right">
+                  <div className="inline-flex items-center gap-1">
+                    <button onClick={() => handleResetPasswordRow(u)} title="Reseteo de contraseña"
+                      className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-amber-50 hover:text-amber-600">
+                      <KeyRound className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={() => openEdit(u)} title="Editar" className={btnIcon}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </Td>
+              </Tr>
+            );
+          })}
         </tbody>
       </DataTable>
 
-      {totalPages > 1 && <Pagination page={page} totalPages={totalPages} onPageChange={setPage} totalItems={filtered.length} pageSize={15} />}
+      {inviteOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-sm">
+          <div className="my-8 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+            <h2 className="text-xl font-bold tracking-tight text-slate-900">Invitar usuario</h2>
+            <p className="mt-1 text-sm text-slate-500">La persona recibirá un email para unirse al sistema.</p>
+            <form onSubmit={handleInvite} className="mt-5 space-y-4">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Email *</span>
+                <input type="email" required value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Rol *</span>
+                <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20">
+                  {ROLES.map((r) => (<option key={r.value} value={r.value}>{r.label}</option>))}
+                </select>
+              </label>
+              {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setInviteOpen(false)} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">Cancelar</button>
+                <button type="submit" disabled={inviting} className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">
+                  {inviting ? 'Enviando…' : 'Enviar invitación'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <EntityModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editing?.full_name || editing?.email || 'Editar usuario'}
+        kicker="EDITAR USUARIO"
+        fields={EDIT_FIELDS}
+        initialData={editing || {}}
+        onSubmit={handleUpdate}
+        onDelete={editing ? handleDelete : null}
+        canDelete={!!editing}
+        submitLabel="Guardar cambios"
+        topContent={
+          editing?.email ? (
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={handleResetPassword}
+                disabled={resetting}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
+              >
+                {resetting ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+                Enviar email de reseteo de contraseña
+              </button>
+              {resetMsg && <p className="text-center text-xs text-emerald-600">{resetMsg}</p>}
+            </div>
+          ) : null
+        }
+      />
     </div>
   );
 }

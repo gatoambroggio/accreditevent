@@ -1,150 +1,451 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { UserPlus, CheckCircle2, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
+import AuthLayout from '@/components/AuthLayout';
+import FaceCapture from '@/components/FaceCapture';
+import {
+  UserPlus,
+  Mail,
+  Lock,
+  Loader2,
+  Camera,
+  Building2,
+  Phone,
+  IdCard,
+  ArrowRight,
+  AlertCircle,
+  CalendarDays,
+} from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
 
 export default function ProviderRegister() {
   const { eventId } = useParams();
-  const navigate = useNavigate();
-  const [event, setEvent] = useState(null);
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState({ full_name: '', document: '', phone: '', email: '', company: '' });
-  const [otp, setOtp] = useState('');
-  const [sentOtp, setSentOtp] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [event, setEvent] = useState(null);
+  const [loadingEvent, setLoadingEvent] = useState(true);
+  const [form, setForm] = useState({
+    email: '',
+    password: '',
+    confirmPassword: '',
+    full_name: '',
+    document: '',
+    company: '',
+    phone: '',
+    event_id: eventId || '',
+  });
+  const [otpCode, setOtpCode] = useState('');
   const [error, setError] = useState('');
-  const [done, setDone] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [personId, setPersonId] = useState(null);
 
   useEffect(() => {
-    if (eventId) {
-      base44.entities.Event.get(eventId).then(setEvent).catch(() => {});
-    }
+    (async () => {
+      if (!eventId) { setLoadingEvent(false); return; }
+      try {
+        const res = await base44.functions.invoke('getCompanyEvents', { event_id: eventId });
+        if (res.data?.events?.length > 0) {
+          setEvent(res.data.events[0]);
+        }
+      } catch {}
+      setLoadingEvent(false);
+    })();
   }, [eventId]);
 
-  const setField = (name, value) => setForm((prev) => ({ ...prev, [name]: value }));
+  const setField = (name, value) => setForm((f) => ({ ...f, [name]: value }));
 
-  const sendOtp = async () => {
-    setLoading(true);
+  const handleRegister = async (e) => {
+    e.preventDefault();
     setError('');
-    try {
-      const code = String(Math.floor(100000 + Math.random() * 900000));
-      setSentOtp(code);
-      await base44.integrations.Core.SendEmail({
-        to: form.email,
-        subject: 'Código de verificación',
-        body: `Tu código de verificación es: <strong>${code}</strong>`,
-      });
-      setStep(2);
-    } catch {
-      setError('No se pudo enviar el código. Verificá tu email.');
+    if (!form.event_id) {
+      setError('No se pudo determinar el evento. Usá el link de registro que te envió el organizador.');
+      return;
     }
-    setLoading(false);
-  };
-
-  const verifyOtp = async () => {
-    if (otp !== sentOtp) {
-      setError('Código incorrecto.');
+    if (!/^\d{7,8}$/.test(form.document)) {
+      setError('El documento debe tener 7 u 8 dígitos numéricos.');
+      return;
+    }
+    if (form.phone.replace(/\D/g, '').length < 12) {
+      setError('El teléfono está incompleto. Ingresá código de área sin 0 y número sin 15.');
+      return;
+    }
+    if (form.password !== form.confirmPassword) {
+      setError('Las contraseñas no coinciden.');
+      return;
+    }
+    if (form.password.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres.');
       return;
     }
     setLoading(true);
-    setError('');
     try {
-      await base44.entities.Person.create({
-        ...form,
-        phone: form.phone.startsWith('54') ? form.phone : '54' + form.phone,
-        person_type: 'provider',
-        access_area: 'general',
-        status: 'pending',
-        event_id: eventId || '',
-        event_ids: eventId ? [eventId] : [],
-        event_names: event?.name ? [event.name] : [],
-      });
-      setDone(true);
+      try {
+        await base44.auth.register({ email: form.email, password: form.password });
+        setStep(2);
+      } catch (regErr) {
+        const msg = (regErr.message || '').toLowerCase();
+        if (msg.includes('already exists')) {
+          await base44.auth.loginViaEmailPassword(form.email, form.password);
+          const res = await base44.functions.invoke('providerSetup', {
+            full_name: form.full_name,
+            document: form.document,
+            company: form.company,
+            phone: form.phone,
+            email: form.email,
+            event_id: form.event_id,
+          });
+          setPersonId(res.data.person_id);
+          setStep(3);
+        } else {
+          throw regErr;
+        }
+      }
     } catch (err) {
-      setError(err.message || 'No se pudo registrar.');
+      const msg = (err.message || '').toLowerCase();
+      if (msg.includes('already exists')) {
+        setError('Ya tenés una cuenta con este email. Iniciá sesión con tu contraseña anterior o recuperá tu cuenta.');
+      } else {
+        setError(err.message || 'No se pudo registrar.');
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  if (done) {
+  const handleVerifyOtp = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const result = await base44.auth.verifyOtp({ email: form.email, otpCode });
+      if (result?.access_token) {
+        base44.auth.setToken(result.access_token);
+      }
+      const res = await base44.functions.invoke('providerSetup', {
+        full_name: form.full_name,
+        document: form.document,
+        company: form.company,
+        phone: form.phone,
+        email: form.email,
+        event_id: form.event_id,
+      });
+      setPersonId(res.data.person_id);
+      setStep(3);
+    } catch (err) {
+      setError(err.message || 'Código inválido.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setError('');
+    try {
+      await base44.auth.resendOtp(form.email);
+      toast({ title: 'Código enviado', description: 'Revisá tu email.' });
+    } catch (err) {
+      setError(err.message || 'No se pudo reenviar.');
+    }
+  };
+
+  const handleFaceCapture = async (file, descriptor) => {
+    setError('');
+    setSaving(true);
+    try {
+      let file_url;
+      try {
+        const uploadRes = await base44.integrations.Core.UploadFile({ file });
+        file_url = uploadRes.file_url;
+      } catch (uploadErr) {
+        setError('No se pudo subir la foto. Verificá tu conexión a internet e intentá de nuevo.');
+        return;
+      }
+
+      await base44.functions.invoke('saveProviderBiometric', {
+        person_id: personId,
+        person_name: form.full_name,
+        event_id: form.event_id,
+        face_photo_url: file_url,
+        face_descriptor: descriptor || [],
+      });
+      toast({
+        title: descriptor ? '¡Rostro registrado!' : 'Foto guardada',
+        description: descriptor ? 'Ya podés ingresar al portal.' : 'Tu foto se guardó. Un administrador revisará tu biometría.',
+      });
+      window.location.href = '/portal';
+    } catch (err) {
+      setError(err.message || 'No se pudo guardar el rostro. Intentá de nuevo.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Step 2: OTP
+  if (step === 2) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-        <div className="max-w-md text-center">
-          <CheckCircle2 className="mx-auto h-16 w-16 text-emerald-600" />
-          <h1 className="mt-4 text-2xl font-bold text-slate-900">¡Registro exitoso!</h1>
-          <p className="mt-2 text-sm text-slate-500">Tu solicitud fue enviada. La productora revisará tu registro y te contactará.</p>
-          <button onClick={() => navigate('/login')} className="mt-6 rounded-lg bg-emerald-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">
-            Ir al inicio de sesión
-          </button>
+      <AuthLayout
+        icon={Mail}
+        title="Verificá tu email"
+        subtitle={`Enviamos un código a ${form.email}`}
+      >
+        {error && (
+          <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>
+        )}
+        <div className="flex justify-center mb-6">
+          <InputOTP
+            maxLength={6}
+            value={otpCode}
+            onChange={setOtpCode}
+            autoFocus
+            autoComplete="one-time-code"
+          >
+            <InputOTPGroup>
+              <InputOTPSlot index={0} />
+              <InputOTPSlot index={1} />
+              <InputOTPSlot index={2} />
+              <InputOTPSlot index={3} />
+              <InputOTPSlot index={4} />
+              <InputOTPSlot index={5} />
+            </InputOTPGroup>
+          </InputOTP>
         </div>
-      </div>
+        <Button
+          className="w-full h-12 font-medium"
+          onClick={handleVerifyOtp}
+          disabled={loading || otpCode.length < 6}
+        >
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Verificando…
+            </>
+          ) : (
+            'Verificar código'
+          )}
+        </Button>
+        <p className="text-center text-sm text-muted-foreground mt-4">
+          ¿No recibiste el código?{' '}
+          <button onClick={handleResend} className="text-primary font-medium hover:underline">
+            Reenviar
+          </button>
+        </p>
+      </AuthLayout>
     );
   }
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-700 mb-4">
-            <UserPlus className="h-7 w-7 text-white" />
+  // Step 3: Face capture
+  if (step === 3) {
+    return (
+      <AuthLayout
+        icon={Camera}
+        title="Registrá tu rostro"
+        subtitle="Capturá una foto para tu acreditación"
+      >
+        {error && (
+          <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>{error}</span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">Registro de proveedor</h1>
-          {event && <p className="mt-1 text-sm text-slate-500">Evento: {event.name}</p>}
+        )}
+
+        {saving ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            <span className="ml-2 text-sm text-muted-foreground">Guardando rostro…</span>
+          </div>
+        ) : (
+          <>
+            <p className="mb-4 text-center text-sm text-muted-foreground">
+              Tu foto se usará para validar tu identidad en el ingreso a eventos.
+            </p>
+            <FaceCapture onCaptured={handleFaceCapture} />
+            <button
+              className="mt-3 w-full text-sm text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                window.location.href = '/portal';
+              }}
+            >
+              Registrar más tarde <ArrowRight className="w-4 h-4 inline ml-1" />
+            </button>
+          </>
+        )}
+      </AuthLayout>
+    );
+  }
+
+  // Step 1: Details
+  return (
+    <AuthLayout
+      icon={UserPlus}
+      title="Registro de proveedor"
+      subtitle={event ? `Inscripción para: ${event.name}` : 'Creá tu cuenta para gestionar acreditaciones'}
+      footer={
+        <>
+          ¿Ya tenés cuenta?{' '}
+          <Link to="/login" className="text-primary font-medium hover:underline">
+            Iniciar sesión
+          </Link>
+        </>
+      }
+    >
+      {error && (
+        <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>
+      )}
+
+      {loadingEvent ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
         </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          {error && <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
-
-          {step === 1 && (
-            <div className="space-y-4">
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Nombre completo *</span>
-                <input type="text" value={form.full_name} onChange={(e) => setField('full_name', e.target.value)} required
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-semibold text-slate-600">DNI</span>
-                <input type="text" inputMode="numeric" value={form.document} onChange={(e) => setField('document', e.target.value.replace(/\D/g, ''))} maxLength={8}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Empresa</span>
-                <input type="text" value={form.company} onChange={(e) => setField('company', e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Teléfono</span>
-                <input type="tel" value={form.phone} onChange={(e) => setField('phone', e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Email *</span>
-                <input type="email" value={form.email} onChange={(e) => setField('email', e.target.value)} required
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
-              </label>
-              <button onClick={sendOtp} disabled={loading || !form.full_name || !form.email}
-                className="w-full rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">
-                {loading ? 'Enviando…' : 'Enviar código de verificación'}
-              </button>
+      ) : !form.event_id ? (
+        <div className="mb-4 p-4 rounded-lg bg-amber-50 text-amber-700 text-sm flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <span>Este link de registro no es válido. Contactate con el organizador del evento.</span>
+        </div>
+      ) : (
+        <form onSubmit={handleRegister} className="space-y-4">
+          {event && (
+            <div className="mb-2 flex items-center gap-3 rounded-lg bg-emerald-50 px-4 py-3 ring-1 ring-emerald-100">
+              <CalendarDays className="h-5 w-5 shrink-0 text-emerald-600" />
+              <div>
+                <p className="text-sm font-bold text-emerald-800">{event.name}</p>
+                {event.venue && <p className="text-xs text-emerald-600">{event.venue}</p>}
+              </div>
             </div>
           )}
 
-          {step === 2 && (
-            <div className="space-y-4">
-              <p className="text-sm text-slate-600">Ingresá el código de 6 dígitos que enviamos a <strong>{form.email}</strong></p>
-              <input type="text" inputMode="numeric" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))} maxLength={6}
-                className="w-full rounded-lg border border-slate-200 px-3 py-3 text-center text-2xl font-bold tracking-widest outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
-              <button onClick={verifyOtp} disabled={loading || otp.length !== 6}
-                className="w-full rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">
-                {loading ? 'Verificando…' : 'Verificar y registrar'}
-              </button>
-              <button onClick={() => setStep(1)} className="w-full text-xs font-semibold text-slate-500 hover:text-slate-700">
-                ← Volver
-              </button>
+          <div className="space-y-2">
+            <Label htmlFor="full_name">Nombre completo</Label>
+            <div className="relative">
+              <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                id="full_name"
+                autoComplete="name"
+                autoFocus
+                placeholder="Juan Pérez"
+                value={form.full_name}
+                onChange={(e) => setField('full_name', e.target.value)}
+                className="pl-10 h-12"
+                required
+              />
             </div>
-          )}
-        </div>
-      </div>
-    </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="document">Documento</Label>
+              <div className="relative">
+                <IdCard className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="document"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="12345678"
+                  value={form.document}
+                  onChange={(e) => setField('document', e.target.value.replace(/\D/g, ''))}
+                  className="pl-10 h-12"
+                  maxLength={8}
+                  required
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Teléfono</Label>
+              <div className="flex">
+                <span className="inline-flex items-center rounded-l-lg border border-r-0 border-input bg-muted px-3 h-12 text-sm font-semibold text-muted-foreground">+54</span>
+                <Input
+                  id="phone"
+                  type="tel"
+                  inputMode="numeric"
+                  placeholder="11 12345678"
+                  value={form.phone.startsWith('54') ? form.phone.slice(2) : form.phone}
+                  onChange={(e) => {
+                    let cleaned = e.target.value.replace(/\D/g, '');
+                    if (cleaned.startsWith('0')) cleaned = cleaned.slice(1);
+                    if (cleaned.startsWith('15')) cleaned = cleaned.slice(2);
+                    setField('phone', '54' + cleaned);
+                  }}
+                  className="rounded-l-none h-12"
+                  required
+                />
+              </div>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="company">Empresa</Label>
+            <div className="relative">
+              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                id="company"
+                placeholder="Nombre de tu empresa"
+                value={form.company}
+                onChange={(e) => setField('company', e.target.value)}
+                className="pl-10 h-12"
+                required
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                placeholder="vos@empresa.com"
+                value={form.email}
+                onChange={(e) => setField('email', e.target.value)}
+                className="pl-10 h-12"
+                required
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="password">Contraseña</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="••••••••"
+                  value={form.password}
+                  onChange={(e) => setField('password', e.target.value)}
+                  className="pl-10 h-12"
+                  required
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm">Confirmar</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="confirm"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="••••••••"
+                  value={form.confirmPassword}
+                  onChange={(e) => setField('confirmPassword', e.target.value)}
+                  className="pl-10 h-12"
+                  required
+                />
+              </div>
+            </div>
+          </div>
+          <Button type="submit" className="w-full h-12 font-medium" disabled={loading}>
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creando cuenta…
+              </>
+            ) : (
+              'Registrarme'
+            )}
+          </Button>
+        </form>
+      )}
+    </AuthLayout>
   );
 }

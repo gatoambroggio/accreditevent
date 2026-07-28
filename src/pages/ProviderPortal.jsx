@@ -1,184 +1,475 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useAuth } from '@/lib/AuthContext';
-import { CalendarDays, FileText, ScanFace, IdCard, LogOut, UserCircle } from 'lucide-react';
-import FaceCapture from '@/components/FaceCapture';
+import { logAudit } from '@/lib/audit';
+import { Loader2, Upload, FileText, IdCard, UserCircle, CheckCircle2, Car, Trash2, Plus, Package } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
-import { formatDateTime } from '@/lib/formatDate';
+import PersonBiometricCard from '@/components/PersonBiometricCard';
+import DocumentViewer from '@/components/DocumentViewer';
+import ProviderRequirementsSection from '@/components/ProviderRequirementsSection';
+import { DEFAULT_ROLE_ACCESS } from '@/lib/modules';
+
+const DOC_TYPES = {
+  dni: 'Documento de identidad',
+  work_insurance: 'Seguro de trabajo',
+  tax_certificate: 'Constancia fiscal',
+  contract: 'Contrato',
+  other: 'Otro',
+};
 
 export default function ProviderPortal() {
-  const { user, logout } = useAuth();
-  const [tab, setTab] = useState('events');
+  const [person, setPerson] = useState(null);
   const [accreditations, setAccreditations] = useState([]);
   const [documents, setDocuments] = useState([]);
-  const [biometrics, setBiometrics] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [captureOpen, setCaptureOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savingVehicle, setSavingVehicle] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [viewingDoc, setViewingDoc] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [creatingProfile, setCreatingProfile] = useState(false);
+  const [profileError, setProfileError] = useState('');
+  const [logisticsEnabled, setLogisticsEnabled] = useState(true);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [accs, docs, bios] = await Promise.all([
-          base44.entities.Accreditation.filter({ person_email: user?.email }, '-created_date', 50),
-          base44.entities.Document.filter({}, '-created_date', 50).then((all) => all.filter((d) => d.person_name && accs.some((a) => a.person_name === d.person_name))),
-          base44.entities.Biometric.filter({}, '-created_date', 50).then((all) => all.filter((b) => b.person_name && accs.some((a) => a.person_name === b.person_name))),
-        ]);
-        setAccreditations(accs);
-        setDocuments(docs);
-        setBiometrics(bios);
-      } catch {}
-      setLoading(false);
-    })();
-  }, [user]);
-
-  const handleCapture = async (file, descriptor) => {
-    if (!descriptor) { alert('No se detectó un rostro.'); return; }
+  const load = useCallback(async () => {
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      const acc = accreditations[0];
-      if (acc) {
-        await base44.entities.Biometric.create({
-          accreditation_id: acc.id,
-          person_id: acc.person_id,
-          person_name: acc.person_name,
-          event_id: acc.event_id,
-          company: acc.company,
-          face_photo_url: file_url,
-          face_descriptor: Array.from(descriptor),
-          status: 'active',
-        });
-        await base44.entities.Accreditation.update(acc.id, { has_biometric: true });
+      const me = await base44.auth.me();
+      setCurrentUser(me);
+      const people = await base44.entities.Person.filter({ email: me.email }, '-created_date', 5);
+      const p = people[0];
+      if (!p) { setLoading(false); return; }
+      setPerson(p);
+      const [accreds, docs, vehs] = await Promise.all([
+        base44.entities.Accreditation.filter({ person_id: p.id }, '-created_date', 50),
+        base44.entities.Document.filter({ person_id: p.id }, '-created_date', 50),
+        base44.entities.Vehicle.filter({ person_id: p.id }, '-created_date', 50),
+      ]);
+      setAccreditations(accreds);
+      setDocuments(docs);
+      setVehicles(vehs);
+      try {
+        const settings = await base44.entities.SystemSetting.list('-created_date', 1);
+        const ra = settings[0]?.role_access;
+        const hasAccess = (ra?.['/provider-requests'] ?? DEFAULT_ROLE_ACCESS['/provider-requests'])?.includes('provider');
+        setLogisticsEnabled(!!hasAccess);
+      } catch {}
+    } catch {
+      // silent
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleCreateProfile = async (e) => {
+    e.preventDefault();
+    setCreatingProfile(true);
+    setProfileError('');
+    try {
+      const formData = new FormData(e.target);
+      const full_name = (formData.get('full_name') || '').trim();
+      const document = (formData.get('document') || '').trim();
+      const phone = (formData.get('phone') || '').trim();
+      const company = (formData.get('company') || '').trim();
+      if (!full_name) {
+        setProfileError('El nombre completo es obligatorio.');
+        setCreatingProfile(false);
+        return;
       }
-      setCaptureOpen(false);
-      window.location.reload();
-    } catch { alert('No se pudo guardar la biometría.'); }
+      const created = await base44.entities.Person.create({
+        full_name,
+        document,
+        phone,
+        email: currentUser?.email || '',
+        company: company || currentUser?.data?.company || '',
+        person_type: 'provider',
+        status: 'active',
+      });
+      await logAudit('provider-self-register', 'Person', created.id, full_name);
+      setPerson(created);
+      setAccreditations([]);
+      setDocuments([]);
+      setVehicles([]);
+    } catch (err) {
+      setProfileError(err.message || 'No se pudo crear el perfil.');
+    } finally {
+      setCreatingProfile(false);
+    }
   };
 
-  const hasBiometric = biometrics.length > 0;
+  const handleProfileSave = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const updated = await base44.entities.Person.update(person.id, {
+        phone: e.target.phone.value,
+        email: e.target.email.value,
+      });
+      setPerson(updated);
+      await logAudit('provider-update', 'Person', person.id, person.full_name);
+      setMsg('Datos actualizados correctamente.');
+      setTimeout(() => setMsg(''), 3000);
+    } catch (err) {
+      setMsg(err.message || 'Error al guardar.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-emerald-600" /></div>;
+  const handleUpload = async (e) => {
+    e.preventDefault();
+    const file = e.target.elements.file.files[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      await base44.entities.Document.create({
+        person_id: person.id,
+        person_name: person.full_name,
+        event_id: person.event_id || null,
+        company: person.productora || person.company || '',
+        document_type: e.target.elements.document_type.value,
+        original_name: file.name,
+        file_url,
+        mime_type: file.type,
+        size: file.size,
+        status: 'pending',
+        expires_at: e.target.elements.expires_at.value || null,
+      });
+      await logAudit('document-upload', 'Document', '', file.name);
+      e.target.reset();
+      await load();
+      setMsg('Documento enviado para revisión.');
+      setTimeout(() => setMsg(''), 3000);
+    } catch (err) {
+      setMsg(err.message || 'Error al subir el documento.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleVehicleAdd = async (e) => {
+    e.preventDefault();
+    setSavingVehicle(true);
+    try {
+      await base44.entities.Vehicle.create({
+        person_id: person.id,
+        person_name: person.full_name,
+        company: person.productora || person.company || '',
+        brand: e.target.elements.brand.value.trim(),
+        model: e.target.elements.model.value.trim(),
+        plate: e.target.elements.plate.value.toUpperCase().trim(),
+        color: e.target.elements.color.value.trim(),
+        event_ids: person.event_id ? [person.event_id] : [],
+      });
+      await logAudit('vehicle-create', 'Vehicle', '', e.target.elements.plate.value);
+      e.target.reset();
+      await load();
+      setMsg('Vehículo registrado correctamente.');
+      setTimeout(() => setMsg(''), 3000);
+    } catch (err) {
+      setMsg(err.message || 'Error al registrar el vehículo.');
+    } finally {
+      setSavingVehicle(false);
+    }
+  };
+
+  const handleVehicleDelete = async (vehicleId) => {
+    if (!window.confirm('¿Eliminar este vehículo?')) return;
+    try {
+      await base44.entities.Vehicle.delete(vehicleId);
+      await load();
+      setMsg('Vehículo eliminado.');
+      setTimeout(() => setMsg(''), 3000);
+    } catch (err) {
+      setMsg(err.message || 'Error al eliminar el vehículo.');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[hsl(120_14%_97%)]">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+      </div>
+    );
+  }
+
+  if (!person) {
+    return (
+      <div className="min-h-screen bg-[hsl(120_14%_97%)]">
+        <div className="mx-auto max-w-md px-5 py-12">
+          <div className="mb-6 flex items-center gap-2.5">
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-[hsl(39_86%_63%)] text-sm font-extrabold text-[hsl(146_34%_11%)]">A</span>
+            <span className="text-lg font-extrabold tracking-tight text-slate-900">acceso</span>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+            <div className="mb-6 flex items-center gap-3">
+              <div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
+                <UserCircle className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Creá tu perfil de proveedor</h2>
+                <p className="text-sm text-slate-500">Completá tus datos para activar tu cuenta.</p>
+              </div>
+            </div>
+            <form onSubmit={handleCreateProfile} className="space-y-4">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Nombre completo *</span>
+                <input name="full_name" type="text" required defaultValue={currentUser?.full_name || ''}
+                  placeholder="Ej: Juan Pérez"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Documento</span>
+                <input name="document" type="text" inputMode="numeric"
+                  placeholder="Ej: 12345678"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Teléfono</span>
+                <input name="phone" type="tel"
+                  placeholder="Ej: 11 12345678"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Empresa / Razón social</span>
+                <input name="company" type="text" defaultValue={currentUser?.data?.company || ''}
+                  placeholder="Ej: Producciones SA"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+              </label>
+              <p className="text-xs text-slate-400">Tu email ({currentUser?.email}) se vinculará automáticamente.</p>
+              {profileError && (
+                <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">{profileError}</div>
+              )}
+              <button type="submit" disabled={creatingProfile}
+                className="w-full rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50">
+                {creatingProfile ? 'Creando perfil…' : 'Crear perfil'}
+              </button>
+            </form>
+          </div>
+          <div className="mt-4 text-center">
+            <button onClick={() => base44.auth.logout(window.location.href)}
+              className="text-sm font-medium text-slate-500 hover:text-slate-900">Cerrar sesión</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-slate-900 text-white">
-        <div className="mx-auto max-w-4xl px-5 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <UserCircle className="h-8 w-8 text-emerald-400" />
-            <div>
-              <p className="font-bold">{user?.full_name || 'Proveedor'}</p>
-              <p className="text-xs text-slate-400">{user?.email}</p>
-            </div>
+    <div className="min-h-screen bg-[hsl(120_14%_97%)]">
+      <div className="mx-auto max-w-4xl px-5 py-8 sm:px-8">
+        {/* Header */}
+        <div className="mb-8 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-[hsl(39_86%_63%)] text-sm font-extrabold text-[hsl(146_34%_11%)]">A</span>
+            <span className="text-lg font-extrabold tracking-tight text-slate-900">acceso</span>
           </div>
-          <button onClick={() => logout()} className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-sm font-semibold transition hover:bg-white/20">
-            <LogOut className="h-4 w-4" /> Salir
-          </button>
+          <button onClick={() => base44.auth.logout(window.location.href)}
+            className="text-sm font-medium text-slate-500 hover:text-slate-900">Cerrar sesión</button>
         </div>
-      </header>
 
-      <main className="mx-auto max-w-4xl px-5 py-8 space-y-6">
-        <div className="flex gap-2 border-b border-slate-200">
-          {[
-            { key: 'events', label: 'Mis eventos', icon: CalendarDays },
-            { key: 'accreditations', label: 'Credenciales', icon: IdCard },
-            { key: 'documents', label: 'Documentos', icon: FileText },
-          ].map((t) => {
-            const Icon = t.icon;
-            return (
-              <button key={t.key} onClick={() => setTab(t.key)}
-                className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold transition ${
-                  tab === t.key ? 'border-b-2 border-emerald-600 text-emerald-700' : 'text-slate-500 hover:text-slate-700'
-                }`}>
-                <Icon className="h-4 w-4" /> {t.label}
+        {/* Hero */}
+        <div className="mb-8 rounded-2xl bg-gradient-to-br from-emerald-700 to-emerald-900 p-8">
+          <p className="font-mono text-[10px] uppercase tracking-wider text-emerald-300">Portal de proveedores</p>
+          <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-white">{person.full_name}</h1>
+          <p className="mt-2 text-sm text-emerald-100">Actualizá tu contacto y cargá la documentación requerida para tu acreditación.</p>
+        </div>
+
+        {msg && (
+          <div className="mb-6 flex items-center gap-2 rounded-lg bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">
+            <CheckCircle2 className="h-4 w-4" /> {msg}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* Profile */}
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="mb-4 text-base font-bold text-slate-900">Mis datos de contacto</h3>
+            <form onSubmit={handleProfileSave} className="space-y-4">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Teléfono</span>
+                <input name="phone" defaultValue={person.phone || ''} type="tel"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Email</span>
+                <input name="email" defaultValue={person.email || ''} type="email"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+              </label>
+              <button type="submit" disabled={saving}
+                className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">
+                {saving ? 'Guardando…' : 'Guardar datos'}
               </button>
-            );
-          })}
+            </form>
+          </div>
+
+          {/* Upload */}
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="mb-4 text-base font-bold text-slate-900">Subir documentación</h3>
+            <form onSubmit={handleUpload} className="space-y-4">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Tipo</span>
+                <select name="document_type" required defaultValue="work_insurance"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20">
+                  {Object.entries(DOC_TYPES).map(([v, l]) => (<option key={v} value={v}>{l}</option>))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Vencimiento (opcional)</span>
+                <input name="expires_at" type="date"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Archivo — PDF, JPG o PNG (máx. 10 MB)</span>
+                <input name="file" type="file" accept="application/pdf,image/jpeg,image/png" required
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm file:mr-3 file:rounded file:border-0 file:bg-emerald-50 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-emerald-700" />
+              </label>
+              <button type="submit" disabled={uploading}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                {uploading ? 'Subiendo…' : 'Subir documento'}
+              </button>
+            </form>
+          </div>
         </div>
 
-        {tab === 'events' && (
-          <div className="space-y-3">
-            {accreditations.length === 0 ? (
-              <p className="py-12 text-center text-sm text-slate-400">No tenés eventos asignados.</p>
-            ) : (
-              accreditations.map((a) => (
-                <div key={a.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-bold text-slate-900">{a.event_name}</p>
-                      <p className="text-xs text-slate-400">Credencial: {a.badge_code} · Área: {a.access_level}</p>
-                    </div>
-                    <StatusBadge status={a.status} />
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
+        {/* Biometric */}
+        <div className="mt-6">
+          <PersonBiometricCard person={person} />
+        </div>
 
-        {tab === 'accreditations' && (
-          <div className="space-y-3">
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <ScanFace className="h-8 w-8 text-emerald-600" />
+        {/* Accreditations */}
+        {accreditations.length > 0 && (
+          <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="mb-4 flex items-center gap-2 text-base font-bold text-slate-900">
+              <IdCard className="h-4 w-4 text-emerald-600" /> Mis acreditaciones
+            </h3>
+            <div className="space-y-2">
+              {accreditations.map((a) => (
+                <div key={a.id} className="flex items-center justify-between border-t border-slate-100 py-3 first:border-0">
                   <div>
-                    <p className="font-bold text-slate-900">Biometría facial</p>
-                    <p className="text-xs text-slate-400">{hasBiometric ? 'Registrada' : 'Pendiente de registro'}</p>
+                    <p className="text-sm font-semibold text-slate-900">{a.event_name}</p>
+                    <p className="text-xs text-slate-400">{a.badge_code} · {a.area || 'Sin área'} · {a.access_level}</p>
                   </div>
+                  <StatusBadge status={a.status} />
                 </div>
-                {hasBiometric ? (
-                  <StatusBadge status="active" />
-                ) : (
-                  <button onClick={() => setCaptureOpen(true)}
-                    className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
-                    Registrar
-                  </button>
-                )}
-              </div>
+              ))}
             </div>
-            {accreditations.map((a) => (
-              <div key={a.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="font-semibold text-slate-900">{a.badge_code}</p>
-                <p className="text-xs text-slate-400">{a.event_name} · {a.access_level}</p>
-              </div>
-            ))}
           </div>
         )}
 
-        {tab === 'documents' && (
-          <div className="space-y-3">
-            {documents.length === 0 ? (
-              <p className="py-12 text-center text-sm text-slate-400">No hay documentos cargados.</p>
-            ) : (
-              documents.map((d) => (
-                <div key={d.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-5 w-5 text-slate-400" />
-                      <div>
-                        <p className="font-semibold text-slate-900">{d.document_type}</p>
-                        {d.expires_at && <p className="text-xs text-slate-400">Vence: {d.expires_at}</p>}
-                      </div>
-                    </div>
-                    <StatusBadge status={d.status} />
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-      </main>
-
-      {captureOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
-            <h2 className="mb-4 text-xl font-bold text-slate-900">Captura facial</h2>
-            <FaceCapture onCaptured={handleCapture} />
-            <button onClick={() => setCaptureOpen(false)} className="mt-3 w-full rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">
-              Cancelar
+        {/* Vehicles */}
+        <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="mb-4 flex items-center gap-2 text-base font-bold text-slate-900">
+            <Car className="h-4 w-4 text-emerald-600" /> Mis vehículos
+          </h3>
+          <form onSubmit={handleVehicleAdd} className="mb-5 space-y-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Marca *</span>
+                <input name="brand" type="text" required placeholder="Ej: Ford"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Modelo *</span>
+                <input name="model" type="text" required placeholder="Ej: Fiesta"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Patente *</span>
+                <input name="plate" type="text" required placeholder="Ej: AB123CD"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm uppercase outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Color</span>
+                <input name="color" type="text" placeholder="Ej: Blanco"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+              </label>
+            </div>
+            <button type="submit" disabled={savingVehicle}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">
+              {savingVehicle ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              {savingVehicle ? 'Guardando…' : 'Agregar vehículo'}
             </button>
-          </div>
+          </form>
+          {vehicles.length === 0 ? (
+            <p className="py-4 text-center text-sm text-slate-400">No registraste vehículos todavía.</p>
+          ) : (
+            <div className="space-y-2">
+              {vehicles.map((v) => (
+                <div key={v.id} className="flex items-center justify-between border-t border-slate-100 py-3 first:border-0">
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex items-center rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1 font-mono text-xs font-bold uppercase tracking-wider text-slate-700">
+                      {v.plate}
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{v.brand} {v.model}</p>
+                      {v.color && <p className="text-xs text-slate-400">{v.color}</p>}
+                    </div>
+                  </div>
+                  <button onClick={() => handleVehicleDelete(v.id)}
+                    className="rounded-lg p-1.5 text-red-500 transition hover:bg-red-50">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+
+        {/* Requirements */}
+        {logisticsEnabled && (
+          <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="mb-4 flex items-center gap-2 text-base font-bold text-slate-900">
+              <Package className="h-4 w-4 text-emerald-600" /> Requerimientos de logística
+            </h3>
+            <ProviderRequirementsSection user={currentUser} person={person} accreditations={accreditations} />
+          </div>
+        )}
+
+        {/* Documents */}
+        <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="mb-4 flex items-center gap-2 text-base font-bold text-slate-900">
+            <FileText className="h-4 w-4 text-emerald-600" /> Mis documentos
+          </h3>
+          {documents.length === 0 ? (
+            <p className="py-6 text-center text-sm text-slate-400">No cargaste documentación todavía.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className="px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-slate-500">Tipo</th>
+                    <th className="px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-slate-500">Archivo</th>
+                    <th className="px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-slate-500">Vence</th>
+                    <th className="px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-slate-500">Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {documents.map((d) => (
+                    <tr key={d.id} className="border-b border-slate-50">
+                      <td className="px-3 py-3 text-sm text-slate-600">{DOC_TYPES[d.document_type] || d.document_type}</td>
+                      <td className="px-3 py-3">
+                        <button onClick={() => setViewingDoc(d)} className="text-left text-sm text-emerald-700 hover:underline">
+                          {d.original_name}
+                        </button>
+                        {d.review_note && <p className="text-xs text-slate-400">{d.review_note}</p>}
+                      </td>
+                      <td className="px-3 py-3 text-sm text-slate-500">{d.expires_at || '—'}</td>
+                      <td className="px-3 py-3"><StatusBadge status={d.status} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <DocumentViewer doc={viewingDoc} onClose={() => setViewingDoc(null)} />
     </div>
   );
 }

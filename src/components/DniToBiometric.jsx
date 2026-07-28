@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { loadModels } from '@/lib/faceRecognition';
 import { X, Upload, ScanFace, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 
-export default function DniToBiometric({ accreditation, person, onSaved, onClose }) {
+export default function DniToBiometric({ person, onSaved, onClose }) {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [processing, setProcessing] = useState(false);
@@ -79,9 +79,7 @@ export default function DniToBiometric({ accreditation, person, onSaved, onClose
       await base44.entities.Biometric.create({
         person_id: person.id,
         person_name: person.full_name,
-        accreditation_id: accreditation?.id || '',
-        event_id: accreditation?.event_id || '',
-        company: person.company || person.productora || accreditation?.company || '',
+        company: person.company || person.productora || '',
         face_photo_url: file_url,
         face_descriptor: Array.from(detection.descriptor),
         status: 'active',
