@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useCrud } from '@/lib/crud';
-import { Plus, Pencil, Download } from 'lucide-react';
+import { Plus, Pencil, Download, Trash2 } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
 import { base44 } from '@/api/base44Client';
 import { useZones } from '@/lib/useZones';
@@ -46,6 +46,7 @@ export default function People() {
   const [statusFilter, setStatusFilter] = useState('');
   const [companyFilter, setCompanyFilter] = useState('');
   const [detailPerson, setDetailPerson] = useState(null);
+  const [selected, setSelected] = useState(new Set());
   const [events, setEvents] = useState([]);
   const [companies, setCompanies] = useState([]);
 
@@ -77,6 +78,52 @@ export default function People() {
   }, [items, query, areaFilter, statusFilter, companyFilter]);
 
   const { page, setPage, totalPages, paginated } = usePagination(filtered, 15);
+
+  const allFilteredIds = useMemo(() => filtered.map((p) => p.id), [filtered]);
+  const isAllSelected = allFilteredIds.length > 0 && allFilteredIds.every((id) => selected.has(id));
+  const toggleSelect = (id) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAll = () => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (isAllSelected) {
+        allFilteredIds.forEach((id) => next.delete(id));
+      } else {
+        allFilteredIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+  const handleBulkDelete = async () => {
+    if (!confirm(`¿Eliminar ${selected.size} persona(s)? Esta acción no se puede deshacer.`)) return;
+    for (const id of selected) {
+      try { await base44.functions.invoke('deletePerson', { person_id: id }); } catch {}
+    }
+    setSelected(new Set());
+    await reload();
+  };
+  const handleExportSelected = () => {
+    exportToExcel(
+      ['Nombre', 'Área', 'Documento', 'Empresa', 'Teléfono', 'Email', 'Estado', 'Notas'],
+      filtered.filter((p) => selected.has(p.id)).map((p) => [
+        p.full_name || '',
+        zones.find((z) => z.value === p.access_area)?.label || p.access_area || '',
+        p.document || '',
+        p.company || '',
+        p.phone || '',
+        p.email || '',
+        p.status || '',
+        p.notes || '',
+      ]),
+      'personas_seleccionadas'
+    );
+  };
 
   const handleExport = () => {
     exportToExcel(
@@ -203,6 +250,19 @@ export default function People() {
         <FilterSelect value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} placeholder="Todos los estados" />
       </div>
 
+      {selected.size > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5">
+          <span className="text-sm font-semibold text-emerald-700">{selected.size} seleccionada(s)</span>
+          <button onClick={handleExportSelected} className={btnOutline}>
+            <Download className="h-4 w-4" /> Exportar selección
+          </button>
+          <button onClick={handleBulkDelete} className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700">
+            <Trash2 className="h-4 w-4" /> Eliminar selección
+          </button>
+          <button onClick={() => setSelected(new Set())} className="text-sm text-slate-500 hover:text-slate-700">Limpiar</button>
+        </div>
+      )}
+
       <DataTable
         loading={loading}
         error={error}
@@ -212,6 +272,9 @@ export default function People() {
       >
         <thead>
           <tr className="border-b border-slate-100 bg-slate-50">
+            <Th className="w-10">
+              <input type="checkbox" checked={isAllSelected} onChange={toggleSelectAll} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+            </Th>
             <Th>Persona</Th>
             <Th>Tipo / Área</Th>
             <Th>Empresa</Th>
@@ -223,6 +286,9 @@ export default function People() {
         <tbody>
           {paginated.map((p) => (
             <Tr key={p.id}>
+              <Td className="w-10">
+                <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+              </Td>
               <Td>
                 <button onClick={() => setDetailPerson(p)} className="text-left text-sm font-semibold text-slate-900 hover:text-emerald-600">{p.full_name}</button>
                 <p className="text-xs text-slate-400">{p.document || 'Sin documento'}</p>
