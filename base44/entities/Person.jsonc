@@ -41,6 +41,19 @@
       "default": "fijo",
       "description": "Tipo de contrataci\u00f3n del empleado"
     },
+    "event_phases": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "armado",
+          "dia_evento",
+          "desarme"
+        ]
+      },
+      "default": [],
+      "description": "Fases del evento en las que participa el empleado"
+    },
     "event_id": {
       "type": "string",
       "description": "Evento al que pertenece la persona"

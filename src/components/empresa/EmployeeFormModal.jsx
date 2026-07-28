@@ -3,8 +3,14 @@ import { X, Loader2, UserPlus, FileImage, ScanFace, CheckCircle2 } from 'lucide-
 import { base44 } from '@/api/base44Client';
 import FaceCapture from '@/components/FaceCapture';
 
-const EMPTY = { first_name: '', last_name: '', document: '', phone: '', employment_type: 'fijo', notes: '' };
+const EMPTY = { first_name: '', last_name: '', document: '', phone: '', employment_type: 'fijo', event_phases: [], notes: '' };
 const normalizeType = (v) => (v === 'eventual' ? 'eventual' : 'fijo');
+
+const PHASES = [
+  { value: 'armado', label: 'Armado' },
+  { value: 'dia_evento', label: 'Día del evento' },
+  { value: 'desarme', label: 'Desarme' },
+];
 
 export default function EmployeeFormModal({ open, onClose, onSubmit, editing, companyName }) {
   const [saving, setSaving] = useState(false);
@@ -19,6 +25,7 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
         document: editing.document || '',
         phone: editing.phone || '',
         employment_type: normalizeType(editing.employment_type),
+        event_phases: Array.isArray(editing.event_phases) ? editing.event_phases : [],
         notes: editing.notes || '',
       };
     }
@@ -39,6 +46,15 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
 
   const setField = (name, value) => setForm((f) => ({ ...f, [name]: value }));
 
+  const togglePhase = (phase) => {
+    setForm((f) => ({
+      ...f,
+      event_phases: f.event_phases.includes(phase)
+        ? f.event_phases.filter((p) => p !== phase)
+        : [...f.event_phases, phase],
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -55,6 +71,7 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
         document: form.document,
         phone: form.phone,
         employment_type: form.employment_type,
+        event_phases: form.event_phases,
         notes: form.notes,
         company: companyName,
         person_type: 'provider',
@@ -151,13 +168,34 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
               <input value={form.phone} onChange={(e) => setField('phone', e.target.value)} type="tel" className={inputCls} placeholder="11 12345678" />
             </label>
           </div>
-          <label className="block">
-            <span className="mb-1.5 block text-xs font-semibold text-slate-600">Tipo de contratación</span>
-            <select value={form.employment_type} onChange={(e) => setField('employment_type', e.target.value)} className={inputCls}>
-              <option value="fijo">Fijo</option>
-              <option value="eventual">Eventual</option>
-            </select>
-          </label>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold text-slate-600">Tipo de contratación</span>
+              <select value={form.employment_type} onChange={(e) => setField('employment_type', e.target.value)} className={inputCls}>
+                <option value="fijo">Fijo</option>
+                <option value="eventual">Eventual</option>
+              </select>
+            </label>
+            <div>
+              <span className="mb-1.5 block text-xs font-semibold text-slate-600">Fases del evento</span>
+              <div className="flex flex-wrap gap-1.5">
+                {PHASES.map(({ value, label }) => {
+                  const active = form.event_phases.includes(value);
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => togglePhase(value)}
+                      className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}
+                    >
+                      {active && <CheckCircle2 className="mr-1 inline h-3 w-3" />}
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold text-slate-600">Notas (opcional)</span>
             <textarea value={form.notes} onChange={(e) => setField('notes', e.target.value)} rows={2} className={inputCls} placeholder="Observaciones internas…" />

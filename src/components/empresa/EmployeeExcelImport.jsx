@@ -13,8 +13,8 @@ export default function EmployeeExcelImport({ open, onClose, onImport, companyNa
   if (!open) return null;
 
   const downloadTemplate = () => {
-    const headers = ['Nombre', 'Apellido', 'Documento', 'Telefono', 'Tipo (Fijo/Eventual)'];
-    const example = ['Juan', 'Pérez', '12345678', '11 12345678', 'Fijo'];
+    const headers = ['Nombre', 'Apellido', 'Documento', 'Telefono', 'Tipo (Fijo/Eventual)', 'Fases (Armado/Dia/Desarme)'];
+    const example = ['Juan', 'Pérez', '12345678', '11 12345678', 'Fijo', 'Armado, Dia'];
     const ws = XLSX.utils.aoa_to_sheet([headers, example]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Empleados');
@@ -36,11 +36,17 @@ export default function EmployeeExcelImport({ open, onClose, onImport, companyNa
         const nombre = String(row['Nombre'] || row['nombre'] || '').trim();
         const apellido = String(row['Apellido'] || row['apellido'] || '').trim();
         const tipoRaw = String(row['Tipo'] || row['Tipo (Fijo/Eventual)'] || row['tipo'] || '').toLowerCase().trim();
+        const fasesRaw = String(row['Fases'] || row['Fases (Armado/Dia/Desarme)'] || row['fases'] || '').toLowerCase();
+        const event_phases = [];
+        if (fasesRaw.includes('arm')) event_phases.push('armado');
+        if (fasesRaw.includes('dia')) event_phases.push('dia_evento');
+        if (fasesRaw.includes('desa')) event_phases.push('desarme');
         return {
           full_name: `${nombre} ${apellido}`.trim(),
           document: String(row['Documento'] || row['documento'] || row['DNI'] || row['dni'] || '').replace(/\D/g, ''),
           phone: String(row['Telefono'] || row['Teléfono'] || row['telefono'] || '').trim(),
           employment_type: tipoRaw.startsWith('eve') ? 'eventual' : 'fijo',
+          event_phases,
           company: companyName,
           person_type: 'provider',
           status: 'active',
@@ -139,6 +145,7 @@ export default function EmployeeExcelImport({ open, onClose, onImport, companyNa
                           <th className="px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-slate-500">DNI</th>
                           <th className="px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-slate-500">Teléfono</th>
                           <th className="px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-slate-500">Tipo</th>
+                          <th className="px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-slate-500">Fases</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -151,6 +158,9 @@ export default function EmployeeExcelImport({ open, onClose, onImport, companyNa
                               <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${r.employment_type === 'fijo' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
                                 {r.employment_type === 'fijo' ? 'Fijo' : 'Eventual'}
                               </span>
+                            </td>
+                            <td className="px-3 py-2 text-xs text-slate-500">
+                              {r.event_phases?.length ? r.event_phases.map((p) => ({armado:'Armado',dia_evento:'Día',desarme:'Desarme'})[p]).join(', ') : '—'}
                             </td>
                           </tr>
                         ))}

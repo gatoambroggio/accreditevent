@@ -21,6 +21,8 @@ const DOC_TYPES = {
   other: 'Otro',
 };
 
+const PHASE_LABELS = { armado: 'Armado', dia_evento: 'Día', desarme: 'Desarme' };
+
 export default function EmpresaPortal() {
   const [user, setUser] = useState(null);
   const [company, setCompany] = useState(null);
@@ -247,6 +249,7 @@ export default function EmpresaPortal() {
                 <Th>DNI</Th>
                 <Th>Contacto</Th>
                 <Th>Tipo</Th>
+                <Th>Fases</Th>
                 <Th />
               </tr>
             </thead>
@@ -267,6 +270,15 @@ export default function EmpresaPortal() {
                     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${(emp.employment_type || 'fijo') === 'fijo' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-amber-50 text-amber-700 ring-amber-200'}`}>
                       {(emp.employment_type || 'fijo') === 'fijo' ? 'Fijo' : 'Eventual'}
                     </span>
+                  </Td>
+                  <Td>
+                    {emp.event_phases?.length ? (
+                      <div className="flex flex-wrap gap-1">
+                        {emp.event_phases.map((p) => (
+                          <span key={p} className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">{PHASE_LABELS[p] || p}</span>
+                        ))}
+                      </div>
+                    ) : '—'}
                   </Td>
                   <Td className="text-right">
                     <div className="inline-flex items-center gap-1">
