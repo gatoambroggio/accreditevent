@@ -42,8 +42,10 @@ import RegisteredVehicles from '@/pages/RegisteredVehicles';
 import ProviderCompanies from '@/pages/ProviderCompanies';
 import RequirementItems from '@/pages/RequirementItems';
 import ProviderRequests from '@/pages/ProviderRequests';
+import EmpresaRegister from '@/pages/EmpresaRegister';
+import EmpresaPortal from '@/pages/EmpresaPortal';
 
-const AUTH_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password', '/provider-register'];
+const AUTH_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password', '/provider-register', '/registro-empresa'];
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, authChecked } = useAuth();
@@ -109,6 +111,8 @@ const AuthenticatedApp = () => {
         <Route path="/provider-requests" element={<ProviderRequests />} />
       </Route>
       <Route path="/portal" element={<ProviderPortal />} />
+      <Route path="/registro-empresa" element={<EmpresaRegister />} />
+      <Route path="/empresa-portal" element={<EmpresaPortal />} />
       <Route path="/control-acceso" element={<AccessStation />} />
       <Route path="/control-qr" element={<AccessQrStation mode="person" />} />
       <Route path="/control-vehicular" element={<AccessQrStation mode="vehicle" />} />

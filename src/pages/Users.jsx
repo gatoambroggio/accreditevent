@@ -11,6 +11,7 @@ import { slugify } from '@/lib/slugify';
 
 const ROLES = [
   { value: 'provider', label: 'Proveedor' },
+  { value: 'empresa', label: 'Empresa' },
   { value: 'control', label: 'Control' },
   { value: 'coordinator', label: 'Coordinador' },
   { value: 'admin', label: 'Administrador' },
@@ -25,6 +26,7 @@ const ROLE_LABELS = {
   coordinator: 'Coordinador',
   control: 'Control',
   provider: 'Proveedor',
+  empresa: 'Empresa',
 };
 
 const ROLE_STYLES = {
@@ -34,6 +36,7 @@ const ROLE_STYLES = {
   coordinator: 'bg-blue-50 text-blue-700 ring-blue-200',
   control: 'bg-amber-50 text-amber-700 ring-amber-200',
   provider: 'bg-slate-100 text-slate-600 ring-slate-200',
+  empresa: 'bg-cyan-50 text-cyan-700 ring-cyan-200',
 };
 
 const EDIT_FIELDS = [

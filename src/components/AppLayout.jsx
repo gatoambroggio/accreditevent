@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 
-export const ROLE_LEVEL = { provider: -1, control: 0, coordinator: 1, productora: 1, admin: 2, superadmin: 3 };
+export const ROLE_LEVEL = { provider: -1, empresa: -1, control: 0, coordinator: 1, productora: 1, admin: 2, superadmin: 3 };
 
 const NAV_ITEMS = [
   // Operación
@@ -88,6 +88,7 @@ export default function AppLayout() {
 
   const userLevel = ROLE_LEVEL[user?.role] ?? -1;
   const isProvider = user?.role === 'provider';
+  const isEmpresa = user?.role === 'empresa';
   const sysName = settings?.system_name || 'acceso';
   const orgName = user?.role === 'productora' && user?.company ? user.company : (settings?.organization_name || 'Acceso Eventos');
   const logoUrl = settings?.logo_url;
@@ -96,7 +97,10 @@ export default function AppLayout() {
     if (isProvider && location.pathname !== '/portal') {
       navigate('/portal', { replace: true });
     }
-  }, [isProvider, location.pathname, navigate]);
+    if (isEmpresa && location.pathname !== '/empresa-portal') {
+      navigate('/empresa-portal', { replace: true });
+    }
+  }, [isProvider, isEmpresa, location.pathname, navigate]);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -105,6 +109,7 @@ export default function AppLayout() {
   const visibleItems = NAV_ITEMS.filter((item) => {
     if (item.providerOnly) return isProvider;
     if (isProvider) return false;
+    if (isEmpresa) return false;
     if (settings?.role_access?.[item.path]) {
       return settings.role_access[item.path].includes(user?.role);
     }
