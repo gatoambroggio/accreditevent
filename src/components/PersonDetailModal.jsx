@@ -12,7 +12,7 @@ import DniToBiometric from '@/components/DniToBiometric';
 import { useCustomFields } from '@/lib/useCustomFields';
 import { getInsuranceStatus } from '@/lib/insuranceUtils';
 
-export default function PersonDetailModal({ person, onClose }) {
+export default function PersonDetailModal({ person, onClose, readOnly = false }) {
   const [docs, setDocs] = useState([]);
   const [bio, setBio] = useState(null);
   const [vehicles, setVehicles] = useState([]);
@@ -242,7 +242,7 @@ export default function PersonDetailModal({ person, onClose }) {
                 <p className="mt-0.5 text-sm text-slate-400">Sin biometría registrada</p>
               )}
             </div>
-            {!loading && (
+            {!loading && !readOnly && (
               <button
                 onClick={() => setDniBioOpen(true)}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50"
@@ -368,7 +368,7 @@ export default function PersonDetailModal({ person, onClose }) {
                       <ExternalLink className="h-3.5 w-3.5" />
                     </button>
                   )}
-                  {doc.status === 'pending' && (
+                  {doc.status === 'pending' && !readOnly && (
                     <>
                       <button onClick={() => openReview(doc, 'approved')} className="rounded-md border border-emerald-200 bg-emerald-50 p-1.5 text-emerald-700 transition hover:bg-emerald-100" title="Aprobar">
                         <Check className="h-3.5 w-3.5" />
@@ -378,9 +378,11 @@ export default function PersonDetailModal({ person, onClose }) {
                       </button>
                     </>
                   )}
-                  <button onClick={() => handleDeleteDoc(doc)} className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600" title="Eliminar">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  {!readOnly && (
+                    <button onClick={() => handleDeleteDoc(doc)} className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600" title="Eliminar">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))
@@ -388,7 +390,7 @@ export default function PersonDetailModal({ person, onClose }) {
           </div>
 
           {/* Upload from backend */}
-          {!loading && (
+          {!loading && !readOnly && (
             <div className="mt-4 rounded-lg border border-dashed border-slate-300 bg-slate-50/50 p-4">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Subir documentación</p>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -425,10 +427,12 @@ export default function PersonDetailModal({ person, onClose }) {
             <div className="mt-5">
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Vehículos asignados</p>
-                <button onClick={openNewVehicle}
-                  className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50">
-                  <Plus className="h-3 w-3" /> Agregar
-                </button>
+                {!readOnly && (
+                  <button onClick={openNewVehicle}
+                    className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50">
+                    <Plus className="h-3 w-3" /> Agregar
+                  </button>
+                )}
               </div>
               {vehicles.length === 0 ? (
                 <p className="py-4 text-center text-sm text-slate-400">Sin vehículos asignados.</p>
@@ -460,10 +464,12 @@ export default function PersonDetailModal({ person, onClose }) {
                           className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-emerald-700" title="Imprimir credencial">
                           <Printer className="h-3.5 w-3.5" />
                         </button>
-                        <button onClick={() => openEditVehicle(v)}
-                          className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
+                        {!readOnly && (
+                          <button onClick={() => openEditVehicle(v)}
+                            className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}

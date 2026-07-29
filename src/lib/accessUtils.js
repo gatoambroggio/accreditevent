@@ -36,6 +36,11 @@ export function isWithinEventPhases(event, eventPhases, date = new Date()) {
   });
 }
 
+export function canModify(user) {
+  const role = user?.role || user?.data?.role;
+  return role !== 'operador';
+}
+
 export function speakResult(ok) {
   try {
     const u = new SpeechSynthesisUtterance(ok ? 'Aceptado' : 'Denegado');

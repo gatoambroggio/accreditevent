@@ -26,6 +26,8 @@ import { usePagination } from '@/lib/usePagination';
 import { logAudit } from '@/lib/audit';
 import { getInsuranceStatus } from '@/lib/insuranceUtils';
 import { pickPersonDefaultEvent } from '@/lib/personDefaultEvent';
+import { useAuth } from '@/lib/AuthContext';
+import { canModify } from '@/lib/accessUtils';
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Activa' },
@@ -38,6 +40,8 @@ export default function Accreditations() {
   const { zones } = useZones();
   const { personTypes } = usePersonTypes();
   const { sectors } = useParkingSectors();
+  const { user } = useAuth();
+  const canEdit = canModify(user);
   const typePrefixes = useMemo(() => {
     const map = {};
     personTypes.forEach((t) => { map[t.value] = t.badge_prefix || 'GE'; });
@@ -488,9 +492,11 @@ export default function Accreditations() {
           <button onClick={handleBatchPrint} className={btnOutline}>
             <Printer className="h-4 w-4" /> Imprimir selección
           </button>
-          <button onClick={handleBulkDelete} className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700">
-            <Trash2 className="h-4 w-4" /> Eliminar selección
-          </button>
+          {canEdit && (
+            <button onClick={handleBulkDelete} className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700">
+              <Trash2 className="h-4 w-4" /> Eliminar selección
+            </button>
+          )}
           <button onClick={() => setSelected(new Set())} className="text-sm text-slate-500 hover:text-slate-700">Limpiar</button>
         </div>
       )}
@@ -562,9 +568,11 @@ export default function Accreditations() {
                   <button onClick={() => setDniBioAccred(a)} className={btnIcon} title="Biometría desde DNI">
                     <ScanFace className="h-3.5 w-3.5" />
                   </button>
-                  <button onClick={() => openEdit(a)} className={btnIcon}>
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
+                  {canEdit && (
+                    <button onClick={() => openEdit(a)} className={btnIcon} title="Editar">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
               </Td>
             </Tr>
@@ -585,7 +593,7 @@ export default function Accreditations() {
         initialData={editing || newInitial}
         onSubmit={handleSubmit}
         onDelete={editing ? handleDelete : null}
-        canDelete={!!editing}
+        canDelete={!!editing && canEdit}
         submitLabel={editing ? 'Guardar cambios' : 'Crear acreditación'}
         onFieldChange={handleFieldChange}
         entityName="Accreditation"
@@ -625,7 +633,7 @@ export default function Accreditations() {
       )}
 
       {detailPerson && (
-        <PersonDetailModal person={detailPerson} onClose={() => setDetailPerson(null)} />
+        <PersonDetailModal person={detailPerson} onClose={() => setDetailPerson(null)} readOnly={!canEdit} />
       )}
 
       {vehicleBatchPrint && (
