@@ -7,7 +7,7 @@ export default async function(req) {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-    const { document_id } = body;
+    const { document_id, event_id } = body;
     if (!document_id) return Response.json({ error: 'document_id es requerido' }, { status: 400 });
 
     const doc = await base44.entities.Document.get(document_id);
@@ -19,8 +19,9 @@ export default async function(req) {
     }
 
     let event = null;
-    if (doc.event_id) {
-      try { event = await base44.entities.Event.get(doc.event_id); } catch {}
+    const eventIdToUse = event_id || doc.event_id;
+    if (eventIdToUse) {
+      try { event = await base44.entities.Event.get(eventIdToUse); } catch {}
     }
 
     // Load company employees for reconciliation

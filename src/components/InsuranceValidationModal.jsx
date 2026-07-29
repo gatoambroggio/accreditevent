@@ -7,16 +7,33 @@ export default function InsuranceValidationModal({ document: doc, onClose, onVal
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [acting, setActing] = useState(false);
+  const [events, setEvents] = useState([]);
+  const [selectedEventId, setSelectedEventId] = useState('');
 
+  // Load available events and initialize selection from doc.event_id
   useEffect(() => {
     if (!doc) return;
+    let cancelled = false;
+    setSelectedEventId(doc.event_id || '');
+    (async () => {
+      try {
+        const evs = await base44.entities.Event.list('-created_date', 100);
+        if (!cancelled) setEvents(evs);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [doc]);
+
+  // Run validation when an event is selected
+  useEffect(() => {
+    if (!doc || !selectedEventId) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
       setError('');
       setResult(null);
       try {
-        const res = await base44.functions.invoke('validateInsurance', { document_id: doc.id });
+        const res = await base44.functions.invoke('validateInsurance', { document_id: doc.id, event_id: selectedEventId });
         if (!cancelled) {
           if (res.data?.error) setError(res.data.error);
           else setResult(res.data);
@@ -27,7 +44,7 @@ export default function InsuranceValidationModal({ document: doc, onClose, onVal
       if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [doc]);
+  }, [doc, selectedEventId]);
 
   if (!doc) return null;
 
@@ -87,14 +104,33 @@ export default function InsuranceValidationModal({ document: doc, onClose, onVal
 
         {/* Body */}
         <div className="max-h-[60vh] overflow-y-auto px-6 py-5">
-          {loading && (
+          {!doc.event_id && (
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-amber-800">Evento a validar</span>
+                <select value={selectedEventId} onChange={(e) => setSelectedEventId(e.target.value)}
+                  className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20">
+                  <option value="">Seleccionar evento…</option>
+                  {events.map((ev) => (<option key={ev.id} value={ev.id}>{ev.name}</option>))}
+                </select>
+                <p className="mt-1.5 text-xs text-amber-700">El documento no está vinculado a un evento. Seleccioná contra qué evento validar las cláusulas de no repetición y el monto asegurado.</p>
+              </label>
+            </div>
+          )}
+          {!selectedEventId && (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Calendar className="h-8 w-8 text-slate-300" />
+              <p className="mt-3 text-sm text-slate-500">Seleccioná un evento para iniciar la validación del seguro.</p>
+            </div>
+          )}
+          {selectedEventId && loading && (
             <div className="flex flex-col items-center justify-center py-16">
               <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
               <p className="mt-3 text-sm text-slate-500">Analizando póliza con OCR…</p>
             </div>
           )}
 
-          {error && !loading && (
+          {selectedEventId && error && !loading && (
             <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4">
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
               <div>
@@ -104,7 +140,7 @@ export default function InsuranceValidationModal({ document: doc, onClose, onVal
             </div>
           )}
 
-          {result && !loading && (
+          {selectedEventId && result && !loading && (
             <div className="space-y-5">
               {/* Overall result */}
               <div className={`flex items-center gap-3 rounded-lg border p-4 ${result.valid ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}>
