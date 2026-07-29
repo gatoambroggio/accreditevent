@@ -9,6 +9,7 @@ import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
 import StatusBadge from '@/components/StatusBadge';
 import { exportToExcel } from '@/lib/exportUtils';
 import { parseServerDate } from '@/lib/formatDate';
+import PersonDetailModal from '@/components/PersonDetailModal';
 
 const PHASE_LABELS = { armado: 'Armado', dia_evento: 'Show', desarme: 'Desarme' };
 
@@ -19,6 +20,7 @@ export default function RegisteredPeople() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [eventFilter, setEventFilter] = useState('');
+  const [detailPerson, setDetailPerson] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -147,7 +149,12 @@ export default function RegisteredPeople() {
           {filtered.map((p) => (
             <Tr key={p.id}>
               <Td>
-                <p className="text-sm font-semibold text-slate-900">{p.full_name}</p>
+                <button
+                  onClick={() => setDetailPerson(p)}
+                  className="text-left text-sm font-semibold text-slate-900 transition hover:text-emerald-700 hover:underline"
+                >
+                  {p.full_name}
+                </button>
                 {p.phone && <p className="text-xs text-slate-400">{p.phone}</p>}
               </Td>
               <Td><code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700">{p.document || '—'}</code></Td>
@@ -169,6 +176,13 @@ export default function RegisteredPeople() {
           ))}
         </tbody>
       </DataTable>
+
+      {detailPerson && (
+        <PersonDetailModal
+          person={detailPerson}
+          onClose={() => setDetailPerson(null)}
+        />
+      )}
     </div>
   );
 }
