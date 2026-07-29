@@ -22,6 +22,14 @@ export default async function(req) {
     const found = await base44.asServiceRole.entities.User.filter({ email });
     if (!found.length) {
       await base44.asServiceRole.entities.PendingOperator.create({ email, company, status: 'pending' });
+      try {
+        await base44.asServiceRole.users.inviteUser(email, 'user');
+      } catch (inviteErr) {
+        const msg = (inviteErr.message || '').toLowerCase();
+        if (!msg.includes('ya') && !msg.includes('exist') && !msg.includes('registrad') && !msg.includes('already')) {
+          console.warn('No se pudo enviar invitación por email:', inviteErr.message || inviteErr);
+        }
+      }
       return Response.json({
         ok: true,
         pending: true,
