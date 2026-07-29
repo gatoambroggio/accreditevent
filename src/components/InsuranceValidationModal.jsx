@@ -107,7 +107,7 @@ export default function InsuranceValidationModal({ document: doc, onClose, onVal
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Datos extraídos de la póliza</p>
                 <div className="grid grid-cols-2 gap-3">
                   <InfoRow icon={<User className="h-3.5 w-3.5" />} label="Titular" value={result.extracted.policyholder_name} />
-                  <InfoRow icon={<FileText className="h-3.5 w-3.5" />} label="DNI titular" value={result.extracted.policyholder_dni} />
+                  <InfoRow icon={<FileText className="h-3.5 w-3.5" />} label="DNI titular" value={result.extracted.policyholder_dni + (result.extracted.policy_dni_was_cuit ? ` (DNI: ${result.extracted.policy_dni_base})` : '')} />
                   <InfoRow icon={<FileText className="h-3.5 w-3.5" />} label="Nº póliza" value={result.extracted.policy_number} />
                   <InfoRow icon={<Building2 className="h-3.5 w-3.5" />} label="Aseguradora" value={result.extracted.insurance_company} />
                   <InfoRow icon={<Calendar className="h-3.5 w-3.5" />} label="Vigencia desde" value={fmtDate(result.extracted.valid_from)} />
@@ -122,7 +122,7 @@ export default function InsuranceValidationModal({ document: doc, onClose, onVal
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Validaciones</p>
                 <div className="space-y-2">
                   <CheckRow label="Coincidencia de DNI" passed={result.validation.dni_match}
-                    detail={`Persona: ${result.validation.person_dni || '—'} · Póliza: ${result.validation.policy_dni || '—'}`} />
+                    detail={`Persona: ${result.validation.person_dni || '—'} · Póliza: ${result.validation.policy_dni || '—'}${result.extracted.policy_dni_was_cuit ? ' (extraído de CUIT/CUIL)' : ''}`} />
                   <CheckRow label="Vigencia de fechas" passed={result.validation.date_valid}
                     detail={result.validation.date_issues.length > 0 ? result.validation.date_issues.join(' · ') : 'Fechas válidas y vigentes'} />
                   {result.validation.event_coverage && (
@@ -180,6 +180,7 @@ export default function InsuranceValidationModal({ document: doc, onClose, onVal
                               {emp.is_covered ? (
                                 <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
                                   <CheckCircle2 className="h-3 w-3" /> Cubierto
+                                  {emp.match_method === 'name' && <span className="text-slate-400">(por nombre)</span>}
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600">

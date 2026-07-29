@@ -40,7 +40,7 @@ export default async function(req) {
         type: 'object',
         properties: {
           policyholder_name: { type: 'string', description: 'Nombre completo del titular del seguro' },
-          policyholder_dni: { type: 'string', description: 'DNI o número de documento del titular' },
+          policyholder_dni: { type: 'string', description: 'DNI o número de documento del titular. Puede venir como CUIT/CUIL (11 dígitos) o DNI (7-8 dígitos)' },
           policy_number: { type: 'string', description: 'Número de póliza' },
           insurance_company: { type: 'string', description: 'Nombre de la aseguradora o ART' },
           coverage_amount: { type: 'number', description: 'Monto de cobertura (valor numérico)' },
@@ -49,12 +49,12 @@ export default async function(req) {
           coverage_type: { type: 'string', description: 'Tipo de cobertura: ART, responsabilidad civil, accidentes personales, etc.' },
           insured_employees: {
             type: 'array',
-            description: 'Lista de empleados asegurados que aparecen en la nómina de la póliza',
+            description: 'Lista de empleados asegurados que aparecen en la nómina de la póliza. Incluir todos los nombres y DNI/CUIT/CUIL que aparezcan',
             items: {
               type: 'object',
               properties: {
                 name: { type: 'string', description: 'Nombre completo del empleado asegurado' },
-                dni: { type: 'string', description: 'DNI del empleado asegurado' }
+                dni: { type: 'string', description: 'DNI o CUIT/CUIL del empleado asegurado' }
               }
             }
           }
@@ -72,13 +72,20 @@ export default async function(req) {
     const extracted = extractResult.output;
 
     // Normalize helpers
-    const normalizeDni = (s) => (s || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
     const normalizeName = (s) => (s || '').toLowerCase().trim().replace(/\s+/g, ' ');
 
-    // DNI validation (person-level)
-    const personDni = normalizeDni(person?.document || '');
-    const policyDni = normalizeDni(extracted.policyholder_dni || '');
-    const dniMatch = !!(personDni && policyDni && personDni === policyDni);
+    // Extract base DNI — handles CUIT/CUIL (11 digits) by stripping first 2 and last 1 digit
+    const dniToBase = (s) => {
+      const digits = (s || '').replace(/\D/g, '');
+      if (digits.length === 11) return digits.substring(2, 10);
+      return digits;
+    };
+
+    // DNI validation (person-level) — compares base DNI, handling CUIT/CUIL
+    const personDniBase = dniToBase(person?.document || '');
+    const policyDniBase = dniToBase(extracted.policyholder_dni || '');
+    const dniMatch = !!(personDniBase && policyDniBase && personDniBase === policyDniBase);
+    const policyDniWasCuit = (extracted.policyholder_dni || '').replace(/\D/g, '').length === 11;
 
     // Date validation
     const now = new Date();
@@ -125,21 +132,24 @@ export default async function(req) {
     }
 
     // Employee reconciliation (company-level ART insurance)
+    // Match primarily by DNI (handles CUIT/CUIL), with name as fallback
     const insuredList = Array.isArray(extracted.insured_employees) ? extracted.insured_employees : [];
     const hasInsuredList = insuredList.length > 0;
-    const insuredDnis = new Set(insuredList.map(e => normalizeDni(e.dni)).filter(Boolean));
+    const insuredDnis = new Set(insuredList.map(e => dniToBase(e.dni)).filter(Boolean));
     const insuredNames = new Set(insuredList.map(e => normalizeName(e.name)).filter(Boolean));
+    const insuredCuitCount = insuredList.filter(e => (e.dni || '').replace(/\D/g, '').length === 11).length;
 
     const reconciliation = companyEmployees.map(emp => {
-      const empDni = normalizeDni(emp.document || '');
+      const empDniBase = dniToBase(emp.document || '');
       const empName = normalizeName(emp.full_name || '');
-      const dniMatchEmp = empDni && insuredDnis.has(empDni);
+      const dniMatchEmp = empDniBase && insuredDnis.has(empDniBase);
       const nameMatchEmp = empName && insuredNames.has(empName);
       return {
         person_id: emp.id,
         full_name: emp.full_name,
         document: emp.document || '',
         is_covered: dniMatchEmp || nameMatchEmp,
+        match_method: dniMatchEmp ? 'dni' : (nameMatchEmp ? 'name' : 'none'),
       };
     });
 
@@ -151,6 +161,7 @@ export default async function(req) {
       total_employees: companyEmployees.length,
       insured_in_policy: insuredList.length,
       has_insured_list: hasInsuredList,
+      cuit_count: insuredCuitCount,
       covered_count: coveredCount,
       uncovered_count: uncoveredCount,
       all_covered: !hasInsuredList || uncoveredCount === 0,
@@ -170,6 +181,8 @@ export default async function(req) {
       extracted: {
         policyholder_name: extracted.policyholder_name || '',
         policyholder_dni: extracted.policyholder_dni || '',
+        policy_dni_was_cuit: policyDniWasCuit,
+        policy_dni_base: policyDniBase,
         policy_number: extracted.policy_number || '',
         insurance_company: extracted.insurance_company || '',
         coverage_amount: extracted.coverage_amount || 0,
@@ -180,7 +193,9 @@ export default async function(req) {
       validation: {
         dni_match: dniMatch,
         person_dni: person?.document || '',
+        person_dni_base: personDniBase,
         policy_dni: extracted.policyholder_dni || '',
+        policy_dni_base: policyDniBase,
         date_valid: dateValid,
         date_issues: dateIssues,
         event_coverage: eventCoverage,

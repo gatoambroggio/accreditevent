@@ -68,7 +68,7 @@ export default function Documents() {
     const q = query.toLowerCase().trim();
     if (q) {
       result = result.filter((d) =>
-        `${d.person_name} ${d.original_name}`.toLowerCase().includes(q)
+        `${d.person_name} ${d.company || ''} ${d.original_name}`.toLowerCase().includes(q)
       );
     }
     if (typeFilter) result = result.filter((d) => d.document_type === typeFilter);
@@ -88,9 +88,10 @@ export default function Documents() {
 
   const handleExport = () => {
     exportToExcel(
-      ['Persona', 'Tipo', 'Archivo', 'Vence', 'Estado', 'Revisor', 'Fecha revisión'],
+      ['Persona', 'Empresa', 'Tipo', 'Archivo', 'Vence', 'Estado', 'Revisor', 'Fecha revisión'],
       filtered.map((d) => [
         d.person_name || '',
+        d.company || '',
         docTypeLabel(d.document_type) || '',
         d.original_name || '',
         d.expires_at ? d.expires_at.split('-').reverse().join('-') : '',
@@ -198,11 +199,12 @@ export default function Documents() {
         error={error}
         isEmpty={filtered.length === 0}
         emptyMessage={query || typeFilter || statusFilter ? 'Sin resultados para tu búsqueda.' : 'No hay documentos cargados.'}
-        tableClassName="min-w-[800px]"
+        tableClassName="min-w-[900px]"
       >
         <thead>
           <tr className="border-b border-slate-100 bg-slate-50">
             <Th>Persona</Th>
+            <Th>Empresa</Th>
             <Th>Tipo</Th>
             <Th>Archivo</Th>
             <Th>Vence</Th>
@@ -214,6 +216,7 @@ export default function Documents() {
           {paginated.map((d) => (
             <Tr key={d.id}>
               <Td className="text-sm font-semibold text-slate-900">{d.person_name || '—'}</Td>
+              <Td className="text-sm text-slate-500">{d.company || '—'}</Td>
               <Td className="text-sm text-slate-500">{docTypeLabel(d.document_type)}</Td>
               <Td>
                 <button onClick={() => setViewingDoc(d)}
