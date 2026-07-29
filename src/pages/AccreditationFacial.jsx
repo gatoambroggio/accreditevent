@@ -4,6 +4,8 @@ import { Loader2, CheckCircle2, XCircle, Calendar, AlertCircle, RefreshCw, Print
 import FaceCapture from '@/components/FaceCapture';
 import BadgePrint from '@/components/BadgePrint';
 import FacialAccreditationForm from '@/components/FacialAccreditationForm';
+import BatchVehicleBadgePrint from '@/components/BatchVehicleBadgePrint';
+import { useParkingSectors } from '@/lib/useParkingSectors';
 import { findBestMatch } from '@/lib/faceRecognition';
 
 export default function AccreditationFacial() {
@@ -19,6 +21,9 @@ export default function AccreditationFacial() {
   const [people, setPeople] = useState([]);
   const [pendingPerson, setPendingPerson] = useState(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [settings, setSettings] = useState(null);
+  const [vehicleBatchPrint, setVehicleBatchPrint] = useState(null);
+  const { sectors } = useParkingSectors();
 
   useEffect(() => {
     (async () => {
@@ -27,6 +32,8 @@ export default function AccreditationFacial() {
         setEvents(data);
         const ps = await base44.entities.Person.list('-created_date', 200);
         setPeople(ps);
+        const sts = await base44.entities.SystemSetting.list('-created_date', 1);
+        setSettings(sts[0] || null);
       } catch {}
       setLoadingEvents(false);
     })();
@@ -308,13 +315,23 @@ export default function AccreditationFacial() {
         />
       )}
 
+      {vehicleBatchPrint && (
+        <BatchVehicleBadgePrint
+          vehicles={vehicleBatchPrint.vehicles}
+          settings={settings}
+          events={events}
+          sectors={sectors}
+          onClose={() => setVehicleBatchPrint(null)}
+        />
+      )}
+
       <FacialAccreditationForm
         open={formOpen}
         event={selectedEvent}
         identifiedPerson={pendingPerson}
         events={events}
         people={people}
-        onCreated={(accred) => {
+        onCreated={(accred, printInfo) => {
           setFormOpen(false);
           setPendingPerson(null);
           setResult({
@@ -323,7 +340,11 @@ export default function AccreditationFacial() {
             badge_code: accred.badge_code,
             accred,
           });
-          setPrintAccred(accred);
+          if (printInfo?.type === 'vehicular') {
+            setVehicleBatchPrint({ vehicles: printInfo.vehicles, event: selectedEvent });
+          } else if (printInfo?.type === 'personal') {
+            setPrintAccred(accred);
+          }
         }}
         onClose={() => {
           setFormOpen(false);

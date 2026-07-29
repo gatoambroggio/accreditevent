@@ -90,6 +90,16 @@ export default function FacialAccreditationForm({ open, event, identifiedPerson,
     { name: 'status', label: 'Estado', type: 'select', options: STATUS_OPTIONS },
     { name: 'block_reason', label: 'Motivo de bloqueo / denegación', type: 'textarea', full: true, hint: 'Documentá la razón si el acceso está bloqueado o revocado.', placeholder: 'Ej: Documentación vencida, sanción disciplinaria…' },
     { name: 'has_biometric', label: 'Biometría registrada', type: 'checkbox' },
+    { name: 'print_badge', label: 'Imprimir credencial al acreditar', type: 'checkbox' },
+    {
+      name: 'print_type', label: 'Tipo de credencial a imprimir', type: 'select',
+      options: [
+        { value: 'personal', label: 'Personal' },
+        { value: 'vehicular', label: 'Vehicular' },
+      ],
+      defaultValue: 'personal',
+      hint: 'Elegí qué credencial imprimir tras acreditar.',
+    },
   ];
 
   const handleFieldChange = async (name, value, setField) => {
@@ -186,7 +196,22 @@ export default function FacialAccreditationForm({ open, event, identifiedPerson,
     if (person && finalPhases.length > 0) {
       try { await base44.entities.Person.update(person.id, { event_phases: finalPhases }); } catch {}
     }
-    if (onCreated) onCreated(created);
+    let printInfo = null;
+    if (data.print_badge) {
+      const printType = data.print_type || 'personal';
+      if (printType === 'vehicular' && approvedVehicles.length > 0) {
+        const vehsForPrint = approvedVehicles.map((v) => ({
+          ...v,
+          parking_sector: vehicleApprovals[v.id]?.sector ?? v.parking_sector,
+          event_ids: Array.from(new Set([...(Array.isArray(v.event_ids) ? v.event_ids : []), data.event_id])),
+          event_names: Array.from(new Set([...(Array.isArray(v.event_names) ? v.event_names : []), evt?.name].filter(Boolean))),
+        }));
+        printInfo = { type: 'vehicular', vehicles: vehsForPrint };
+      } else {
+        printInfo = { type: 'personal' };
+      }
+    }
+    if (onCreated) onCreated(created, printInfo);
     setPersonVehicles([]);
     setVehicleApprovals({});
   };

@@ -9,6 +9,8 @@ import StatusBadge from '@/components/StatusBadge';
 import BadgePrint from '@/components/BadgePrint';
 import BatchBadgePrint from '@/components/BatchBadgePrint';
 import DniToBiometric from '@/components/DniToBiometric';
+import BatchVehicleBadgePrint from '@/components/BatchVehicleBadgePrint';
+import PersonDetailModal from '@/components/PersonDetailModal';
 import VehicleAccreditSection from '@/components/VehicleAccreditSection';
 import { useZones } from '@/lib/useZones';
 import { usePersonTypes } from '@/lib/usePersonTypes';
@@ -56,16 +58,21 @@ export default function Accreditations() {
   const [personVehicles, setPersonVehicles] = useState([]);
   const [vehicleApprovals, setVehicleApprovals] = useState({});
   const [selectedEventId, setSelectedEventId] = useState('');
+  const [settings, setSettings] = useState(null);
+  const [detailPerson, setDetailPerson] = useState(null);
+  const [vehicleBatchPrint, setVehicleBatchPrint] = useState(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const [evs, ps] = await Promise.all([
+        const [evs, ps, sts] = await Promise.all([
           base44.entities.Event.list('-created_date', 200),
           base44.entities.Person.list('-created_date', 200),
+          base44.entities.SystemSetting.list('-created_date', 1),
         ]);
         setEvents(evs);
         setPeople(ps);
+        setSettings(sts[0] || null);
       } catch {}
     })();
   }, []);
@@ -165,6 +172,18 @@ export default function Accreditations() {
     { name: 'status', label: 'Estado', type: 'select', options: STATUS_OPTIONS },
     { name: 'block_reason', label: 'Motivo de bloqueo / denegación', type: 'textarea', full: true, hint: 'Documentá la razón si el acceso está bloqueado o revocado.', placeholder: 'Ej: Documentación vencida, sanción disciplinaria…' },
     { name: 'has_biometric', label: 'Biometría registrada', type: 'checkbox' },
+    ...(editing ? [] : [
+      { name: 'print_badge', label: 'Imprimir credencial al acreditar', type: 'checkbox' },
+      {
+        name: 'print_type', label: 'Tipo de credencial a imprimir', type: 'select',
+        options: [
+          { value: 'personal', label: 'Personal' },
+          { value: 'vehicular', label: 'Vehicular' },
+        ],
+        defaultValue: 'personal',
+        hint: 'Elegí qué credencial imprimir tras acreditar.',
+      },
+    ]),
   ];
 
   const openNew = () => { setEditing(null); setPersonVehicles([]); setVehicleApprovals({}); setSelectedEventId(''); setModalOpen(true); };
@@ -178,6 +197,14 @@ export default function Accreditations() {
     }
     setEditing(normalized);
     setModalOpen(true);
+  };
+
+  const openPersonDetail = async (accred) => {
+    let p = people.find((pp) => pp.id === accred.person_id);
+    if (!p && accred.person_id) {
+      try { p = await base44.entities.Person.get(accred.person_id); } catch {}
+    }
+    if (p) setDetailPerson(p);
   };
 
   const handleFieldChange = async (name, value, setField, formData) => {
@@ -254,11 +281,12 @@ export default function Accreditations() {
       block_reason: data.block_reason || '',
       has_biometric: data.has_biometric || false,
     };
+    let createdAccred = null;
     if (editing) {
       await update(editing.id, payload);
       await logAudit('update-accreditation', 'Accreditation', editing.id, `${person?.full_name} → ${evt?.name}`);
     } else {
-      const createdAccred = await create(payload);
+      createdAccred = await create(payload);
       await logAudit('create-accreditation', 'Accreditation', createdAccred.id, `${person?.full_name} → ${evt?.name}`);
       if (evt?.pickup_address) {
         const mapsUrl = evt.pickup_lat && evt.pickup_lng
@@ -373,6 +401,21 @@ export default function Accreditations() {
         await base44.entities.Person.update(person.id, { event_phases: finalPhases });
       } catch {}
     }
+    // Impresión opcional tras acreditar
+    if (!editing && data.print_badge) {
+      const printType = data.print_type || 'personal';
+      if (printType === 'personal') {
+        setBadgeAccred(createdAccred);
+      } else if (printType === 'vehicular' && approvedVehicles.length > 0) {
+        const vehsForPrint = approvedVehicles.map((v) => ({
+          ...v,
+          parking_sector: vehicleApprovals[v.id]?.sector ?? v.parking_sector,
+          event_ids: Array.from(new Set([...(Array.isArray(v.event_ids) ? v.event_ids : []), data.event_id])),
+          event_names: Array.from(new Set([...(Array.isArray(v.event_names) ? v.event_names : []), evt?.name].filter(Boolean))),
+        }));
+        setVehicleBatchPrint({ vehicles: vehsForPrint, event: evt });
+      }
+    }
     setPersonVehicles([]);
     setVehicleApprovals({});
   };
@@ -470,7 +513,12 @@ export default function Accreditations() {
                 />
               </Td>
               <Td>
-                <p className="text-sm font-semibold text-slate-900">{a.person_name || '—'}</p>
+                <button
+                  onClick={() => openPersonDetail(a)}
+                  className="text-left text-sm font-semibold text-slate-900 transition hover:text-emerald-700 hover:underline"
+                >
+                  {a.person_name || '—'}
+                </button>
                 <p className="text-xs text-slate-400">{zones.find((z) => z.value === a.person_type)?.label || a.person_type}</p>
               </Td>
               <Td className="text-sm text-slate-500">{a.event_name || '—'}</Td>
@@ -547,6 +595,20 @@ export default function Accreditations() {
           person={{ id: dniBioAccred.person_id, full_name: dniBioAccred.person_name, company: dniBioAccred.company }}
           onSaved={reload}
           onClose={() => setDniBioAccred(null)}
+        />
+      )}
+
+      {detailPerson && (
+        <PersonDetailModal person={detailPerson} onClose={() => setDetailPerson(null)} />
+      )}
+
+      {vehicleBatchPrint && (
+        <BatchVehicleBadgePrint
+          vehicles={vehicleBatchPrint.vehicles}
+          settings={settings}
+          events={events}
+          sectors={sectors}
+          onClose={() => setVehicleBatchPrint(null)}
         />
       )}
     </div>
