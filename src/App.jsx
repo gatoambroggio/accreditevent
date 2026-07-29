@@ -38,6 +38,7 @@ import Settings from '@/pages/Settings';
 import ZKTecoDevices from '@/pages/ZKTecoDevices';
 import Vehicles from '@/pages/Vehicles';
 import ParkingSectors from '@/pages/ParkingSectors';
+import ParkingCapacities from '@/pages/ParkingCapacities';
 import Companies from '@/pages/Companies';
 import RegisteredPeople from '@/pages/RegisteredPeople';
 import RegisteredVehicles from '@/pages/RegisteredVehicles';
@@ -108,6 +109,7 @@ const AuthenticatedApp = () => {
         <Route path="/zkteco-devices" element={<ZKTecoDevices />} />
         <Route path="/vehicles" element={<Vehicles />} />
         <Route path="/parking-sectors" element={<ParkingSectors />} />
+        <Route path="/parking-capacities" element={<ParkingCapacities />} />
         <Route path="/companies" element={<Companies />} />
         <Route path="/registered-people" element={<RegisteredPeople />} />
         <Route path="/registered-vehicles" element={<RegisteredVehicles />} />

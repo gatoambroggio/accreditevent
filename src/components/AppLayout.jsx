@@ -61,7 +61,10 @@ const NAV_ITEMS = [
   { path: '/documents', label: 'Documentos', icon: FileText, minLevel: 1 },
   { path: '/registered-vehicles', label: 'Vehículos registrados', icon: ClipboardList, minLevel: 1 },
   { path: '/vehicles', label: 'Vehículos acreditados', icon: Car, minLevel: 1 },
-  { path: '/parking-sectors', label: 'Estacionamiento', icon: SquareParking, minLevel: 1 },
+  { path: '/parking', label: 'Estacionamiento', icon: SquareParking, minLevel: 1, expandable: true, children: [
+    { path: '/parking-sectors', label: 'Sectores de estacionamiento' },
+    { path: '/parking-capacities', label: 'Capacidades por evento' },
+  ] },
   // Logística
   // Reportes y comunicación
   { path: '/reports', label: 'Reportes', icon: BarChart3, minLevel: 1 },
@@ -116,6 +119,9 @@ export default function AppLayout() {
 
   useEffect(() => {
     setMobileOpen(false);
+    if (location.pathname.startsWith('/parking')) {
+      setExpandedNav('/parking');
+    }
   }, [location.pathname]);
 
   const visibleItems = NAV_ITEMS.filter((item) => {
@@ -227,7 +233,22 @@ export default function AppLayout() {
                 )}
                 {item.expandable && isExpanded && (
                   <div className="mt-0.5 ml-4 space-y-0.5 border-l border-white/10 pl-2">
-                    {subItems.length === 0 ? (
+                    {item.children ? (
+                      item.children.map((child) => {
+                        const childActive = isActive(child.path);
+                        return (
+                          <Link
+                            key={child.path}
+                            to={child.path}
+                            className={`flex items-center rounded-lg px-3 py-2 text-xs font-medium transition ${
+                              childActive ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                            }`}
+                          >
+                            {child.label}
+                          </Link>
+                        );
+                      })
+                    ) : subItems.length === 0 ? (
                       <div className="px-3 py-2 text-xs text-slate-500">Sin empresas</div>
                     ) : (
                       subItems.map((company) => (

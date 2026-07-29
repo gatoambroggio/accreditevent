@@ -1,13 +1,15 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useCrud } from '@/lib/crud';
-import { Plus, Pencil, Download, Trash2, ScanLine, ShieldCheck, ShieldX, FileCheck2, FileWarning, IdCard, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Download, Trash2, ScanLine, ShieldCheck, ShieldX, FileCheck2, FileWarning, IdCard, Loader2, FileText } from 'lucide-react';
 import DniScannerModal from '@/components/DniScannerModal';
 import { exportToExcel } from '@/lib/exportUtils';
 import { base44 } from '@/api/base44Client';
 import { useZones } from '@/lib/useZones';
+import { useParkingSectors } from '@/lib/useParkingSectors';
 import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
 import PersonDetailModal from '@/components/PersonDetailModal';
+import PersonDocUploadModal from '@/components/PersonDocUploadModal';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
 import FilterSelect from '@/components/ui/filter-select';
@@ -25,6 +27,7 @@ const validateAutonomo = (data) => {
   if (data.phone?.trim() && data.phone.replace(/\D/g, '').length < 12) e.phone = 'Teléfono incompleto (código de área + número)';
   if (data.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e.email = 'Email inválido';
   if (!data.status) e.status = 'Seleccioná un estado';
+  if (data._veh_plate?.trim() && (!data._veh_brand?.trim() || !data._veh_model?.trim())) e._veh_plate = 'Si cargás una patente, debés completar marca y modelo';
   return e;
 };
 
@@ -32,6 +35,18 @@ const STATUS_OPTIONS = [
   { value: 'active', label: 'Activo' },
   { value: 'inactive', label: 'Inactivo' },
   { value: 'pending', label: 'Pendiente' },
+];
+
+const BLOOD_TYPE_OPTIONS = [
+  { value: '', label: 'Sin especificar' },
+  { value: 'A+', label: 'A+' },
+  { value: 'A-', label: 'A-' },
+  { value: 'B+', label: 'B+' },
+  { value: 'B-', label: 'B-' },
+  { value: 'AB+', label: 'AB+' },
+  { value: 'AB-', label: 'AB-' },
+  { value: 'O+', label: 'O+' },
+  { value: 'O-', label: 'O-' },
 ];
 
 function InsuranceBadge({ doc }) {
@@ -62,6 +77,7 @@ function InsuranceBadge({ doc }) {
 export default function PersonasAutonomas() {
   const { items, loading, error, create, update, remove, reload } = useCrud('Person');
   const { zones } = useZones();
+  const { sectors } = useParkingSectors();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [query, setQuery] = useState('');
@@ -74,6 +90,7 @@ export default function PersonasAutonomas() {
   const [events, setEvents] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [accreditingId, setAccreditingId] = useState(null);
+  const [docUploadPerson, setDocUploadPerson] = useState(null);
 
   const refreshDocs = async () => {
     try {
@@ -245,8 +262,19 @@ export default function PersonasAutonomas() {
       { name: 'status', label: 'Estado', type: 'select', required: true, options: STATUS_OPTIONS },
       { name: 'notes', label: 'Notas', type: 'textarea', full: true, placeholder: 'Ej: Autónomo, responsable de sonido' },
       { name: '_face', label: 'Registro facial', type: 'face-capture', full: true },
+      { name: '_veh_plate', label: 'Vehículo — Patente', type: 'text', full: true, placeholder: 'Ej: AB123CD', hint: 'Completá estos datos si la persona necesita acceso vehicular al evento.' },
+      { name: '_veh_brand', label: 'Vehículo — Marca', type: 'text', placeholder: 'Ej: Toyota' },
+      { name: '_veh_model', label: 'Vehículo — Modelo', type: 'text', placeholder: 'Ej: Corolla' },
+      { name: '_veh_color', label: 'Vehículo — Color', type: 'text', placeholder: 'Ej: Blanco' },
+      { name: '_veh_parking_sector', label: 'Vehículo — Sector', type: 'select', options: sectors.map((s) => ({ value: s.value, label: s.label })) },
+      { name: 'blood_type', label: 'Grupo sanguíneo', type: 'select', options: BLOOD_TYPE_OPTIONS, hint: 'Datos para emergencia médica' },
+      { name: 'allergies', label: 'Alergias a medicamentos', type: 'textarea', full: true, placeholder: 'Ej: Penicilina, aspirina…' },
+      { name: 'obra_social', label: 'Obra social', type: 'text', placeholder: 'Ej: OSDE' },
+      { name: 'carnet_obra_social', label: 'N° carnet obra social', type: 'text', placeholder: 'Ej: 123456789' },
+      { name: 'emergency_contact_name', label: 'Contacto de emergencia — Nombre', type: 'text', placeholder: 'Ej: María Pérez' },
+      { name: 'emergency_contact_phone', label: 'Contacto de emergencia — Teléfono', type: 'phone-ar' },
     ];
-  }, [zones, events, editing]);
+  }, [zones, events, editing, sectors]);
 
   const openNew = () => { setEditing(null); setDniPrefill(null); setModalOpen(true); };
   const openEdit = async (item) => {
@@ -258,10 +286,21 @@ export default function PersonasAutonomas() {
     setEditing(normalized);
     setModalOpen(true);
     try {
-      const bios = await base44.entities.Biometric.filter({ person_id: item.id, status: 'active' }, '-created_date', 1);
-      if (bios[0]?.face_photo_url) {
-        setEditing({ ...normalized, face_photo_url: bios[0].face_photo_url });
+      const [bios, vehs] = await Promise.all([
+        base44.entities.Biometric.filter({ person_id: item.id, status: 'active' }, '-created_date', 1),
+        base44.entities.Vehicle.filter({ person_id: item.id }, '-created_date', 1),
+      ]);
+      const extra = {};
+      if (bios[0]?.face_photo_url) extra.face_photo_url = bios[0].face_photo_url;
+      if (vehs[0]) {
+        extra._veh_id = vehs[0].id;
+        extra._veh_brand = vehs[0].brand || '';
+        extra._veh_model = vehs[0].model || '';
+        extra._veh_plate = vehs[0].plate || '';
+        extra._veh_color = vehs[0].color || '';
+        extra._veh_parking_sector = vehs[0].parking_sector || '';
       }
+      if (Object.keys(extra).length) setEditing({ ...normalized, ...extra });
     } catch {}
   };
   const handleDniScanned = (data) => {
@@ -346,6 +385,31 @@ export default function PersonasAutonomas() {
         });
       }
     } catch {}
+    // Handle vehicle
+    const vehPlate = data._veh_plate?.trim().toUpperCase();
+    const existingVehId = data._veh_id;
+    if (vehPlate) {
+      const vehData = {
+        person_id: personId,
+        person_name: personData.full_name,
+        company: userCompany || personData.productora || '',
+        brand: data._veh_brand?.trim() || '',
+        model: data._veh_model?.trim() || '',
+        plate: vehPlate,
+        color: data._veh_color?.trim() || '',
+        parking_sector: data._veh_parking_sector || '',
+        event_ids: personData.event_id ? [personData.event_id] : [],
+        event_names: events.filter((e) => e.id === personData.event_id).map((e) => e.name),
+        status: 'pending',
+      };
+      if (existingVehId) {
+        await base44.entities.Vehicle.update(existingVehId, vehData);
+      } else {
+        await base44.entities.Vehicle.create(vehData);
+      }
+    } else if (existingVehId) {
+      try { await base44.entities.Vehicle.delete(existingVehId); } catch {}
+    }
   };
   const handleDelete = async () => {
     await base44.functions.invoke('deletePerson', { person_id: editing.id });
@@ -466,6 +530,9 @@ export default function PersonasAutonomas() {
                         {accreditingId === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <IdCard className="h-3.5 w-3.5" />}
                       </button>
                     )}
+                    <button onClick={() => setDocUploadPerson(p)} className={btnIcon} title="Subir documento">
+                      <FileText className="h-3.5 w-3.5" />
+                    </button>
                     <button onClick={() => openEdit(p)} className={btnIcon}>
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
@@ -497,6 +564,12 @@ export default function PersonasAutonomas() {
       />
 
       <DniScannerModal open={dniScannerOpen} onClose={() => setDniScannerOpen(false)} onScanned={handleDniScanned} />
+
+      <PersonDocUploadModal
+        person={docUploadPerson}
+        onClose={() => setDocUploadPerson(null)}
+        onUploaded={() => { setDocUploadPerson(null); refreshDocs(); }}
+      />
 
       {detailPerson && (
         <PersonDetailModal person={detailPerson} onClose={() => { setDetailPerson(null); refreshDocs(); }} />

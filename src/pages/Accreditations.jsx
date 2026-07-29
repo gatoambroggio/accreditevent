@@ -192,7 +192,7 @@ export default function Accreditations() {
     setEditing(null);
     setPersonVehicles([]);
     setVehicleApprovals({});
-    const activeEvent = events.find((e) => e.status === 'active');
+    const activeEvent = events.find((e) => e.status === 'active' && (!e.end_at || new Date(e.end_at).getTime() + (e.grace_hours || 0) * 3600000 > Date.now()));
     const defaultEventId = activeEvent?.id || '';
     setSelectedEventId(defaultEventId);
     setNewInitial({ event_id: defaultEventId });

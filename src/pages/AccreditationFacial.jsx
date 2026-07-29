@@ -30,6 +30,8 @@ export default function AccreditationFacial() {
       try {
         const data = await base44.entities.Event.filter({ status: 'active' }, '-created_date', 100);
         setEvents(data);
+        const vigente = data.find((e) => !e.end_at || new Date(e.end_at).getTime() + (e.grace_hours || 0) * 3600000 > Date.now());
+        if (vigente) setSelectedEventId(vigente.id);
         const ps = await base44.entities.Person.list('-created_date', 200);
         setPeople(ps);
         const sts = await base44.entities.SystemSetting.list('-created_date', 1);
