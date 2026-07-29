@@ -247,6 +247,7 @@ export default function Events() {
         onDelete={editing?.id ? handleDelete : null}
         canDelete={!!editing?.id}
         submitLabel={editing ? 'Guardar cambios' : 'Crear evento'}
+        entityName="Event"
       />
 
       <ShareLinkModal event={shareEvent} onClose={() => setShareEvent(null)} />

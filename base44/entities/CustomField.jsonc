@@ -11,7 +11,12 @@
         "Vehicle",
         "Document",
         "ProviderCompany",
-        "Biometric"
+        "Biometric",
+        "AccessLog",
+        "ZKTecoDevice",
+        "ProviderRequest",
+        "RequirementItem",
+        "EventCompanyApproval"
       ],
       "description": "Entidad a la que pertenece el campo personalizado"
     },

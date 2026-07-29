@@ -409,6 +409,7 @@ export default function Accreditations() {
         canDelete={!!editing}
         submitLabel={editing ? 'Guardar cambios' : 'Crear acreditación'}
         onFieldChange={handleFieldChange}
+        entityName="Accreditation"
       />
 
       {badgeAccred && (

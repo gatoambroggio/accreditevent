@@ -61,6 +61,11 @@
     "notes": {
       "type": "string",
       "description": "Notas adicionales"
+    },
+    "custom_fields": {
+      "type": "object",
+      "description": "Campos personalizados definidos por el administrador",
+      "default": {}
     }
   },
   "required": [

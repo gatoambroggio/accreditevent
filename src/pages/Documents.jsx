@@ -240,6 +240,7 @@ export default function Documents() {
         onSubmit={handleReview}
         canDelete={false}
         submitLabel="Guardar revisión"
+        entityName="Document"
       />
 
       <EntityModal

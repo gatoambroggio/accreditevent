@@ -13,6 +13,12 @@ const ENTITIES = [
   { value: 'Vehicle', label: 'Vehículos' },
   { value: 'Document', label: 'Documentos' },
   { value: 'ProviderCompany', label: 'Empresas proveedoras' },
+  { value: 'Biometric', label: 'Biometría' },
+  { value: 'AccessLog', label: 'Registro de accesos' },
+  { value: 'ZKTecoDevice', label: 'Dispositivos ZKTeco' },
+  { value: 'ProviderRequest', label: 'Solicitudes de proveedores' },
+  { value: 'RequirementItem', label: 'Ítems de logística' },
+  { value: 'EventCompanyApproval', label: 'Aprobaciones de empresa' },
 ];
 
 const FIELD_TYPES = [

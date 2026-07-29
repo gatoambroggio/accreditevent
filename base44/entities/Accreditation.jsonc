@@ -70,6 +70,11 @@
       "type": "boolean",
       "default": false,
       "description": "Indica si tiene biometr\u00eda registrada"
+    },
+    "custom_fields": {
+      "type": "object",
+      "description": "Campos personalizados definidos por el administrador",
+      "default": {}
     }
   },
   "required": [

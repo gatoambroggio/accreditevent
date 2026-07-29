@@ -14,6 +14,45 @@
       "type": "string",
       "description": "URL del logo del sistema"
     },
+    "theme": {
+      "type": "object",
+      "description": "Personalizaci\u00f3n visual completa del sistema (colores, tipograf\u00eda, formato)",
+      "properties": {
+        "primary": {
+          "type": "string",
+          "description": "Color primario (hex)"
+        },
+        "accent": {
+          "type": "string",
+          "description": "Color de acento (hex)"
+        },
+        "background": {
+          "type": "string",
+          "description": "Color de fondo (hex)"
+        },
+        "sidebar_bg": {
+          "type": "string",
+          "description": "Fondo de barra lateral (hex)"
+        },
+        "sidebar_fg": {
+          "type": "string",
+          "description": "Texto de barra lateral (hex)"
+        },
+        "heading_font": {
+          "type": "string",
+          "description": "Fuente de t\u00edtulos"
+        },
+        "body_font": {
+          "type": "string",
+          "description": "Fuente de cuerpo"
+        },
+        "radius": {
+          "type": "number",
+          "description": "Radio de bordes (rem)"
+        }
+      },
+      "default": {}
+    },
     "mail_from": {
       "type": "string",
       "description": "Email remitente para notificaciones"

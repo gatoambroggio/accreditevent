@@ -94,6 +94,11 @@
         "type": "string"
       },
       "description": "IDs de usuarios asignados a este evento"
+    },
+    "custom_fields": {
+      "type": "object",
+      "description": "Campos personalizados definidos por el administrador",
+      "default": {}
     }
   },
   "required": [

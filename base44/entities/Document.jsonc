@@ -71,6 +71,11 @@
       "type": "string",
       "format": "date-time",
       "description": "Fecha del \u00faltimo aviso de vencimiento enviado al proveedor"
+    },
+    "custom_fields": {
+      "type": "object",
+      "description": "Campos personalizados definidos por el administrador",
+      "default": {}
     }
   },
   "required": [

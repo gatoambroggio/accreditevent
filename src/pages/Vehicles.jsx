@@ -340,6 +340,7 @@ export default function Vehicles() {
         onDelete={editing ? handleDelete : null}
         canDelete={!!editing}
         submitLabel={editing ? 'Guardar cambios' : 'Crear vehículo'}
+        entityName="Vehicle"
       />
 
       {printingVehicle && (

@@ -30,8 +30,10 @@ import {
   UserSearch,
   ClipboardList,
   ChevronDown,
+  Palette,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { applyTheme } from '@/lib/useTheme';
 
 export const ROLE_LEVEL = { provider: -1, empresa: -1, control: 0, coordinator: 1, productora: 1, admin: 2, superadmin: 3 };
 
@@ -67,6 +69,7 @@ const NAV_ITEMS = [
   { path: '/users', label: 'Usuarios y roles', icon: ShieldCheck, minLevel: 2 },
   { path: '/audit', label: 'Auditoría', icon: ScrollText, minLevel: 2 },
   { path: '/custom-fields', label: 'Campos personalizados', icon: ListPlus, minLevel: 2 },
+  { path: '/apariencia', label: 'Apariencia', icon: Palette, minLevel: 2 },
   { path: '/settings', label: 'Configuración', icon: SettingsIcon, minLevel: 2 },
   // Portal proveedor
   { path: '/portal', label: 'Mi portal', icon: UserCircle, providerOnly: true },
@@ -85,7 +88,10 @@ export default function AppLayout() {
     (async () => {
       try {
         const all = await base44.entities.SystemSetting.list('-created_date', 1);
-        if (all[0]) setSettings(all[0]);
+        if (all[0]) {
+          setSettings(all[0]);
+          if (all[0].theme) applyTheme(all[0].theme);
+        }
       } catch {}
     })();
   }, []);
@@ -147,14 +153,14 @@ export default function AppLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-[hsl(120_14%_97%)]">
+    <div className="min-h-screen bg-background">
       {/* Mobile top bar */}
-      <div className="sticky top-0 z-20 flex items-center justify-between bg-[hsl(157_42%_11%)] px-4 py-3 lg:hidden">
+      <div className="sticky top-0 z-20 flex items-center justify-between bg-sidebar px-4 py-3 lg:hidden">
         <div className="flex items-center gap-2">
           {logoUrl ? (
             <img src={logoUrl} alt="Logo" className="h-7 w-7 rounded-md object-cover" />
           ) : (
-            <span className="grid h-7 w-7 place-items-center rounded-md bg-[hsl(39_86%_63%)] text-xs font-extrabold text-[hsl(146_34%_11%)]">A</span>
+            <span className="grid h-7 w-7 place-items-center rounded-md bg-sidebar-primary text-xs font-extrabold text-sidebar-primary-foreground">A</span>
           )}
           <span className="text-base font-extrabold tracking-tight text-white">{sysName}</span>
         </div>
@@ -169,13 +175,13 @@ export default function AppLayout() {
       )}
 
       {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-40 flex w-60 flex-col bg-[hsl(157_42%_11%)] text-slate-300 transition-transform duration-300 lg:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`fixed inset-y-0 left-0 z-40 flex w-60 flex-col bg-sidebar text-slate-300 transition-transform duration-300 lg:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center justify-between px-5 py-6">
           <div className="flex items-center gap-2.5">
             {logoUrl ? (
               <img src={logoUrl} alt="Logo" className="h-8 w-8 rounded-lg object-cover" />
             ) : (
-              <span className="grid h-8 w-8 place-items-center rounded-lg bg-[hsl(39_86%_63%)] text-sm font-extrabold text-[hsl(146_34%_11%)]">A</span>
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-sidebar-primary text-sm font-extrabold text-sidebar-primary-foreground">A</span>
             )}
             <span className="text-lg font-extrabold tracking-tight text-white">{sysName}</span>
           </div>

@@ -197,6 +197,7 @@ export default function ProviderCompanies() {
         onDelete={editing ? handleDelete : null}
         canDelete={!!editing}
         submitLabel={editing ? 'Guardar cambios' : 'Crear empresa'}
+        entityName="ProviderCompany"
       />
 
       {peopleModalCompany && (
