@@ -48,6 +48,16 @@ export default function EmpresaPortal() {
   const approvedEvents = approvals.filter((a) => a.status === 'approved').map((a) => a.event_name);
   const isApproved = approvedEvents.length > 0;
   const approvedEventList = approvals.filter((a) => a.status === 'approved').map((a) => ({ event_id: a.event_id, event_name: a.event_name, productora: a.company }));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const loadBlocked = isApproved && approvedEventList.every((ev) => {
+    const ap = approvals.find((a) => a.event_id === ev.event_id);
+    if (!ap?.load_start_date || !ap?.load_end_date) return false;
+    const start = new Date(ap.load_start_date + 'T00:00:00');
+    const end = new Date(ap.load_end_date + 'T23:59:59');
+    return today < start || today > end;
+  });
+  const canLoad = isApproved && !loadBlocked;
 
   const load = useCallback(async () => {
     try {
@@ -343,6 +353,15 @@ export default function EmpresaPortal() {
             <CheckCircle2 className="h-4 w-4" /> Aprobada para: {approvedEvents.join(', ')}
           </div>
         )}
+        {loadBlocked && (
+          <div className="mb-6 flex items-start gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm ring-1 ring-amber-200">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <div>
+              <p className="font-semibold text-amber-800">Período de carga cerrado</p>
+              <p className="mt-0.5 text-amber-700">El plazo para cargar empleados finalizó. Contactá al administrador para reactivar o extender el permiso.</p>
+            </div>
+          </div>
+        )}
         {msg && (
           <div className="mb-6 flex items-center gap-2 rounded-lg bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">
             <CheckCircle2 className="h-4 w-4" /> {msg}
@@ -356,10 +375,10 @@ export default function EmpresaPortal() {
               <Users className="h-5 w-5 text-emerald-600" /> Empleados
             </h3>
             <div className="flex flex-wrap items-center gap-2">
-              <button onClick={() => { setEditingEmployee(null); setFormOpen(true); }} disabled={!isApproved} className={`${btnPrimary} disabled:cursor-not-allowed disabled:opacity-50`}>
+              <button onClick={() => { setEditingEmployee(null); setFormOpen(true); }} disabled={!canLoad} className={`${btnPrimary} disabled:cursor-not-allowed disabled:opacity-50`}>
                 <UserPlus className="h-4 w-4" /> Nuevo empleado
               </button>
-              <button onClick={() => setImportOpen(true)} disabled={!isApproved} className={`${btnOutline} disabled:cursor-not-allowed disabled:opacity-50`}>
+              <button onClick={() => setImportOpen(true)} disabled={!canLoad} className={`${btnOutline} disabled:cursor-not-allowed disabled:opacity-50`}>
                 <FileSpreadsheet className="h-4 w-4" /> Importar Excel
               </button>
             </div>

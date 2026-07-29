@@ -32,6 +32,16 @@
       "type": "string",
       "description": "Usuario que aprob\u00f3/rechaz\u00f3"
     },
+    "load_start_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de inicio del per\u00edodo de carga de empleados"
+    },
+    "load_end_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de fin del per\u00edodo de carga de empleados"
+    },
     "notes": {
       "type": "string",
       "description": "Notas internas"

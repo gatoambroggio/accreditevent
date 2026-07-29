@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { X, Loader2, FileText, ExternalLink, User, UploadCloud, Car, Plus, Pencil, Trash2, Printer, Check, XCircle, ScanFace } from 'lucide-react';
+import { X, Loader2, FileText, ExternalLink, User, UploadCloud, Car, Plus, Pencil, Trash2, Printer, Check, XCircle, ScanFace, Heart } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
 import { Image } from '@/components/ui/image';
 import { useDocumentTypes } from '@/lib/useDocumentTypes';
@@ -264,6 +264,49 @@ export default function PersonDetailModal({ person, onClose }) {
                     </div>
                   );
                 })}
+              </div>
+            </>
+          )}
+
+          {/* Emergency & medical info */}
+          {!loading && (person.obra_social || person.carnet_obra_social || person.emergency_contact_name || person.emergency_contact_phone || person.allergies || person.blood_type || person.coordinator_name) && (
+            <>
+              <p className="mb-2 mt-5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-red-500">
+                <Heart className="h-3.5 w-3.5" /> Ficha médica y de emergencia
+              </p>
+              <div className="mb-5 grid grid-cols-2 gap-3">
+                {person.blood_type && (
+                  <div className="rounded-lg border border-red-200 bg-red-50/30 p-2.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-red-400">Grupo sanguíneo</p>
+                    <p className="mt-0.5 text-sm font-bold text-slate-900">{person.blood_type}</p>
+                  </div>
+                )}
+                {person.allergies && (
+                  <div className="rounded-lg border border-red-200 bg-red-50/30 p-2.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-red-400">Alergias</p>
+                    <p className="mt-0.5 text-sm font-bold text-slate-900">{person.allergies}</p>
+                  </div>
+                )}
+                {person.obra_social && (
+                  <div className="rounded-lg border border-slate-200 p-2.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Obra social</p>
+                    <p className="mt-0.5 text-sm text-slate-900">{person.obra_social}</p>
+                    {person.carnet_obra_social && <p className="text-xs text-slate-500">Carnet: {person.carnet_obra_social}</p>}
+                  </div>
+                )}
+                {person.emergency_contact_name && (
+                  <div className="rounded-lg border border-slate-200 p-2.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Contacto de emergencia</p>
+                    <p className="mt-0.5 text-sm text-slate-900">{person.emergency_contact_name}</p>
+                    {person.emergency_contact_phone && <p className="text-xs text-slate-500">{person.emergency_contact_phone}</p>}
+                  </div>
+                )}
+                {person.coordinator_name && (
+                  <div className="rounded-lg border border-slate-200 p-2.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Coordinador</p>
+                    <p className="mt-0.5 text-sm text-slate-900">{person.coordinator_name}</p>
+                  </div>
+                )}
               </div>
             </>
           )}

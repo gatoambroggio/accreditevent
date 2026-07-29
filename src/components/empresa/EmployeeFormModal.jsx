@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, UserPlus, FileImage, ScanFace, CheckCircle2, FileText, CalendarDays, MapPin, ScanLine } from 'lucide-react';
+import { X, Loader2, UserPlus, FileImage, ScanFace, CheckCircle2, FileText, CalendarDays, MapPin, ScanLine, Heart } from 'lucide-react';
 import DniScannerModal from '@/components/DniScannerModal';
 import { base44 } from '@/api/base44Client';
 import { Image } from '@/components/ui/image';
@@ -7,7 +7,7 @@ import FaceCapture from '@/components/FaceCapture';
 import { useZones } from '@/lib/useZones';
 import { extractFaceFromDni } from '@/lib/dniFaceExtract';
 
-const EMPTY = { first_name: '', last_name: '', document: '', phone: '', employment_type: 'fijo', access_area: '', event_phases: [], event_ids: [], notes: '' };
+const EMPTY = { first_name: '', last_name: '', document: '', phone: '', employment_type: 'fijo', access_area: '', event_phases: [], event_ids: [], notes: '', obra_social: '', carnet_obra_social: '', emergency_contact_name: '', emergency_contact_phone: '', allergies: '', blood_type: '', coordinator_name: '' };
 const normalizeType = (v) => (v === 'eventual' || v === 'esporadico' ? 'eventual' : 'fijo');
 
 const PHASES = [
@@ -29,6 +29,13 @@ function buildForm(editing) {
     event_phases: Array.isArray(editing.event_phases) ? editing.event_phases : [],
     event_ids: Array.isArray(editing.event_ids) ? editing.event_ids : [],
     notes: editing.notes || '',
+    obra_social: editing.obra_social || '',
+    carnet_obra_social: editing.carnet_obra_social || '',
+    emergency_contact_name: editing.emergency_contact_name || '',
+    emergency_contact_phone: editing.emergency_contact_phone || '',
+    allergies: editing.allergies || '',
+    blood_type: editing.blood_type || '',
+    coordinator_name: editing.coordinator_name || '',
   };
 }
 
@@ -155,6 +162,13 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
         event_ids: form.event_ids,
         event_names,
         notes: form.notes,
+        obra_social: form.obra_social,
+        carnet_obra_social: form.carnet_obra_social,
+        emergency_contact_name: form.emergency_contact_name,
+        emergency_contact_phone: form.emergency_contact_phone,
+        allergies: form.allergies,
+        blood_type: form.blood_type,
+        coordinator_name: form.coordinator_name,
         company: companyName,
         person_type: form.access_area || 'general',
         tipo_vinculo: 'empresa',
@@ -355,6 +369,46 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
             <span className="mb-1.5 block text-xs font-semibold text-slate-600">Notas (opcional)</span>
             <textarea value={form.notes} onChange={(e) => setField('notes', e.target.value)} rows={2} className={inputCls} placeholder="Observaciones internas…" />
           </label>
+
+          {/* Ficha médica y de emergencia */}
+          <div className="rounded-xl border border-red-100 bg-red-50/30 p-4">
+            <p className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-red-600">
+              <Heart className="h-4 w-4" /> Ficha médica y de emergencia (opcional)
+            </p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Obra social</span>
+                <input value={form.obra_social} onChange={(e) => setField('obra_social', e.target.value)} className={inputCls} placeholder="Ej: OSDE" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">N° de carnet / afiliado</span>
+                <input value={form.carnet_obra_social} onChange={(e) => setField('carnet_obra_social', e.target.value)} className={inputCls} placeholder="Ej: 123456789" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Grupo sanguíneo</span>
+                <select value={form.blood_type} onChange={(e) => setField('blood_type', e.target.value)} className={inputCls}>
+                  <option value="">Sin especificar</option>
+                  {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((bt) => (<option key={bt} value={bt}>{bt}</option>))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Alergias a medicamentos</span>
+                <input value={form.allergies} onChange={(e) => setField('allergies', e.target.value)} className={inputCls} placeholder="Ej: Penicilina, aspirina…" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Contacto de emergencia — Nombre</span>
+                <input value={form.emergency_contact_name} onChange={(e) => setField('emergency_contact_name', e.target.value)} className={inputCls} placeholder="Ej: María Pérez" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Contacto de emergencia — Teléfono</span>
+                <input value={form.emergency_contact_phone} onChange={(e) => setField('emergency_contact_phone', e.target.value)} type="tel" className={inputCls} placeholder="Ej: 11 12345678" />
+              </label>
+              <label className="block sm:col-span-2">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Coordinador / responsable asignado</span>
+                <input value={form.coordinator_name} onChange={(e) => setField('coordinator_name', e.target.value)} className={inputCls} placeholder="Ej: Carlos Gómez" />
+              </label>
+            </div>
+          </div>
 
           {/* DNI */}
           <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">

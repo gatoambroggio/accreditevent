@@ -89,6 +89,46 @@
       "type": "string",
       "description": "Notas internas"
     },
+    "obra_social": {
+      "type": "string",
+      "description": "Obra social del empleado"
+    },
+    "carnet_obra_social": {
+      "type": "string",
+      "description": "N\u00famero de carnet / afiliado de la obra social"
+    },
+    "emergency_contact_name": {
+      "type": "string",
+      "description": "Nombre completo del contacto de emergencia"
+    },
+    "emergency_contact_phone": {
+      "type": "string",
+      "description": "Tel\u00e9fono del contacto de emergencia"
+    },
+    "allergies": {
+      "type": "string",
+      "description": "Alergias a medicamentos"
+    },
+    "blood_type": {
+      "type": "string",
+      "enum": [
+        "A+",
+        "A-",
+        "B+",
+        "B-",
+        "AB+",
+        "AB-",
+        "O+",
+        "O-",
+        ""
+      ],
+      "default": "",
+      "description": "Grupo sangu\u00edneo"
+    },
+    "coordinator_name": {
+      "type": "string",
+      "description": "Coordinador o responsable asignado por la empresa"
+    },
     "custom_fields": {
       "type": "object",
       "description": "Campos personalizados definidos por el administrador",
