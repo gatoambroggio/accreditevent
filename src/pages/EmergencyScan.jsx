@@ -40,12 +40,15 @@ export default function EmergencyScan() {
           if (match) {
             const accred = accreditations.find((a) => a.person_id === match.person_id);
             if (accred) {
-              const [person, docs, vehicles] = await Promise.all([
-                base44.entities.Person.get(accred.person_id),
+              const person = await base44.entities.Person.get(accred.person_id);
+              const [docs, vehicles, companyDocs] = await Promise.all([
                 base44.entities.Document.filter({ person_id: accred.person_id }, '-created_date', 50),
                 base44.entities.Vehicle.filter({ person_id: accred.person_id }, '-created_date', 10),
+                person.company
+                  ? base44.entities.Document.filter({ company: person.company }, '-created_date', 100).then((ds) => ds.filter((d) => !d.person_id))
+                  : Promise.resolve([]),
               ]);
-              setResult({ person, docs, vehicles, accred });
+              setResult({ person, docs, vehicles, accred, companyDocs });
               return;
             }
           }
@@ -59,12 +62,15 @@ export default function EmergencyScan() {
         event_id: selectedEventId || null,
       });
       if (res.data?.verified && res.data?.accred?.person_id) {
-        const [person, docs, vehicles] = await Promise.all([
-          base44.entities.Person.get(res.data.accred.person_id),
+        const person = await base44.entities.Person.get(res.data.accred.person_id);
+        const [docs, vehicles, companyDocs] = await Promise.all([
           base44.entities.Document.filter({ person_id: res.data.accred.person_id }, '-created_date', 50),
           base44.entities.Vehicle.filter({ person_id: res.data.accred.person_id }, '-created_date', 10),
+          person.company
+            ? base44.entities.Document.filter({ company: person.company }, '-created_date', 100).then((ds) => ds.filter((d) => !d.person_id))
+            : Promise.resolve([]),
         ]);
-        setResult({ person, docs, vehicles, accred: res.data.accred });
+        setResult({ person, docs, vehicles, accred: res.data.accred, companyDocs });
       } else {
         setError(res.data?.message || 'No se identificó a la persona.');
       }
@@ -140,6 +146,7 @@ export default function EmergencyScan() {
           person={result.person}
           accred={result.accred}
           docs={result.docs}
+          companyDocs={result.companyDocs}
           vehicles={result.vehicles}
           onReset={reset}
         />
@@ -148,9 +155,12 @@ export default function EmergencyScan() {
   );
 }
 
-function EmergencyCard({ person, accred, docs, vehicles, onReset }) {
+function EmergencyCard({ person, accred, docs, companyDocs, vehicles, onReset }) {
   const [viewingDoc, setViewingDoc] = useState(null);
-  const insuranceDocs = docs.filter((d) => ['work_insurance', 'art', 'seguro'].includes(d.document_type));
+  const insuranceDocs = [
+    ...docs.filter((d) => ['work_insurance', 'art', 'seguro'].includes(d.document_type)),
+    ...(companyDocs || []).filter((d) => ['work_insurance', 'art', 'seguro'].includes(d.document_type)),
+  ];
   const otherDocs = docs.filter((d) => !['work_insurance', 'art', 'seguro'].includes(d.document_type));
 
   return (
@@ -184,6 +194,7 @@ function EmergencyCard({ person, accred, docs, vehicles, onReset }) {
                     >
                       {d.original_name}
                     </button>
+                    {!d.person_id && <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-blue-600 ring-1 ring-blue-200">Empresa</span>}
                     <StatusBadge status={d.status} />
                   </div>
                 ))
