@@ -17,6 +17,7 @@ import AppLayout from '@/components/AppLayout';
 import Home from '@/pages/Home';
 import Events from '@/pages/Events';
 import People from '@/pages/People';
+import PersonasAutonomas from '@/pages/PersonasAutonomas';
 import Accreditations from '@/pages/Accreditations';
 import AccessLevels from '@/pages/AccessLevels';
 import Documents from '@/pages/Documents';
@@ -89,6 +90,7 @@ const AuthenticatedApp = () => {
         <Route path="/" element={<Home />} />
         <Route path="/events" element={<Events />} />
         <Route path="/people" element={<People />} />
+        <Route path="/personas-autonomas" element={<PersonasAutonomas />} />
         <Route path="/accreditations" element={<Accreditations />} />
         <Route path="/access-levels" element={<AccessLevels />} />
         <Route path="/documents" element={<Documents />} />

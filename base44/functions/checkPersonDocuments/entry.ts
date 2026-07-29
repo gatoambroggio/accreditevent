@@ -13,11 +13,13 @@ export default async function(req) {
 
     const person = await base44.asServiceRole.entities.Person.get(personId);
     const hasCompany = !!person?.company;
+    // Use explicit tipo_vinculo if set; fall back to company presence for backward compatibility
+    const tipoVinculo = person?.tipo_vinculo || (hasCompany ? 'empresa' : 'autonomo');
 
-    // If the person belongs to a company (empleado):
-    // The company's EventCompanyApproval (with its insurance) covers the employee.
-    // No individual documents are required — only the company needs to be approved.
-    if (hasCompany) {
+    // ════════════════════════════════════════════════════════════
+    // EMPRESA: company-level approval covers all employees
+    // ════════════════════════════════════════════════════════════
+    if (tipoVinculo === 'empresa') {
       const eventIdsToCheck = [];
       if (eventId) {
         eventIdsToCheck.push(eventId);
@@ -72,7 +74,9 @@ export default async function(req) {
       });
     }
 
-    // For unique persons (no company): all document types must be approved and not expired
+    // ════════════════════════════════════════════════════════════
+    // AUTÓNOMO: individual documents must be approved (insurance key)
+    // ════════════════════════════════════════════════════════════
     const docs = await base44.asServiceRole.entities.Document.filter(
       { person_id: personId },
       '-created_date',

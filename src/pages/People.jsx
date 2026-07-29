@@ -65,7 +65,7 @@ export default function People() {
   }, []);
 
   const filtered = useMemo(() => {
-    let result = items;
+    let result = items.filter((p) => p.tipo_vinculo !== 'autonomo');
     const q = query.toLowerCase().trim();
     if (q) {
       result = result.filter((p) =>
@@ -226,6 +226,7 @@ export default function People() {
   const handleSubmit = async (data) => {
     const { face_photo_url, face_descriptor, ...personData } = data;
     personData.person_type = personData.access_area || 'general';
+    personData.tipo_vinculo = 'empresa';
     // Create ProviderCompany if it doesn't exist
     if (personData.company && !companies.find((c) => c.name === personData.company)) {
       try { await base44.entities.ProviderCompany.create({ name: personData.company }); } catch {}
@@ -287,7 +288,7 @@ export default function People() {
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="Directorio" title="Personas">
+      <PageHeader kicker="Directorio" title="Empleados">
         <button onClick={handleExport} className={btnOutline}>
           <Download className="h-4 w-4" /> Exportar
         </button>
@@ -295,7 +296,7 @@ export default function People() {
           <ScanLine className="h-4 w-4" /> Escanear DNI
         </button>
         <button onClick={openNew} className={btnPrimary}>
-          <Plus className="h-4 w-4" /> Nueva persona
+          <Plus className="h-4 w-4" /> Nuevo empleado
         </button>
       </PageHeader>
 
@@ -323,7 +324,7 @@ export default function People() {
         loading={loading}
         error={error}
         isEmpty={filtered.length === 0}
-        emptyMessage={query ? 'Sin resultados para tu búsqueda.' : 'No hay personas registradas todavía.'}
+        emptyMessage={query ? 'Sin resultados para tu búsqueda.' : 'No hay empleados registrados todavía.'}
         tableClassName="min-w-[800px]"
       >
         <thead>
@@ -374,15 +375,15 @@ export default function People() {
       <EntityModal
         open={modalOpen}
         onClose={() => { setModalOpen(false); setDniPrefill(null); }}
-        title={editing ? 'Editar persona' : 'Nueva persona'}
-        kicker={editing ? 'EDITAR PERSONA' : 'CREAR PERSONA'}
+        title={editing ? 'Editar empleado' : 'Nuevo empleado'}
+        kicker={editing ? 'EDITAR EMPLEADO' : 'CREAR EMPLEADO'}
         fields={fields}
         initialData={editing || dniPrefill || {}}
         onSubmit={handleSubmit}
         validate={validatePerson}
         onDelete={editing ? handleDelete : null}
         canDelete={!!editing}
-        submitLabel={editing ? 'Guardar cambios' : 'Crear persona'}
+        submitLabel={editing ? 'Guardar cambios' : 'Crear empleado'}
       />
 
       <DniScannerModal open={dniScannerOpen} onClose={() => setDniScannerOpen(false)} onScanned={handleDniScanned} />

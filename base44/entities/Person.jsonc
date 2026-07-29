@@ -10,6 +10,15 @@
       "type": "string",
       "description": "Documento de identidad"
     },
+    "tipo_vinculo": {
+      "type": "string",
+      "enum": [
+        "empresa",
+        "autonomo"
+      ],
+      "default": "empresa",
+      "description": "Tipo de v\u00ednculo: empleado de empresa o persona aut\u00f3noma"
+    },
     "company": {
       "type": "string",
       "description": "Empresa o raz\u00f3n social del proveedor"

@@ -1,7 +1,8 @@
 export const MODULES = [
   { path: '/', label: 'Resumen' },
   { path: '/events', label: 'Eventos' },
-  { path: '/people', label: 'Personas' },
+  { path: '/people', label: 'Empleados' },
+  { path: '/personas-autonomas', label: 'Personas Autónomas' },
   { path: '/provider-companies', label: 'Empresas proveedoras' },
   { path: '/accreditations', label: 'Acreditaciones' },
   { path: '/access-levels', label: 'Niveles de acceso' },
@@ -28,6 +29,7 @@ export const DEFAULT_ROLE_ACCESS = {
   '/': ['control', 'coordinator', 'productora', 'admin', 'superadmin'],
   '/events': ['coordinator', 'productora', 'admin', 'superadmin'],
   '/people': ['coordinator', 'productora', 'admin', 'superadmin'],
+  '/personas-autonomas': ['coordinator', 'productora', 'admin', 'superadmin'],
   '/provider-companies': ['coordinator', 'productora', 'admin', 'superadmin'],
   '/accreditations': ['control', 'coordinator', 'productora', 'admin', 'superadmin'],
   '/access-levels': ['coordinator', 'productora', 'admin', 'superadmin'],
