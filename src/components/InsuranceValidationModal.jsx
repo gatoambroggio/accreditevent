@@ -96,6 +96,29 @@ export default function InsuranceValidationModal({ document: doc, onClose, onVal
         ...(result?.extracted?.valid_until ? { expires_at: result.extracted.valid_until } : {}),
         custom_fields: customFields,
       });
+
+      // Auto-assign the event to all company employees when insurance is approved
+      if (status === 'approved' && doc.company && selectedEventId) {
+        try {
+          const eventName = events.find((e) => e.id === selectedEventId)?.name || '';
+          const employees = await base44.entities.Person.filter(
+            { company: doc.company, tipo_vinculo: 'empresa' },
+            '-created_date', 500
+          );
+          const toUpdate = employees
+            .filter((emp) => !(emp.event_ids || []).includes(selectedEventId))
+            .map((emp) => ({
+              id: emp.id,
+              event_ids: [...(emp.event_ids || []), selectedEventId],
+              event_names: [...(emp.event_names || []), eventName].filter((v, i, a) => a.indexOf(v) === i),
+              event_id: emp.event_id || selectedEventId,
+            }));
+          if (toUpdate.length > 0) {
+            await base44.entities.Person.bulkUpdate(toUpdate);
+          }
+        } catch {}
+      }
+
       onValidated?.();
     } catch (e) {
       setError(e.message);
