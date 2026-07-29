@@ -3,6 +3,7 @@ import { X, Users, UserPlus, Link2, Search, Loader2, FileSpreadsheet, FileText }
 import { base44 } from '@/api/base44Client';
 import AdminEmployeeImportModal from '@/components/AdminEmployeeImportModal';
 import CompanyDocUploadModal from '@/components/CompanyDocUploadModal';
+import PersonDetailModal from '@/components/PersonDetailModal';
 
 export default function ProviderCompanyPeopleModal({ company, onClose }) {
   const [people, setPeople] = useState([]);
@@ -13,6 +14,7 @@ export default function ProviderCompanyPeopleModal({ company, onClose }) {
   const [importOpen, setImportOpen] = useState(false);
   const [docOpen, setDocOpen] = useState(false);
   const [events, setEvents] = useState([]);
+  const [detailPerson, setDetailPerson] = useState(null);
 
   const loadPeople = async () => {
     try {
@@ -180,7 +182,9 @@ export default function ProviderCompanyPeopleModal({ company, onClose }) {
                 {people.map((p) => (
                   <div key={p.id} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2.5">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-900">{p.full_name}</p>
+                      <button type="button" onClick={() => setDetailPerson(p)} className="truncate text-left text-sm font-semibold text-slate-900 hover:text-emerald-600 hover:underline">
+                        {p.full_name}
+                      </button>
                       <p className="truncate text-xs text-slate-400">
                         {p.document || 'Sin documento'} {p.email ? `· ${p.email}` : ''} {p.phone ? `· ${p.phone}` : ''}
                       </p>
@@ -219,6 +223,10 @@ export default function ProviderCompanyPeopleModal({ company, onClose }) {
         company={docOpen ? company : null}
         onClose={() => setDocOpen(false)}
       />
+
+      {detailPerson && (
+        <PersonDetailModal person={detailPerson} onClose={() => setDetailPerson(null)} />
+      )}
     </div>
   );
 }

@@ -18,7 +18,7 @@ import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
 import { btnPrimary, btnOutline, btnIcon } from '@/components/ui/button-styles';
 import Pagination from '@/components/ui/pagination';
 import { usePagination } from '@/lib/usePagination';
-import { getInsuredCompanies } from '@/lib/insuranceUtils';
+import { getInsuranceCoverageMap, isPersonInsured } from '@/lib/insuranceUtils';
 
 const validatePerson = (data) => {
   const e = {};
@@ -63,20 +63,20 @@ export default function People() {
   const [companies, setCompanies] = useState([]);
   const [importOpen, setImportOpen] = useState(false);
   const [docUploadPerson, setDocUploadPerson] = useState(null);
-  const [insuredCompanies, setInsuredCompanies] = useState(new Set());
+  const [coverageMap, setCoverageMap] = useState({});
   const [insuranceFilter, setInsuranceFilter] = useState('');
 
   React.useEffect(() => {
     (async () => {
       try {
-        const [evs, comps, insured] = await Promise.all([
+        const [evs, comps, covMap] = await Promise.all([
           base44.entities.Event.list('-start_at', 200),
           base44.entities.ProviderCompany.list('name', 500),
-          getInsuredCompanies(),
+          getInsuranceCoverageMap(),
         ]);
         setEvents(evs);
         setCompanies(comps);
-        setInsuredCompanies(insured);
+        setCoverageMap(covMap);
       } catch {}
     })();
   }, []);
@@ -92,10 +92,10 @@ export default function People() {
     if (areaFilter) result = result.filter((p) => p.access_area === areaFilter);
     if (statusFilter) result = result.filter((p) => p.status === statusFilter);
     if (companyFilter) result = result.filter((p) => p.company === companyFilter);
-    if (insuranceFilter === 'insured') result = result.filter((p) => insuredCompanies.has(p.company));
-    if (insuranceFilter === 'uninsured') result = result.filter((p) => !insuredCompanies.has(p.company));
+    if (insuranceFilter === 'insured') result = result.filter((p) => isPersonInsured(p, coverageMap));
+    if (insuranceFilter === 'uninsured') result = result.filter((p) => !isPersonInsured(p, coverageMap));
     return result;
-  }, [items, query, areaFilter, statusFilter, companyFilter, insuranceFilter, insuredCompanies]);
+  }, [items, query, areaFilter, statusFilter, companyFilter, insuranceFilter, coverageMap]);
 
   const { page, setPage, totalPages, paginated } = usePagination(filtered, 15);
 
@@ -455,12 +455,12 @@ export default function People() {
               </Td>
               <Td className="text-sm text-slate-500">{p.company || '—'}</Td>
               <Td>
-                {insuredCompanies.has(p.company) ? (
-                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700" title="Empresa con seguro aprobado">
+                {isPersonInsured(p, coverageMap) ? (
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700" title="Cubierto por seguro aprobado">
                     <ShieldCheck className="h-3.5 w-3.5" /> Asegurado
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600" title="Sin seguro aprobado">
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600" title="No cubierto por seguro aprobado">
                     <ShieldAlert className="h-3.5 w-3.5" /> Sin seguro
                   </span>
                 )}

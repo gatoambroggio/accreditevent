@@ -35,6 +35,22 @@ export default function InsuranceValidationModal({ document: doc, onClose, onVal
     setActing(true);
     try {
       const me = await base44.auth.me();
+      const empVal = result?.validation?.employee_validation;
+      const customFields = { ...(doc.custom_fields || {}) };
+      if (status === 'approved' && empVal && empVal.total_employees > 0) {
+        if (empVal.has_insured_list) {
+          customFields.has_insured_list = true;
+          customFields.covered_person_ids = empVal.reconciliation
+            .filter((e) => e.is_covered)
+            .map((e) => e.person_id);
+        } else {
+          customFields.has_insured_list = false;
+          customFields.covered_person_ids = [];
+        }
+      } else if (status === 'approved') {
+        customFields.has_insured_list = false;
+        customFields.covered_person_ids = [];
+      }
       await base44.entities.Document.update(doc.id, {
         status,
         review_note: status === 'approved'
@@ -43,6 +59,7 @@ export default function InsuranceValidationModal({ document: doc, onClose, onVal
         reviewed_by: me?.full_name || me?.email || '',
         reviewed_at: new Date().toISOString(),
         ...(result?.extracted?.valid_until ? { expires_at: result.extracted.valid_until } : {}),
+        custom_fields: customFields,
       });
       onValidated?.();
     } catch (e) {
