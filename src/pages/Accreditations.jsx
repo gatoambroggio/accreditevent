@@ -445,10 +445,15 @@ export default function Accreditations() {
           // Solo se desvincula el evento del vehículo; el registro se conserva en la persona.
           const remainingEventIds = v.event_ids.filter((id) => id !== eventId);
           const remainingEventNames = (v.event_names || []).filter((n) => n !== evt?.name);
-          await base44.entities.Vehicle.update(v.id, {
+          const updateData = {
             event_ids: remainingEventIds,
             event_names: remainingEventNames,
-          });
+          };
+          // Si el vehículo ya no está vinculado a ningún evento, deja de figurar como acreditado
+          if (remainingEventIds.length === 0) {
+            updateData.status = 'pending';
+          }
+          await base44.entities.Vehicle.update(v.id, updateData);
         } catch {}
       }
     } catch {}
