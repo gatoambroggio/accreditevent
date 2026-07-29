@@ -1,0 +1,40 @@
+{
+  "description": "Cuando un usuario se registra, verifica si tiene una asignaci\u00f3n de operador pendiente y la completa autom\u00e1ticamente.",
+  "name": "Asignar Operadores Pendientes",
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "asignar_operadores_pendientes",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "process_pending": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "processPendingOperators",
+            "args": {
+              "user_id": "${ .trigger.user_id }",
+              "email": "${ .trigger.email }"
+            }
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Procesar operador pendiente",
+            "description": "Vincula al nuevo usuario como operador si hay asignaci\u00f3n pendiente"
+          }
+        }
+      }
+    ]
+  },
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "app_user_auth",
+      "events": [
+        "signup"
+      ]
+    }
+  }
+}

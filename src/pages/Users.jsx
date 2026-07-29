@@ -237,6 +237,9 @@ export default function Users() {
         }
         const res = await base44.functions.invoke('assignOperator', { email: inviteEmail });
         if (res.data?.error) throw new Error(res.data.error);
+        if (res.data?.pending) {
+          alert(res.data.message || 'La invitación fue enviada. El operador quedará vinculado a tu empresa al completar su registro.');
+        }
         await logAudit('invite-operator', 'User', '', `Operador invitado: ${inviteEmail}`);
       } else {
         await base44.users.inviteUser(inviteEmail, inviteRole);

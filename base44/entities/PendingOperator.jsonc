@@ -1,0 +1,102 @@
+{
+  "name": "PendingOperator",
+  "type": "object",
+  "properties": {
+    "email": {
+      "type": "string",
+      "description": "Email del operador invitado (lowercase)"
+    },
+    "company": {
+      "type": "string",
+      "description": "Empresa productora a la que se vincular\u00e1 el operador"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "processed"
+      ],
+      "default": "pending",
+      "description": "Estado de la asignaci\u00f3n pendiente"
+    }
+  },
+  "required": [
+    "email",
+    "company"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "productora"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

@@ -21,7 +21,12 @@ export default async function(req) {
 
     const found = await base44.asServiceRole.entities.User.filter({ email });
     if (!found.length) {
-      return Response.json({ error: 'La persona no está registrada en el sistema. Pedile que se registre primero.' }, { status: 404 });
+      await base44.asServiceRole.entities.PendingOperator.create({ email, company, status: 'pending' });
+      return Response.json({
+        ok: true,
+        pending: true,
+        message: 'La invitación fue enviada. Cuando la persona complete su registro, quedará automáticamente vinculada como operador de tu empresa.'
+      });
     }
     const target = found[0];
     const targetRole = target.role || (target.data && target.data.role);
@@ -43,7 +48,7 @@ export default async function(req) {
       }
     } catch {}
 
-    return Response.json({ ok: true, user: { id: target.id, email: target.email, role: 'operador', company } });
+    return Response.json({ ok: true, pending: false, user: { id: target.id, email: target.email, role: 'operador', company } });
   } catch (error) {
     return Response.json({ error: error.message || 'Error al asignar operador' }, { status: 500 });
   }
