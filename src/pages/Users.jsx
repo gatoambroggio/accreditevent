@@ -227,9 +227,17 @@ export default function Users() {
     setError('');
     try {
       if (isProductora) {
+        try {
+          await base44.users.inviteUser(inviteEmail, 'operador');
+        } catch (inviteErr) {
+          const msg = (inviteErr.message || '').toLowerCase();
+          if (!msg.includes('ya') && !msg.includes('exist') && !msg.includes('registrad') && !msg.includes('already')) {
+            throw inviteErr;
+          }
+        }
         const res = await base44.functions.invoke('assignOperator', { email: inviteEmail });
         if (res.data?.error) throw new Error(res.data.error);
-        await logAudit('assign-operator', 'User', '', `Operador asignado: ${inviteEmail}`);
+        await logAudit('invite-operator', 'User', '', `Operador invitado: ${inviteEmail}`);
       } else {
         await base44.users.inviteUser(inviteEmail, inviteRole);
         await logAudit('invite', 'User', '', `Invitación a ${inviteEmail} (${inviteRole})`);
@@ -354,7 +362,7 @@ export default function Users() {
                 </label>
               )}
               {isProductora && (
-                <p className="text-xs text-slate-500">Se asignará el email ingresado como <strong>operador</strong> de tu productora. La persona debe estar registrada en el sistema.</p>
+                <p className="text-xs text-slate-500">La persona recibirá un email para registrarse como <strong>operador</strong> de tu productora y quedará vinculada a tu empresa.</p>
               )}
               {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
               <div className="flex justify-end gap-2 pt-2">
