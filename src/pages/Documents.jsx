@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { useCrud } from '@/lib/crud';
-import { Eye, FileText, Download, Plus, Pencil, Settings2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Eye, FileText, Download, Plus, Pencil, Settings2, ChevronDown, ChevronRight, ShieldCheck } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
 import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
 import DocumentViewer from '@/components/DocumentViewer';
+import InsuranceValidationModal from '@/components/InsuranceValidationModal';
 import { base44 } from '@/api/base44Client';
 import { logAudit } from '@/lib/audit';
 import { useDocumentTypes } from '@/lib/useDocumentTypes';
@@ -44,7 +45,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function Documents() {
-  const { items, loading, error, update } = useCrud('Document');
+  const { items, loading, error, update, reload } = useCrud('Document');
   const { docTypes, rawItems, refetch: refetchTypes } = useDocumentTypes();
   const [reviewing, setReviewing] = useState(null);
   const [query, setQuery] = useState('');
@@ -54,6 +55,7 @@ export default function Documents() {
   const [typeModalOpen, setTypeModalOpen] = useState(false);
   const [editingType, setEditingType] = useState(null);
   const [viewingDoc, setViewingDoc] = useState(null);
+  const [validatingDoc, setValidatingDoc] = useState(null);
 
   const isExpired = (d) => {
     if (d.status === 'expired') return true;
@@ -77,6 +79,12 @@ export default function Documents() {
   const { page, setPage, totalPages, paginated } = usePagination(filtered, 15);
 
   const docTypeLabel = (value) => docTypes.find((t) => t.value === value)?.label || value;
+
+  const isInsuranceDoc = (d) => {
+    const type = docTypes.find((t) => t.value === d.document_type);
+    if (!type) return /seguro|insurance/i.test(d.document_type || '');
+    return /seguro|insurance/i.test(type.value) || /seguro|insurance/i.test(type.label);
+  };
 
   const handleExport = () => {
     exportToExcel(
@@ -216,10 +224,18 @@ export default function Documents() {
               <Td className="text-sm text-slate-500">{d.expires_at ? d.expires_at.split('-').reverse().join('-') : '—'}</Td>
               <Td><StatusBadge status={d.status} /></Td>
               <Td className="text-right">
-                <button onClick={() => setReviewing(d)}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">
-                  <Eye className="h-3.5 w-3.5" /> Revisar
-                </button>
+                <div className="flex items-center justify-end gap-1.5">
+                  {isInsuranceDoc(d) && (
+                    <button onClick={() => setValidatingDoc(d)}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100">
+                      <ShieldCheck className="h-3.5 w-3.5" /> Validar seguro
+                    </button>
+                  )}
+                  <button onClick={() => setReviewing(d)}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">
+                    <Eye className="h-3.5 w-3.5" /> Revisar
+                  </button>
+                </div>
               </Td>
             </Tr>
           ))}
@@ -257,6 +273,12 @@ export default function Documents() {
       />
 
       <DocumentViewer doc={viewingDoc} onClose={() => setViewingDoc(null)} />
+
+      <InsuranceValidationModal
+        document={validatingDoc}
+        onClose={() => setValidatingDoc(null)}
+        onValidated={() => { setValidatingDoc(null); reload(); }}
+      />
     </div>
   );
 }
