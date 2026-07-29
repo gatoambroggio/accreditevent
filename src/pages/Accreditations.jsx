@@ -185,7 +185,7 @@ export default function Accreditations() {
       throw new Error('Esta persona ya tiene una credencial registrada para este evento.');
     }
     if (!editing) {
-      const res = await base44.functions.invoke('checkPersonDocuments', { person_id: data.person_id });
+      const res = await base44.functions.invoke('checkPersonDocuments', { person_id: data.person_id, event_id: data.event_id });
       if (res.data?.has_pending) {
         throw new Error(`No se puede asignar: la persona tiene documentación pendiente o vencida (${res.data.pending_statuses.join(', ')}).`);
       }

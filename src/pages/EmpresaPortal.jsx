@@ -163,7 +163,7 @@ export default function EmpresaPortal() {
 
   const handleDeleteEmployee = async (emp) => {
     if (!window.confirm(`¿Eliminar a ${emp.full_name}?`)) return;
-    await base44.entities.Person.delete(emp.id);
+    await base44.functions.invoke('deletePerson', { person_id: emp.id });
     setEmployees((prev) => prev.filter((e) => e.id !== emp.id));
     await logAudit('empresa-delete-employee', 'Person', emp.id, emp.full_name);
     setMsg('Empleado eliminado.');

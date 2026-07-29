@@ -120,7 +120,7 @@ export default function AccreditationFacial() {
       } catch {}
 
       // Block accreditation if the person has pending/rejected/expired documentation
-      const docCheck = await base44.functions.invoke('checkPersonDocuments', { person_id: personId });
+      const docCheck = await base44.functions.invoke('checkPersonDocuments', { person_id: personId, event_id: selectedEvent.id });
       if (docCheck.data?.has_pending) {
         setResult({
           ok: false,

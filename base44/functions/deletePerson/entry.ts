@@ -34,6 +34,8 @@ export default async function (req) {
       base44.asServiceRole.entities.Vehicle.deleteMany({ person_id }),
       base44.asServiceRole.entities.ZKTecoCommand.deleteMany({ person_id }),
       base44.asServiceRole.entities.Accreditation.deleteMany({ person_id }),
+      base44.asServiceRole.entities.ProviderRequest.deleteMany({ person_id }),
+      base44.asServiceRole.entities.AuditLog.deleteMany({ entity_id: person_id }),
       ...accredIds.map((id) =>
         base44.asServiceRole.entities.AccessLog.deleteMany({ accreditation_id: id })
       ),
