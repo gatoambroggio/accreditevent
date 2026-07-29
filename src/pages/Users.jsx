@@ -13,10 +13,29 @@ const ROLES = [
   { value: 'provider', label: 'Proveedor' },
   { value: 'empresa', label: 'Empresa' },
   { value: 'control', label: 'Control' },
+  { value: 'operador', label: 'Operador' },
   { value: 'coordinator', label: 'Coordinador' },
   { value: 'admin', label: 'Administrador' },
   { value: 'superadmin', label: 'Superadministrador' },
   { value: 'productora', label: 'Productora' },
+];
+
+const MODULE_OPTIONS = [
+  { value: '/', label: 'Resumen' },
+  { value: '/accreditations', label: 'Acreditaciones' },
+  { value: '/accreditation-facial', label: 'Acreditación facial' },
+  { value: '/dni-scan', label: 'Escaneo de DNI' },
+  { value: '/access-control', label: 'Control de acceso' },
+  { value: '/emergency-scan', label: 'Escaneo de emergencia' },
+  { value: '/access-monitor', label: 'Monitor en vivo' },
+  { value: '/vehicles', label: 'Vehículos acreditados' },
+  { value: '/parking-sectors', label: 'Sectores de estacionamiento' },
+  { value: '/parking-capacities', label: 'Capacidades por evento' },
+  { value: '/documents', label: 'Documentos' },
+  { value: '/people', label: 'Personal de Empresas' },
+  { value: '/personas-autonomas', label: 'Personas Autónomas' },
+  { value: '/registered-people', label: 'Personas registradas' },
+  { value: '/reports', label: 'Reportes' },
 ];
 
 const ROLE_LABELS = {
@@ -25,6 +44,7 @@ const ROLE_LABELS = {
   admin: 'Administrador',
   coordinator: 'Coordinador',
   control: 'Control',
+  operador: 'Operador',
   provider: 'Proveedor',
   empresa: 'Empresa',
 };
@@ -35,20 +55,16 @@ const ROLE_STYLES = {
   admin: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
   coordinator: 'bg-blue-50 text-blue-700 ring-blue-200',
   control: 'bg-amber-50 text-amber-700 ring-amber-200',
+  operador: 'bg-teal-50 text-teal-700 ring-teal-200',
   provider: 'bg-slate-100 text-slate-600 ring-slate-200',
   empresa: 'bg-cyan-50 text-cyan-700 ring-cyan-200',
 };
-
-const EDIT_FIELDS = [
-  { name: 'company', label: 'Empresa', type: 'text', placeholder: 'Ej: Producciones SA', full: true },
-  { name: 'role', label: 'Rol', type: 'select', options: ROLES, required: true },
-  { name: 'password', label: 'Nueva contraseña', type: 'password', placeholder: 'Dejar en blanco para no cambiar', full: true, hint: 'Mínimo 6 caracteres' },
-];
 
 export default function Users() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [events, setEvents] = useState([]);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -71,7 +87,10 @@ export default function Users() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    base44.entities.Event.list('-start_at', 200).then(setEvents).catch(() => {});
+  }, []);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -80,6 +99,21 @@ export default function Users() {
       `${u.full_name || ''} ${u.email || ''} ${u.company || ''} ${u.role || ''}`.toLowerCase().includes(q)
     );
   }, [users, search]);
+
+  const fields = useMemo(() => [
+    { name: 'company', label: 'Empresa', type: 'text', placeholder: 'Ej: Producciones SA', full: true },
+    { name: 'role', label: 'Rol', type: 'select', options: ROLES, required: true },
+    {
+      name: 'assigned_event_ids', label: 'Eventos asignados', type: 'toggle-group',
+      options: events.map((e) => ({ value: e.id, label: e.name })),
+      full: true, hint: 'Eventos a los que este usuario tiene acceso (operadores).',
+    },
+    {
+      name: 'allowed_paths', label: 'Módulos permitidos', type: 'toggle-group',
+      options: MODULE_OPTIONS, full: true, hint: 'Si seleccionás módulos, el usuario solo verá esos. Vacío = sin restricción.',
+    },
+    { name: 'password', label: 'Nueva contraseña', type: 'password', placeholder: 'Dejar en blanco para no cambiar', full: true, hint: 'Mínimo 6 caracteres' },
+  ], [events]);
 
   const openEdit = (u) => { setEditing(u); setModalOpen(true); setResetMsg(''); };
 
@@ -115,10 +149,16 @@ export default function Users() {
     }
     const oldCompany = editing.company || '';
     const newCompany = data.company || '';
-    await base44.entities.User.update(editing.id, { role: data.role, company: newCompany });
+    const assignedEventIds = typeof data.assigned_event_ids === 'string'
+      ? data.assigned_event_ids.split(',').map((s) => s.trim()).filter(Boolean)
+      : (Array.isArray(data.assigned_event_ids) ? data.assigned_event_ids : []);
+    const allowedPaths = typeof data.allowed_paths === 'string'
+      ? data.allowed_paths.split(',').map((s) => s.trim()).filter(Boolean)
+      : (Array.isArray(data.allowed_paths) ? data.allowed_paths : []);
+    await base44.entities.User.update(editing.id, { role: data.role, company: newCompany, assigned_event_ids: assignedEventIds, allowed_paths: allowedPaths });
     await syncUserCompany(editing.id, oldCompany, newCompany);
     await logAudit('update', 'User', editing.id, `Rol: ${data.role}, Empresa: ${newCompany || '—'}`);
-    setUsers((prev) => prev.map((u) => (u.id === editing.id ? { ...u, role: data.role, company: newCompany } : u)));
+    setUsers((prev) => prev.map((u) => (u.id === editing.id ? { ...u, role: data.role, company: newCompany, assigned_event_ids: assignedEventIds, allowed_paths: allowedPaths } : u)));
   };
 
   const handleDelete = async () => {
@@ -283,7 +323,7 @@ export default function Users() {
         onClose={() => setModalOpen(false)}
         title={editing?.full_name || editing?.email || 'Editar usuario'}
         kicker="EDITAR USUARIO"
-        fields={EDIT_FIELDS}
+        fields={fields}
         initialData={editing || {}}
         onSubmit={handleUpdate}
         onDelete={editing ? handleDelete : null}

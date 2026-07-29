@@ -9,6 +9,7 @@
         "admin",
         "coordinator",
         "control",
+        "operador",
         "provider",
         "empresa"
       ],
@@ -20,6 +21,13 @@
         "type": "string"
       },
       "description": "IDs de eventos a los que el usuario tiene acceso"
+    },
+    "allowed_paths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "M\u00f3dulos (rutas) permitidos para este usuario. Vac\u00edo = sin restricci\u00f3n (seg\u00fan rol)."
     },
     "company": {
       "type": "string",

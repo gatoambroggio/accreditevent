@@ -36,7 +36,7 @@ import {
 import { base44 } from '@/api/base44Client';
 import { applyTheme } from '@/lib/useTheme';
 
-export const ROLE_LEVEL = { provider: -1, empresa: -1, control: 0, coordinator: 1, productora: 1, admin: 2, superadmin: 3 };
+export const ROLE_LEVEL = { provider: -1, empresa: -1, control: 0, operador: 0, coordinator: 1, productora: 1, admin: 2, superadmin: 3 };
 
 const NAV_ITEMS = [
   // Operación
@@ -124,11 +124,18 @@ export default function AppLayout() {
     }
   }, [location.pathname]);
 
+  const userAllowedPaths = user?.allowed_paths || user?.data?.allowed_paths || [];
+  const hasPathRestriction = Array.isArray(userAllowedPaths) && userAllowedPaths.length > 0;
   const visibleItems = NAV_ITEMS.filter((item) => {
     if (item.module && !settings?.enabled_modules?.[item.module]) return false;
     if (item.providerOnly) return isProvider;
     if (isProvider) return false;
     if (isEmpresa) return false;
+    if (hasPathRestriction) {
+      if (item.path === '/') return true;
+      if (item.expandable && item.children?.some((c) => userAllowedPaths.includes(c.path))) return true;
+      if (!userAllowedPaths.includes(item.path)) return false;
+    }
     if (settings?.role_access?.[item.path]) {
       return settings.role_access[item.path].includes(user?.role);
     }
