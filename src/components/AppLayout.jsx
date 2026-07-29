@@ -42,7 +42,7 @@ const NAV_ITEMS = [
   { path: '/', label: 'Resumen', icon: LayoutDashboard, minLevel: 0 },
   { path: '/events', label: 'Eventos', icon: CalendarDays, minLevel: 1 },
   // Personas y proveedores
-  { path: '/people', label: 'Empleados', icon: Users, minLevel: 1 },
+  { path: '/people', label: 'Personal de Empresas', icon: Users, minLevel: 1 },
   { path: '/personas-autonomas', label: 'Personas Autónomas', icon: UserSearch, minLevel: 1 },
   { path: '/registered-people', label: 'Personas registradas', icon: UserSearch, minLevel: 1 },
   { path: '/provider-companies', label: 'Empresas de servicios', icon: Briefcase, minLevel: 1, expandable: true },
