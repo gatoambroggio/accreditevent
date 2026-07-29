@@ -81,7 +81,7 @@ export default function EmergencyScan() {
           </div>
           <p className="mt-1 text-sm text-slate-500">La cámara se abrirá para identificar a la persona acreditada.</p>
           <div className="mt-5">
-            <FaceCapture key={scanKey} onCaptured={handleScan} label="Abrir cámara" />
+            <FaceCapture key={scanKey} onCaptured={handleScan} label="Abrir cámara" autoCapture />
           </div>
         </div>
       )}
