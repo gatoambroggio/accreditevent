@@ -88,9 +88,16 @@
           }
         },
         {
-          "user_condition": {
-            "role": "productora"
-          }
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
         },
         {
           "$and": [
