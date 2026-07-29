@@ -10,15 +10,33 @@ export default function InsuranceValidationModal({ document: doc, onClose, onVal
   const [events, setEvents] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState('');
 
-  // Load available events and initialize selection from doc.event_id
+  // Load available events and initialize selection:
+  // 1) doc.event_id if present, 2) company's assigned (approved) event, 3) manual selection
   useEffect(() => {
     if (!doc) return;
     let cancelled = false;
-    setSelectedEventId(doc.event_id || '');
     (async () => {
       try {
         const evs = await base44.entities.Event.list('-created_date', 100);
-        if (!cancelled) setEvents(evs);
+        if (cancelled) return;
+        setEvents(evs);
+
+        let initialEventId = doc.event_id || '';
+        // If no event on the doc, look for the company's approved event assignment
+        if (!initialEventId && doc.company) {
+          try {
+            const approvals = await base44.entities.EventCompanyApproval.filter(
+              { provider_company: doc.company, status: 'approved' },
+              '-created_date', 50
+            );
+            if (!cancelled && approvals.length > 0) {
+              // Pick the first approved event that exists in our loaded events
+              const match = approvals.find((a) => evs.some((e) => e.id === a.event_id));
+              if (match) initialEventId = match.event_id;
+            }
+          } catch {}
+        }
+        if (!cancelled) setSelectedEventId(initialEventId);
       } catch {}
     })();
     return () => { cancelled = true; };

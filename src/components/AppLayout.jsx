@@ -46,7 +46,7 @@ const NAV_ITEMS = [
   { path: '/people', label: 'Personal de Empresas', icon: Users, minLevel: 1 },
   { path: '/personas-autonomas', label: 'Personas Autónomas', icon: UserSearch, minLevel: 1 },
   { path: '/registered-people', label: 'Personas registradas', icon: UserSearch, minLevel: 1 },
-  { path: '/provider-companies', label: 'Empresas de servicios', icon: Briefcase, minLevel: 1, expandable: true },
+  { path: '/provider-companies', label: 'Empresas de servicios', icon: Briefcase, minLevel: 1 },
   // Acreditaciones
   { path: '/accreditations', label: 'Acreditaciones', icon: IdCard, minLevel: 0 },
   { path: '/access-levels', label: 'Niveles de acceso', icon: Layers, minLevel: 1 },

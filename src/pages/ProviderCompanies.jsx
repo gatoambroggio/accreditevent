@@ -50,6 +50,9 @@ export default function ProviderCompanies() {
 
   const fields = [
     { name: 'name', label: 'Nombre de la empresa', type: 'text', required: true, full: true, placeholder: 'Ej: Audiovisuales del Sur SA' },
+    { name: 'cuit', label: 'CUIT', type: 'text', placeholder: 'Ej: 30-12345678-9', hint: '11 dígitos, sin guiones' },
+    { name: 'responsible_name', label: 'Responsable', type: 'text', placeholder: 'Ej: Juan Pérez' },
+    { name: 'address', label: 'Dirección', type: 'text', full: true, placeholder: 'Ej: Av. Corrientes 1234, CABA' },
     { name: 'description', label: 'Descripción / Rubro', type: 'textarea', full: true, placeholder: 'Ej: Proveedor de sonido e iluminación' },
     { name: 'contact_phone', label: 'Teléfono de contacto', type: 'phone-ar', hint: 'Código de área sin 0 y número sin 15' },
     { name: 'contact_email', label: 'Email de contacto', type: 'email', placeholder: 'Ej: contacto@empresa.com' },
@@ -71,8 +74,8 @@ export default function ProviderCompanies() {
 
   const handleExport = () => {
     exportToExcel(
-      ['Empresa', 'Descripción', 'Teléfono', 'Email'],
-      filtered.map((c) => [c.name || '', c.description || '', c.contact_phone || '', c.contact_email || '']),
+      ['Empresa', 'CUIT', 'Responsable', 'Dirección', 'Descripción', 'Teléfono', 'Email'],
+      filtered.map((c) => [c.name || '', c.cuit || '', c.responsible_name || '', c.address || '', c.description || '', c.contact_phone || '', c.contact_email || '']),
       'empresas-proveedoras'
     );
   };
@@ -134,6 +137,9 @@ export default function ProviderCompanies() {
                     >
                       {c.name}
                     </button>
+                    {c.cuit && <p className="font-mono text-xs text-slate-500">CUIT: {c.cuit}</p>}
+                    {c.responsible_name && <p className="text-xs text-slate-400">Resp.: {c.responsible_name}</p>}
+                    {c.address && <p className="text-xs text-slate-400">{c.address}</p>}
                     {c.description && <p className="text-xs text-slate-400">{c.description}</p>}
                   </div>
                 </div>

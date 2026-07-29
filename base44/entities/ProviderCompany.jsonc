@@ -14,6 +14,18 @@
       "type": "string",
       "description": "Logo de la empresa"
     },
+    "cuit": {
+      "type": "string",
+      "description": "CUIT de la empresa (11 d\u00edgitos)"
+    },
+    "address": {
+      "type": "string",
+      "description": "Direcci\u00f3n fiscal de la empresa"
+    },
+    "responsible_name": {
+      "type": "string",
+      "description": "Nombre completo del responsable de la empresa"
+    },
     "contact_phone": {
       "type": "string",
       "description": "Tel\u00e9fono de contacto de la empresa"
