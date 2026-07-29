@@ -428,18 +428,13 @@ export default function Accreditations() {
       const evt = events.find((e) => e.id === eventId);
       for (const v of linked) {
         try {
+          // Solo se desvincula el evento del vehículo; el registro se conserva en la persona.
           const remainingEventIds = v.event_ids.filter((id) => id !== eventId);
           const remainingEventNames = (v.event_names || []).filter((n) => n !== evt?.name);
-          // Si el vehículo ya no está vinculado a ningún evento, se elimina el registro.
-          // Si aún está asignado a otros eventos, solo se desvincula de este.
-          if (remainingEventIds.length === 0) {
-            await base44.entities.Vehicle.delete(v.id);
-          } else {
-            await base44.entities.Vehicle.update(v.id, {
-              event_ids: remainingEventIds,
-              event_names: remainingEventNames,
-            });
-          }
+          await base44.entities.Vehicle.update(v.id, {
+            event_ids: remainingEventIds,
+            event_names: remainingEventNames,
+          });
         } catch {}
       }
     } catch {}
