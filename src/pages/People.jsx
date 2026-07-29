@@ -18,7 +18,7 @@ import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
 import { btnPrimary, btnOutline, btnIcon } from '@/components/ui/button-styles';
 import Pagination from '@/components/ui/pagination';
 import { usePagination } from '@/lib/usePagination';
-import { getInsuranceCoverageMap, isPersonInsured } from '@/lib/insuranceUtils';
+import { getInsuranceCoverageMap, isPersonInsured, isPersonInsurancePending } from '@/lib/insuranceUtils';
 
 const validatePerson = (data) => {
   const e = {};
@@ -54,6 +54,7 @@ const BLOOD_TYPE_OPTIONS = [
 
 const INSURANCE_OPTIONS = [
   { value: 'insured', label: 'Asegurados' },
+  { value: 'pending', label: 'En revisión' },
   { value: 'uninsured', label: 'Sin seguro' },
 ];
 
@@ -105,7 +106,8 @@ export default function People() {
     if (statusFilter) result = result.filter((p) => p.status === statusFilter);
     if (companyFilter) result = result.filter((p) => p.company === companyFilter);
     if (insuranceFilter === 'insured') result = result.filter((p) => isPersonInsured(p, coverageMap));
-    if (insuranceFilter === 'uninsured') result = result.filter((p) => !isPersonInsured(p, coverageMap));
+    if (insuranceFilter === 'pending') result = result.filter((p) => isPersonInsurancePending(p, coverageMap));
+    if (insuranceFilter === 'uninsured') result = result.filter((p) => !isPersonInsured(p, coverageMap) && !isPersonInsurancePending(p, coverageMap));
     return result;
   }, [items, query, areaFilter, statusFilter, companyFilter, insuranceFilter, coverageMap]);
 
@@ -477,6 +479,10 @@ export default function People() {
                 {isPersonInsured(p, coverageMap) ? (
                   <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700" title="Cubierto por seguro aprobado">
                     <ShieldCheck className="h-3.5 w-3.5" /> Asegurado
+                  </span>
+                ) : isPersonInsurancePending(p, coverageMap) ? (
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-600" title="Seguro cargado, pendiente de aprobación">
+                    <ShieldAlert className="h-3.5 w-3.5" /> En revisión
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600" title="No cubierto por seguro aprobado">

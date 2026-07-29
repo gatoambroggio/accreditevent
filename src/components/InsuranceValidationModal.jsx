@@ -71,6 +71,7 @@ export default function InsuranceValidationModal({ document: doc, onClose, onVal
     setActing(true);
     try {
       const me = await base44.auth.me();
+      const role = me?.data?.role || me?.role || '';
       const empVal = result?.validation?.employee_validation;
       const customFields = { ...(doc.custom_fields || {}) };
       if (status === 'approved' && empVal && empVal.total_employees > 0) {
@@ -87,16 +88,29 @@ export default function InsuranceValidationModal({ document: doc, onClose, onVal
         customFields.has_insured_list = false;
         customFields.covered_person_ids = [];
       }
-      await base44.entities.Document.update(doc.id, {
-        status,
-        review_note: status === 'approved'
-          ? 'Seguro validado automáticamente (fechas, DNI y nómina de empleados verificados)'
-          : 'Seguro rechazado: validación automática falló (DNI, fechas o nómina de empleados)',
-        reviewed_by: me?.full_name || me?.email || '',
-        reviewed_at: new Date().toISOString(),
-        ...(result?.extracted?.valid_until ? { expires_at: result.extracted.valid_until } : {}),
-        custom_fields: customFields,
-      });
+      const reviewNote = status === 'approved'
+        ? 'Seguro validado automáticamente (fechas, DNI y nómina de empleados verificados)'
+        : 'Seguro rechazado: validación automática falló (DNI, fechas o nómina de empleados)';
+      const expiresAt = result?.extracted?.valid_until || '';
+      if (role === 'productora') {
+        // Productora RLS blocks Document.update on provider-company docs — go via service role
+        await base44.functions.invoke('reviewDocument', {
+          document_id: doc.id,
+          status,
+          expires_at: expiresAt,
+          review_note: reviewNote,
+          custom_fields: customFields,
+        });
+      } else {
+        await base44.entities.Document.update(doc.id, {
+          status,
+          review_note: reviewNote,
+          reviewed_by: me?.full_name || me?.email || '',
+          reviewed_at: new Date().toISOString(),
+          ...(expiresAt ? { expires_at: expiresAt } : {}),
+          custom_fields: customFields,
+        });
+      }
 
       // Auto-assign the event to all company employees when insurance is approved
       if (status === 'approved' && doc.company && selectedEventId) {

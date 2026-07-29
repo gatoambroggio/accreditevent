@@ -53,23 +53,37 @@ export async function getInsuranceStatus(person) {
   };
 }
 
-// Build a coverage map: { companyName: { allCovered: boolean, coveredPersonIds: Set } }
-// If any approved insurance doc for a company has no nómina, allCovered = true.
-// Otherwise, coveredPersonIds is the union of all covered lists.
+// Build a coverage map: { companyName: { allCovered, coveredPersonIds, pending } }
+// Includes approved AND pending insurance docs. If an approved doc has no nómina, allCovered = true.
+// pending=true indicates at least one insurance doc is pending review for that company.
 export async function getInsuranceCoverageMap() {
   try {
-    const docs = await base44.entities.Document.filter({ status: 'approved' }, '-created_date', 500);
+    let docs;
+    const me = await base44.auth.me().catch(() => null);
+    const role = me?.data?.role || me?.role || '';
+    if (role === 'productora') {
+      // Productora RLS blocks provider-company docs; fetch via backend service role
+      const res = await base44.functions.invoke('getProductoraDocuments', {});
+      docs = res?.data?.documents || [];
+    } else {
+      docs = await base44.entities.Document.filter({ status: 'approved' }, '-created_date', 500);
+    }
     const insuranceDocs = docs.filter((d) => isInsuranceDocType(d.document_type) && d.company && !isDocExpired(d));
     const map = {};
     for (const d of insuranceDocs) {
       const cf = d.custom_fields || {};
       if (!map[d.company]) {
-        map[d.company] = { allCovered: false, coveredPersonIds: new Set() };
+        map[d.company] = { allCovered: false, coveredPersonIds: new Set(), pending: false };
       }
-      if (!cf.has_insured_list) {
-        map[d.company].allCovered = true;
-      } else {
-        (cf.covered_person_ids || []).forEach(id => map[d.company].coveredPersonIds.add(id));
+      if (d.status === 'pending') {
+        map[d.company].pending = true;
+      }
+      if (d.status === 'approved') {
+        if (!cf.has_insured_list) {
+          map[d.company].allCovered = true;
+        } else {
+          (cf.covered_person_ids || []).forEach(id => map[d.company].coveredPersonIds.add(id));
+        }
       }
     }
     return map;
@@ -85,4 +99,12 @@ export function isPersonInsured(person, coverageMap) {
   if (!coverage) return false;
   if (coverage.allCovered) return true;
   return coverage.coveredPersonIds.has(person.id);
+}
+
+// Helper to check if a person has insurance pending review (not yet approved)
+export function isPersonInsurancePending(person, coverageMap) {
+  if (!person || !coverageMap) return false;
+  const coverage = coverageMap[person.company];
+  if (!coverage) return false;
+  return !!coverage.pending && !isPersonInsured(person, coverageMap);
 }

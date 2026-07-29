@@ -45,7 +45,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function Documents() {
-  const { items, loading, error, update, reload } = useCrud('Document');
+  const { items: crudItems, loading: crudLoading, error: crudError, update: crudUpdate, reload: crudReload } = useCrud('Document');
   const { docTypes, rawItems, refetch: refetchTypes } = useDocumentTypes();
   const [reviewing, setReviewing] = useState(null);
   const [query, setQuery] = useState('');
@@ -56,6 +56,48 @@ export default function Documents() {
   const [editingType, setEditingType] = useState(null);
   const [viewingDoc, setViewingDoc] = useState(null);
   const [validatingDoc, setValidatingDoc] = useState(null);
+  const [productoraDocs, setProductoraDocs] = useState([]);
+  const [productoraLoading, setProductoraLoading] = useState(false);
+  const [productoraError, setProductoraError] = useState('');
+  const [userRole, setUserRole] = useState('');
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const me = await base44.auth.me();
+        const role = me?.data?.role || me?.role || '';
+        setUserRole(role);
+        if (role === 'productora') {
+          setProductoraLoading(true);
+          const res = await base44.functions.invoke('getProductoraDocuments', {});
+          setProductoraDocs(res?.data?.documents || []);
+        }
+      } catch (e) {
+        setProductoraError(e.message || 'Error al cargar documentos.');
+      } finally {
+        setProductoraLoading(false);
+      }
+    })();
+  }, []);
+
+  const isProductora = userRole === 'productora';
+  const items = isProductora ? productoraDocs : crudItems;
+  const loading = isProductora ? productoraLoading : crudLoading;
+  const error = isProductora ? productoraError : crudError;
+
+  const reloadProductora = async () => {
+    setProductoraLoading(true);
+    try {
+      const res = await base44.functions.invoke('getProductoraDocuments', {});
+      setProductoraDocs(res?.data?.documents || []);
+    } catch (e) {
+      setProductoraError(e.message || 'Error al cargar documentos.');
+    } finally {
+      setProductoraLoading(false);
+    }
+  };
+
+  const reload = () => (isProductora ? reloadProductora() : crudReload());
 
   const isExpired = (d) => {
     if (d.status === 'expired') return true;
@@ -104,15 +146,25 @@ export default function Documents() {
   };
 
   const handleReview = async (data) => {
-    const me = await base44.auth.me();
-    await update(reviewing.id, {
-      status: data.status,
-      expires_at: data.expires_at || '',
-      review_note: data.review_note || '',
-      reviewed_by: me?.full_name || me?.email || '',
-      reviewed_at: new Date().toISOString(),
-    });
+    if (isProductora) {
+      await base44.functions.invoke('reviewDocument', {
+        document_id: reviewing.id,
+        status: data.status,
+        expires_at: data.expires_at || '',
+        review_note: data.review_note || '',
+      });
+    } else {
+      const me = await base44.auth.me();
+      await crudUpdate(reviewing.id, {
+        status: data.status,
+        expires_at: data.expires_at || '',
+        review_note: data.review_note || '',
+        reviewed_by: me?.full_name || me?.email || '',
+        reviewed_at: new Date().toISOString(),
+      });
+    }
     await logAudit('document-review', 'Document', reviewing.id, data.status);
+    await reload();
   };
 
   const handleTypeSubmit = async (data) => {
