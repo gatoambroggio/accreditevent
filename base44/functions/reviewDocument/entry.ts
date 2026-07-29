@@ -13,7 +13,8 @@ export default async function(req) {
     const doc = await base44.asServiceRole.entities.Document.get(document_id);
     if (!doc) return Response.json({ error: 'Documento no encontrado' }, { status: 404 });
 
-    // Authorization: the productora may only review docs linked to their events or their approved provider companies
+    // Authorization: the productora has absolute control over everything related to their events,
+    // their approved provider companies, their own company, and people under their productora.
     const userCompany = user?.data?.company || user?.company || '';
     const assignedEventIds = user?.data?.assigned_event_ids || [];
     const role = user?.data?.role || user?.role || '';
@@ -23,11 +24,15 @@ export default async function(req) {
     let authorized = canReviewAny;
 
     if (!authorized && role === 'productora') {
-      // Doc linked to one of the productora's assigned events
+      // 1) Doc linked to one of the productora's assigned events
       if (doc.event_id && assignedEventIds.includes(doc.event_id)) {
         authorized = true;
       }
-      // Doc belongs to a provider company approved for the productora's events
+      // 2) Doc belongs to the productora's own company
+      if (!authorized && doc.company && doc.company === userCompany) {
+        authorized = true;
+      }
+      // 3) Doc belongs to a provider company approved for the productora's events
       if (!authorized && doc.company) {
         const approvals = await base44.asServiceRole.entities.EventCompanyApproval.filter(
           { company: userCompany },
@@ -36,6 +41,22 @@ export default async function(req) {
         );
         const providerCompanies = new Set(approvals.map((a) => a.provider_company).filter(Boolean));
         authorized = providerCompanies.has(doc.company);
+      }
+      // 4) Doc belongs to a person under the productora's scope (productora field or assigned events)
+      if (!authorized && doc.person_id) {
+        const person = await base44.asServiceRole.entities.Person.get(doc.person_id);
+        if (person) {
+          if (person.productora && person.productora === userCompany) {
+            authorized = true;
+          }
+          if (!authorized && person.event_id && assignedEventIds.includes(person.event_id)) {
+            authorized = true;
+          }
+        }
+      }
+      // 5) Doc created by this user
+      if (!authorized && doc.created_by_id === user.id) {
+        authorized = true;
       }
     }
 

@@ -10,25 +10,27 @@ export default async function(req) {
     const { document_id, event_id } = body;
     if (!document_id) return Response.json({ error: 'document_id es requerido' }, { status: 400 });
 
-    const doc = await base44.entities.Document.get(document_id);
+    // Use service role to bypass RLS — the function authenticates the user separately
+    // and the productora's RLS would block reading provider-company docs
+    const doc = await base44.asServiceRole.entities.Document.get(document_id);
     if (!doc) return Response.json({ error: 'Documento no encontrado' }, { status: 404 });
 
     let person = null;
     if (doc.person_id) {
-      try { person = await base44.entities.Person.get(doc.person_id); } catch {}
+      try { person = await base44.asServiceRole.entities.Person.get(doc.person_id); } catch {}
     }
 
     let event = null;
     const eventIdToUse = event_id || doc.event_id;
     if (eventIdToUse) {
-      try { event = await base44.entities.Event.get(eventIdToUse); } catch {}
+      try { event = await base44.asServiceRole.entities.Event.get(eventIdToUse); } catch {}
     }
 
     // Load company employees for reconciliation
     let companyEmployees = [];
     if (doc.company) {
       try {
-        companyEmployees = await base44.entities.Person.filter(
+        companyEmployees = await base44.asServiceRole.entities.Person.filter(
           { company: doc.company, tipo_vinculo: 'empresa' },
           '-created_date', 500
         );
