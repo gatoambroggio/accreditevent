@@ -90,11 +90,13 @@ export default function Users() {
   const load = async () => {
     setLoading(true);
     try {
-      let data = await base44.entities.User.list('-created_date', 200);
+      let data;
       if (isProductora && myCompany) {
-        data = data.filter((u) => (u.company || '') === myCompany);
+        data = await base44.entities.User.filter({ company: myCompany }, '-created_date', 200);
+      } else {
+        data = await base44.entities.User.list('-created_date', 200);
       }
-      setUsers(data);
+      setUsers(data || []);
     } catch (err) {
       setError(err.message || 'Error al cargar usuarios.');
     } finally {
