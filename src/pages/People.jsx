@@ -40,6 +40,18 @@ const STATUS_OPTIONS = [
   { value: 'pending', label: 'Pendiente' },
 ];
 
+const BLOOD_TYPE_OPTIONS = [
+  { value: '', label: 'Sin especificar' },
+  { value: 'A+', label: 'A+' },
+  { value: 'A-', label: 'A-' },
+  { value: 'B+', label: 'B+' },
+  { value: 'B-', label: 'B-' },
+  { value: 'AB+', label: 'AB+' },
+  { value: 'AB-', label: 'AB-' },
+  { value: 'O+', label: 'O+' },
+  { value: 'O-', label: 'O-' },
+];
+
 const INSURANCE_OPTIONS = [
   { value: 'insured', label: 'Asegurados' },
   { value: 'uninsured', label: 'Sin seguro' },
@@ -227,6 +239,13 @@ export default function People() {
       { name: '_veh_model', label: 'Vehículo — Modelo', type: 'text', placeholder: 'Ej: Corolla' },
       { name: '_veh_color', label: 'Vehículo — Color', type: 'text', placeholder: 'Ej: Blanco' },
       { name: '_veh_parking_sector', label: 'Vehículo — Sector', type: 'select', options: sectors.map((s) => ({ value: s.value, label: s.label })) },
+      { name: 'blood_type', label: 'Grupo sanguíneo', type: 'select', options: BLOOD_TYPE_OPTIONS, hint: 'Datos para emergencia médica' },
+      { name: 'allergies', label: 'Alergias a medicamentos', type: 'textarea', full: true, placeholder: 'Ej: Penicilina, aspirina…' },
+      { name: 'obra_social', label: 'Obra social', type: 'text', placeholder: 'Ej: OSDE' },
+      { name: 'carnet_obra_social', label: 'N° carnet obra social', type: 'text', placeholder: 'Ej: 123456789' },
+      { name: 'emergency_contact_name', label: 'Contacto de emergencia — Nombre', type: 'text', placeholder: 'Ej: María Pérez' },
+      { name: 'emergency_contact_phone', label: 'Contacto de emergencia — Teléfono', type: 'phone-ar' },
+      { name: 'coordinator_name', label: 'Coordinador asignado', type: 'text', placeholder: 'Ej: Carlos López' },
     ];
   }, [zones, events, editing, companies, sectors]);
 

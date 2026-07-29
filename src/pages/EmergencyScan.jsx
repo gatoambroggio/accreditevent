@@ -5,6 +5,7 @@ import FaceCapture from '@/components/FaceCapture';
 import PageHeader from '@/components/ui/page-header';
 import FilterSelect from '@/components/ui/filter-select';
 import StatusBadge from '@/components/StatusBadge';
+import { findBestMatch } from '@/lib/faceRecognition';
 
 export default function EmergencyScan() {
   const [scanning, setScanning] = useState(false);
@@ -18,11 +19,39 @@ export default function EmergencyScan() {
     base44.entities.Event.list('-start_at', 100).then(setEvents).catch(() => {});
   }, []);
 
-  const handleScan = async (file) => {
+  const handleScan = async (file, descriptor) => {
     setScanning(true);
     setError('');
     setResult(null);
     try {
+      // 1. Try descriptor matching first (same as AccessStation — fast, local, reliable)
+      if (descriptor) {
+        const accredFilter = { status: 'active' };
+        if (selectedEventId) accredFilter.event_id = selectedEventId;
+        const accreditations = await base44.entities.Accreditation.filter(accredFilter, '-created_date', 500);
+        const eventPersonIds = new Set(accreditations.map((a) => a.person_id));
+        const bios = await base44.entities.Biometric.filter({ status: 'active' }, '-created_date', 500);
+        const withDescriptors = bios.filter(
+          (b) => b.face_descriptor?.length > 0 && eventPersonIds.has(b.person_id)
+        );
+        if (withDescriptors.length > 0) {
+          const { match } = findBestMatch(descriptor, withDescriptors);
+          if (match) {
+            const accred = accreditations.find((a) => a.person_id === match.person_id);
+            if (accred) {
+              const [person, docs, vehicles] = await Promise.all([
+                base44.entities.Person.get(accred.person_id),
+                base44.entities.Document.filter({ person_id: accred.person_id }, '-created_date', 50),
+                base44.entities.Vehicle.filter({ person_id: accred.person_id }, '-created_date', 10),
+              ]);
+              setResult({ person, docs, vehicles, accred });
+              return;
+            }
+          }
+        }
+      }
+
+      // 2. Fallback: LLM-based identification via backend function
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       const res = await base44.functions.invoke('faceIdentify', {
         captured_photo_url: file_url,
