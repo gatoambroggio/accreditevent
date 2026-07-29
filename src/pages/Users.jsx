@@ -228,7 +228,7 @@ export default function Users() {
     try {
       if (isProductora) {
         try {
-          await base44.users.inviteUser(inviteEmail, 'operador');
+          await base44.users.inviteUser(inviteEmail, 'user');
         } catch (inviteErr) {
           const msg = (inviteErr.message || '').toLowerCase();
           if (!msg.includes('ya') && !msg.includes('exist') && !msg.includes('registrad') && !msg.includes('already')) {
