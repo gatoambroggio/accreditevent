@@ -112,7 +112,7 @@ export default function Events() {
     );
   };
 
-  const openNew = () => { setEditing(isProductora ? { company: currentUser.company } : null); setModalOpen(true); };
+  const openNew = () => { setEditing(isProductora ? { company: (currentUser.company || currentUser?.data?.company || '').toUpperCase() } : null); setModalOpen(true); };
   const openEdit = (item) => { setEditing(item); setModalOpen(true); };
 
   const syncUserEvents = async (eventId, newAssignedIds) => {
@@ -148,7 +148,7 @@ export default function Events() {
       } catch {}
     }
     if (isProductora) {
-      data.company = currentUser.company;
+      data.company = (currentUser.company || currentUser?.data?.company || '').toUpperCase();
     }
     const assignedIds = data.assigned_user_ids
       ? String(data.assigned_user_ids).split(',').filter(Boolean)

@@ -14,7 +14,7 @@ export default async function(req) {
     const email = (body && body.email ? body.email : '').toString().trim().toLowerCase();
     if (!email) return Response.json({ error: 'Email requerido' }, { status: 400 });
 
-    const company = user.company || (user.data && user.data.company) || '';
+    const company = (user.company || (user.data && user.data.company) || '').toUpperCase();
     if (role === 'productora' && !company) {
       return Response.json({ error: 'Tu usuario no tiene una empresa asignada' }, { status: 400 });
     }
