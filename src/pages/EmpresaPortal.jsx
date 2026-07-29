@@ -92,21 +92,21 @@ export default function EmpresaPortal() {
     eventuals: employees.filter((e) => e.employment_type === 'eventual').length,
   }), [employees]);
 
-  const syncAccreditations = async (person, eventIds, accessArea, events) => {
+  const syncAccreditations = async (person, eventIds, accessArea, events, eventPhases) => {
+    const phases = Array.isArray(eventPhases) ? eventPhases : [];
     const existing = await base44.entities.Accreditation.filter({ person_id: person.id });
     for (const eventId of eventIds) {
       const ev = events.find((e) => e.event_id === eventId);
       if (!ev) continue;
       const existingAccr = existing.find((a) => a.event_id === eventId);
       if (existingAccr) {
-        if (accessArea) {
-          await base44.entities.Accreditation.update(existingAccr.id, {
-            area: accessArea,
-            access_level: accessArea,
-            person_name: person.full_name,
-            person_type: person.person_type || 'provider',
-          });
-        }
+        await base44.entities.Accreditation.update(existingAccr.id, {
+          area: accessArea || 'general',
+          access_level: accessArea || 'general',
+          person_name: person.full_name,
+          person_type: person.person_type || 'provider',
+          event_phases: phases,
+        });
       } else {
         const allAccrs = await base44.entities.Accreditation.filter({ event_id: eventId }, '-created_date', 200);
         const existingCodes = allAccrs.map((a) => a.badge_code).filter(Boolean);
@@ -122,6 +122,7 @@ export default function EmpresaPortal() {
           badge_code,
           area: accessArea || 'general',
           access_level: accessArea || 'general',
+          event_phases: phases,
           status: 'active',
           has_biometric: false,
         });
@@ -147,6 +148,9 @@ export default function EmpresaPortal() {
       person = await base44.entities.Person.create(personData);
       setEmployees((prev) => [person, ...prev]);
       await logAudit('empresa-create-employee', 'Person', person.id, data.full_name);
+    }
+    if (data.event_ids?.length) {
+      await syncAccreditations(person, data.event_ids, data.access_area, approvedEventList, data.event_phases);
     }
     return person;
   };

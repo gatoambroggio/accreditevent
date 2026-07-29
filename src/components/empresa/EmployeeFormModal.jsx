@@ -254,7 +254,7 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
               <input value={form.document} onChange={(e) => setField('document', e.target.value.replace(/\D/g, ''))} inputMode="numeric" className={inputCls} placeholder="12345678" />
             </label>
             <label className="block">
-              <span className="mb-1.5 block text-xs font-semibold text-slate-600">Teléfono</span>
+              <span className="mb-1.5 block text-xs font-semibold text-slate-600">Teléfono (opcional)</span>
               <input value={form.phone} onChange={(e) => setField('phone', e.target.value)} type="tel" className={inputCls} placeholder="11 12345678" />
             </label>
           </div>
