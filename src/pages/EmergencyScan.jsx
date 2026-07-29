@@ -220,7 +220,7 @@ function EmergencyCard({ person, accred, docs, vehicles, onReset }) {
       </div>
 
       {viewingDoc && (
-        <DocumentViewer document={viewingDoc} onClose={() => setViewingDoc(null)} />
+        <DocumentViewer doc={viewingDoc} onClose={() => setViewingDoc(null)} />
       )}
     </div>
   );
