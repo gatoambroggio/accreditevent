@@ -9,6 +9,7 @@ import EntityModal from '@/components/EntityModal';
 import VehicleBadgePrint from '@/components/VehicleBadgePrint';
 import { useParkingSectors } from '@/lib/useParkingSectors';
 import DniToBiometric from '@/components/DniToBiometric';
+import { useCustomFields } from '@/lib/useCustomFields';
 
 export default function PersonDetailModal({ person, onClose }) {
   const [docs, setDocs] = useState([]);
@@ -28,6 +29,7 @@ export default function PersonDetailModal({ person, onClose }) {
   const [reviewAction, setReviewAction] = useState('');
   const [reviewExpiresAt, setReviewExpiresAt] = useState('');
   const [savingReview, setSavingReview] = useState(false);
+  const { customFields } = useCustomFields('Person');
   const [dniBioOpen, setDniBioOpen] = useState(false);
   const { docTypes } = useDocumentTypes();
   const { sectors } = useParkingSectors();
@@ -245,6 +247,26 @@ export default function PersonDetailModal({ person, onClose }) {
               </button>
             )}
           </div>
+
+          {/* Custom fields */}
+          {!loading && customFields.length > 0 && person.custom_fields && Object.keys(person.custom_fields).length > 0 && (
+            <>
+              <p className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wider text-slate-500">Campos personalizados</p>
+              <div className="mb-5 grid grid-cols-2 gap-3">
+                {customFields.map((cf) => {
+                  const val = person.custom_fields?.[cf.field_key];
+                  if (val === undefined || val === null || val === '') return null;
+                  const display = cf.field_type === 'boolean' ? (val ? 'Sí' : 'No') : String(val);
+                  return (
+                    <div key={cf.id} className="rounded-lg border border-slate-200 p-2.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{cf.field_label}</p>
+                      <p className="mt-0.5 text-sm text-slate-900">{display}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
 
           {/* Documents */}
           <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Documentación</p>

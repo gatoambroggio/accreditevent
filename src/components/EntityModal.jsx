@@ -3,6 +3,7 @@ import { X, Trash2, Loader2, Upload } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import AddressInput from '@/components/AddressInput';
 import FaceCapture from '@/components/FaceCapture';
+import { useCustomFields } from '@/lib/useCustomFields';
 
 export default function EntityModal({
   open,
@@ -18,12 +19,14 @@ export default function EntityModal({
   topContent,
   validate,
   onFieldChange,
+  entityName,
 }) {
   const [data, setData] = useState({});
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [errors, setErrors] = useState({});
+  const { customFields } = useCustomFields(entityName);
 
   useEffect(() => {
     if (open) {
@@ -36,7 +39,12 @@ export default function EntityModal({
   if (!open) return null;
 
   const setField = (name, value) => {
-    setData((d) => ({ ...d, [name]: value }));
+    if (name.startsWith('cf__')) {
+      const key = name.slice(4);
+      setData((d) => ({ ...d, custom_fields: { ...(d.custom_fields || {}), [key]: value } }));
+    } else {
+      setData((d) => ({ ...d, [name]: value }));
+    }
     setErrors((e) => ({ ...e, [name]: undefined }));
     if (onFieldChange) onFieldChange(name, value, setField, data);
   };
@@ -78,8 +86,22 @@ export default function EntityModal({
     }
   };
 
+  const customFieldConfigs = (customFields || []).map((cf) => ({
+    name: `cf__${cf.field_key}`,
+    label: cf.field_label,
+    type: cf.field_type === 'boolean' ? 'checkbox' : cf.field_type === 'select' ? 'select' : cf.field_type,
+    options: cf.options,
+    required: cf.required,
+    defaultValue: cf.default_value,
+    full: cf.field_type === 'textarea',
+    hint: cf.description,
+  }));
+  const allFields = [...fields, ...customFieldConfigs];
+
   const renderField = (f) => {
-    const value = data[f.name] ?? f.defaultValue ?? '';
+    const value = f.name.startsWith('cf__')
+      ? (data.custom_fields?.[f.name.slice(4)] ?? f.defaultValue ?? '')
+      : (data[f.name] ?? f.defaultValue ?? '');
     const fieldError = errors[f.name];
     const common = {
       id: f.name,
@@ -395,6 +417,15 @@ export default function EntityModal({
       );
     }
 
+    if (f.type === 'textarea') {
+      return (
+        <label key={f.name} className="block">
+          <span className="mb-1.5 block text-xs font-semibold text-slate-600">{f.label}{f.required && ' *'}</span>
+          <textarea {...common} rows={3} placeholder={f.placeholder || ''} />
+        </label>
+      );
+    }
+
     return (
       <label key={f.name} className="block">
         <span className="mb-1.5 block text-xs font-semibold text-slate-600">{f.label}{f.required && ' *'}</span>
@@ -418,7 +449,7 @@ export default function EntityModal({
         <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
           {topContent && <div className="mb-2">{topContent}</div>}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {fields.map((f) => (
+            {allFields.map((f) => (
               <div key={f.name} className={f.full ? 'sm:col-span-2' : ''}>
                 {renderField(f)}
                 {errors[f.name] ? (

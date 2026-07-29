@@ -45,6 +45,7 @@ import ProviderCompanies from '@/pages/ProviderCompanies';
 import EmpresaRegister from '@/pages/EmpresaRegister';
 import EmpresaPortal from '@/pages/EmpresaPortal';
 import DniScan from '@/pages/DniScan';
+import CustomFields from '@/pages/CustomFields';
 
 const AUTH_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password', '/provider-register', '/registro-empresa'];
 
@@ -110,6 +111,7 @@ const AuthenticatedApp = () => {
         <Route path="/registered-vehicles" element={<RegisteredVehicles />} />
         <Route path="/provider-companies" element={<ProviderCompanies />} />
         <Route path="/dni-scan" element={<DniScan />} />
+        <Route path="/custom-fields" element={<CustomFields />} />
       </Route>
       <Route path="/portal" element={<ProviderPortal />} />
       <Route path="/registro-empresa" element={<EmpresaRegister />} />

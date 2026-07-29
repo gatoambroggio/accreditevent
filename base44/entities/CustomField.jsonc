@@ -1,0 +1,144 @@
+{
+  "name": "CustomField",
+  "type": "object",
+  "properties": {
+    "entity_name": {
+      "type": "string",
+      "enum": [
+        "Person",
+        "Event",
+        "Accreditation",
+        "Vehicle",
+        "Document",
+        "ProviderCompany",
+        "Biometric"
+      ],
+      "description": "Entidad a la que pertenece el campo personalizado"
+    },
+    "field_key": {
+      "type": "string",
+      "description": "Identificador \u00fanico del campo (slug, sin espacios)"
+    },
+    "field_label": {
+      "type": "string",
+      "description": "Etiqueta visible del campo"
+    },
+    "field_type": {
+      "type": "string",
+      "enum": [
+        "text",
+        "textarea",
+        "number",
+        "date",
+        "boolean",
+        "select"
+      ],
+      "default": "text",
+      "description": "Tipo de campo"
+    },
+    "options": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Opciones para campos tipo select"
+    },
+    "required": {
+      "type": "boolean",
+      "default": false,
+      "description": "Indica si el campo es obligatorio"
+    },
+    "default_value": {
+      "type": "string",
+      "description": "Valor por defecto"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n o ayuda del campo"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Indica si el campo est\u00e1 activo y visible en los formularios"
+    },
+    "sort_order": {
+      "type": "number",
+      "default": 0,
+      "description": "Orden de visualizaci\u00f3n"
+    }
+  },
+  "required": [
+    "entity_name",
+    "field_key",
+    "field_label",
+    "field_type"
+  ],
+  "rls": {
+    "read": {},
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "productora"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "productora"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "productora"
+          }
+        }
+      ]
+    }
+  }
+}

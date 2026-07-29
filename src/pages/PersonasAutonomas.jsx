@@ -493,6 +493,7 @@ export default function PersonasAutonomas() {
         onDelete={editing ? handleDelete : null}
         canDelete={!!editing}
         submitLabel={editing ? 'Guardar cambios' : 'Crear persona'}
+        entityName="Person"
       />
 
       <DniScannerModal open={dniScannerOpen} onClose={() => setDniScannerOpen(false)} onScanned={handleDniScanned} />

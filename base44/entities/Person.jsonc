@@ -89,6 +89,11 @@
       "type": "string",
       "description": "Notas internas"
     },
+    "custom_fields": {
+      "type": "object",
+      "description": "Campos personalizados definidos por el administrador",
+      "default": {}
+    },
     "status": {
       "type": "string",
       "enum": [

@@ -22,6 +22,7 @@ import {
   Settings as SettingsIcon,
   Layers,
   Cpu,
+  ListPlus,
   Car,
   SquareParking,
   Building2,
@@ -65,6 +66,7 @@ const NAV_ITEMS = [
   { path: '/companies', label: 'Empresas', icon: Building2, minLevel: 2 },
   { path: '/users', label: 'Usuarios y roles', icon: ShieldCheck, minLevel: 2 },
   { path: '/audit', label: 'Auditoría', icon: ScrollText, minLevel: 2 },
+  { path: '/custom-fields', label: 'Campos personalizados', icon: ListPlus, minLevel: 2 },
   { path: '/settings', label: 'Configuración', icon: SettingsIcon, minLevel: 2 },
   // Portal proveedor
   { path: '/portal', label: 'Mi portal', icon: UserCircle, providerOnly: true },
