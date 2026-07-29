@@ -100,6 +100,21 @@
       },
       "description": "Zonas de control de acceso configurables"
     },
+    "doors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Puertas / puntos de control de acceso configurables"
+    },
     "event_phases": {
       "type": "array",
       "items": {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useCrud } from '@/lib/crud';
-import { Plus, Pencil, Printer, Download, ScanFace, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Printer, Download, ScanFace, Trash2, Car } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
 import BiometricButton from '@/components/BiometricButton';
 import EntityModal from '@/components/EntityModal';
@@ -19,6 +19,7 @@ import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
 import { btnPrimary, btnOutline, btnIcon } from '@/components/ui/button-styles';
 import Pagination from '@/components/ui/pagination';
 import { usePagination } from '@/lib/usePagination';
+import { logAudit } from '@/lib/audit';
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Activa' },
@@ -47,6 +48,8 @@ export default function Accreditations() {
   const [selected, setSelected] = useState(new Set());
   const [batchOpen, setBatchOpen] = useState(false);
   const [dniBioAccred, setDniBioAccred] = useState(null);
+  const [personVehicles, setPersonVehicles] = useState([]);
+  const [accreditVehicles, setAccreditVehicles] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -137,8 +140,10 @@ export default function Accreditations() {
     { name: 'person_id', label: 'Persona', type: 'searchable-select', options: personOptions, required: true, placeholder: 'Buscar por nombre o documento…', full: true },
     ...(editing ? [{ name: 'badge_code', label: 'Código de credencial', type: 'text', required: true }] : []),
     {
-      name: 'access_level', label: 'Área de acceso', type: 'select',
+      name: 'access_level', label: 'Zonas de acceso', type: 'toggle-group',
       options: zones.map((z) => ({ value: z.value, label: z.label })),
+      hint: 'Seleccioná una, varias o todas las zonas disponibles.',
+      full: true,
     },
     {
       name: 'event_phases', label: 'Fases del evento', type: 'toggle-group',
@@ -150,12 +155,15 @@ export default function Accreditations() {
       full: true,
     },
     { name: 'status', label: 'Estado', type: 'select', options: STATUS_OPTIONS },
+    { name: 'block_reason', label: 'Motivo de bloqueo / denegación', type: 'textarea', full: true, hint: 'Documentá la razón si el acceso está bloqueado o revocado.', placeholder: 'Ej: Documentación vencida, sanción disciplinaria…' },
     { name: 'has_biometric', label: 'Biometría registrada', type: 'checkbox' },
   ];
 
-  const openNew = () => { setEditing(null); setModalOpen(true); };
+  const openNew = () => { setEditing(null); setPersonVehicles([]); setAccreditVehicles(false); setModalOpen(true); };
   const openEdit = (item) => {
     const normalized = { ...item, access_level: item.access_level || item.area || '' };
+    setPersonVehicles([]);
+    setAccreditVehicles(false);
     if (Array.isArray(normalized.event_phases)) {
       normalized.event_phases = normalized.event_phases.join(',');
     }
@@ -169,9 +177,14 @@ export default function Accreditations() {
       if (p?.access_area) setField('access_level', p.access_area);
       if (p?.event_phases) setField('event_phases', Array.isArray(p.event_phases) ? p.event_phases.join(',') : p.event_phases);
       try {
-        const bios = await base44.entities.Biometric.filter({ person_id: value, status: 'active' }, '-created_date', 1);
+        const [bios, vehs] = await Promise.all([
+          base44.entities.Biometric.filter({ person_id: value, status: 'active' }, '-created_date', 1),
+          base44.entities.Vehicle.filter({ person_id: value }, '-created_date', 10),
+        ]);
         setField('has_biometric', bios.length > 0);
-      } catch {}
+        setPersonVehicles(vehs);
+        setAccreditVehicles(false);
+      } catch { setPersonVehicles([]); }
     }
   };
 
@@ -195,7 +208,8 @@ export default function Accreditations() {
     if (!person && data.person_id) {
       try { person = await base44.entities.Person.get(data.person_id); } catch {}
     }
-    const zoneValue = person?.access_area || data.access_level || 'general';
+    const accessLevelValue = data.access_level || person?.access_area || 'general';
+    const primaryZone = accessLevelValue.split(',')[0].trim() || 'general';
     const phasesFromForm = typeof data.event_phases === 'string'
       ? data.event_phases.split(',').map((s) => s.trim()).filter(Boolean)
       : (Array.isArray(data.event_phases) ? data.event_phases : []);
@@ -207,19 +221,22 @@ export default function Accreditations() {
       event_name: evt?.name || '',
       company: evt?.company || '',
       person_name: person?.full_name || '',
-      person_type: zoneValue,
+      person_type: primaryZone,
       person_email: person?.email || '',
       badge_code: editing ? data.badge_code : generateBadgeCode(person?.person_type, items.map((a) => a.badge_code), typePrefixes),
-      area: zoneValue,
-      access_level: zoneValue,
+      area: primaryZone,
+      access_level: accessLevelValue,
       event_phases: finalPhases,
       status: data.status || 'active',
+      block_reason: data.block_reason || '',
       has_biometric: data.has_biometric || false,
     };
     if (editing) {
       await update(editing.id, payload);
+      await logAudit('update-accreditation', 'Accreditation', editing.id, `${person?.full_name} → ${evt?.name}`);
     } else {
-      await create(payload);
+      const createdAccred = await create(payload);
+      await logAudit('create-accreditation', 'Accreditation', createdAccred.id, `${person?.full_name} → ${evt?.name}`);
       if (evt?.pickup_address) {
         const mapsUrl = evt.pickup_lat && evt.pickup_lng
           ? `https://www.google.com/maps?q=${evt.pickup_lat},${evt.pickup_lng}`
@@ -292,6 +309,36 @@ export default function Accreditations() {
           document.body.removeChild(waLink);
         }
       }
+      // Send confirmation email to company contact (#8)
+      if (person?.company) {
+        try {
+          const comps = await base44.entities.ProviderCompany.filter({ name: person.company });
+          if (comps[0]?.contact_email) {
+            const vehicleLines = (accreditVehicles && personVehicles.length > 0)
+              ? personVehicles.map((v) => `• ${v.brand} ${v.model} — Patente: ${v.plate}${v.color ? ` (${v.color})` : ''}`).join('<br>')
+              : 'Sin vehículos acreditados.';
+            await base44.integrations.Core.SendEmail({
+              to: comps[0].contact_email,
+              subject: `Acreditación confirmada — ${person.full_name} en ${evt.name}`,
+              body: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;color:#1e293b;"><h2>Resumen de acreditación</h2><p><strong>Evento:</strong> ${evt.name}</p><h3>Personas acreditadas:</h3><p>• ${person.full_name} — ${person.document || 'sin documento'} (Credencial: ${payload.badge_code})</p><h3>Vehículos autorizados:</h3><p>${vehicleLines}</p></body></html>`,
+            });
+          }
+        } catch {}
+      }
+    }
+    // Vehicle accreditation (#7)
+    if (accreditVehicles && personVehicles.length > 0) {
+      for (const v of personVehicles) {
+        try {
+          const currentEventIds = Array.isArray(v.event_ids) ? v.event_ids : [];
+          const vehUpdate = { status: 'approved' };
+          if (!currentEventIds.includes(data.event_id)) {
+            vehUpdate.event_ids = [...currentEventIds, data.event_id];
+            vehUpdate.event_names = [...(v.event_names || []), evt?.name].filter(Boolean);
+          }
+          await base44.entities.Vehicle.update(v.id, vehUpdate);
+        } catch {}
+      }
     }
     // Sync phases back to Person (productora authority)
     if (person && finalPhases.length > 0) {
@@ -299,9 +346,14 @@ export default function Accreditations() {
         await base44.entities.Person.update(person.id, { event_phases: finalPhases });
       } catch {}
     }
+    setPersonVehicles([]);
+    setAccreditVehicles(false);
   };
 
-  const handleDelete = async () => { await remove(editing.id); };
+  const handleDelete = async () => {
+    await logAudit('delete-accreditation', 'Accreditation', editing.id, editing.person_name);
+    await remove(editing.id);
+  };
 
   return (
     <div className="space-y-6">
@@ -370,7 +422,7 @@ export default function Accreditations() {
               </Td>
               <Td className="text-sm text-slate-500">{a.event_name || '—'}</Td>
               <Td><code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700">{a.badge_code}</code></Td>
-              <Td className="text-sm text-slate-500">{zones.find((z) => z.value === (a.access_level || a.area))?.label || a.access_level || a.area || '—'}</Td>
+              <Td className="text-sm text-slate-500">{(a.access_level || a.area || '').split(',').map((z) => zones.find((zz) => zz.value === z.trim())?.label || z.trim()).filter(Boolean).join(', ') || '—'}</Td>
               <Td><StatusBadge status={a.status} /></Td>
               <Td>
                 <BiometricButton accreditation={a} onRegistered={reload} />
@@ -399,7 +451,7 @@ export default function Accreditations() {
 
       <EntityModal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => { setModalOpen(false); setPersonVehicles([]); setAccreditVehicles(false); }}
         title={editing ? 'Editar acreditación' : 'Nueva acreditación'}
         kicker={editing ? 'EDITAR ACREDITACIÓN' : 'CREAR ACREDITACIÓN'}
         fields={fields}
@@ -410,6 +462,20 @@ export default function Accreditations() {
         submitLabel={editing ? 'Guardar cambios' : 'Crear acreditación'}
         onFieldChange={handleFieldChange}
         entityName="Accreditation"
+        topContent={personVehicles.length > 0 ? (
+          <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3">
+            <Car className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-blue-800">
+                Esta persona tiene {personVehicles.length} vehículo(s): {personVehicles.map((v) => v.plate).join(', ')}
+              </p>
+              <label className="mt-1.5 flex items-center gap-2">
+                <input type="checkbox" checked={accreditVehicles} onChange={(e) => setAccreditVehicles(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                <span className="text-sm text-blue-700">Acreditar también los vehículos para este evento</span>
+              </label>
+            </div>
+          </div>
+        ) : undefined}
       />
 
       {badgeAccred && (

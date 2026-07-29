@@ -36,12 +36,12 @@
     },
     "area": {
       "type": "string",
-      "description": "\u00c1rea de trabajo asignada"
+      "description": "\u00c1rea de trabajo principal asignada"
     },
     "access_level": {
       "type": "string",
       "default": "general",
-      "description": "Nivel de acceso (coincide con el valor de zona)"
+      "description": "Zona(s) de acceso asignadas (pueden ser m\u00faltiples, separadas por coma)"
     },
     "event_phases": {
       "type": "array",
@@ -65,6 +65,10 @@
       ],
       "default": "active",
       "description": "Estado de la acreditaci\u00f3n"
+    },
+    "block_reason": {
+      "type": "string",
+      "description": "Raz\u00f3n/motivo del bloqueo o denegaci\u00f3n de acceso"
     },
     "has_biometric": {
       "type": "boolean",

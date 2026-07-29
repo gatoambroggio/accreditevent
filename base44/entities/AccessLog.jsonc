@@ -52,6 +52,10 @@
       "type": "string",
       "description": "Zona(s) de control de acceso (separadas por coma)"
     },
+    "door": {
+      "type": "string",
+      "description": "Puerta o punto de control donde se registr\u00f3 el acceso"
+    },
     "result": {
       "type": "string",
       "enum": [

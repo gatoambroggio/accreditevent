@@ -75,6 +75,7 @@ export default function Settings() {
             person_types: DEFAULT_PERSON_TYPES,
             default_grace_hours: 4,
             zones: [],
+            doors: [],
             enabled_modules: { whatsapp: false },
           });
           setSettings(created);
@@ -129,6 +130,7 @@ export default function Settings() {
         person_types: settings.person_types,
         default_grace_hours: settings.default_grace_hours ? Number(settings.default_grace_hours) : null,
         zones: settings.zones,
+        doors: settings.doors,
         enabled_modules: settings.enabled_modules,
       });
       setSettings(updated);
@@ -216,6 +218,15 @@ export default function Settings() {
           onChange={(items) => update('zones', items)}
           valuePlaceholder="backstage"
           labelPlaceholder="Backstage"
+        />
+      </Section>
+
+      <Section title="Puertas / Puntos de control" description="Configurá los nombres de las puertas o puntos de control de acceso del evento">
+        <ListEditor
+          items={settings.doors || []}
+          onChange={(items) => update('doors', items)}
+          valuePlaceholder="puerta_1"
+          labelPlaceholder="Puerta Principal"
         />
       </Section>
 
