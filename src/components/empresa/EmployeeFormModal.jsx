@@ -160,6 +160,16 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
         if (faceFile) {
           setStatus('Procesando biometría…');
           const { file_url } = await base44.integrations.Core.UploadFile({ file: faceFile });
+          // SECURITY: Check for face duplicate before saving
+          if (faceDescriptor?.length) {
+            const dupCheck = await base44.functions.invoke('checkFaceDuplicate', {
+              face_descriptor: faceDescriptor,
+              person_id: person.id,
+            });
+            if (dupCheck.is_duplicate) {
+              throw new Error(`SECURIDAD: Este rostro ya está registrado para "${dupCheck.duplicates[0].person_name}".`);
+            }
+          }
           try {
             const existing = await base44.entities.Biometric.filter({ person_id: person.id, status: 'active' });
             for (const b of existing) {

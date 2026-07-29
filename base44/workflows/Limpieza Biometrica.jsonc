@@ -1,0 +1,44 @@
+{
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "limpieza_biometrica",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "cleanup": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "cleanupBiometrics"
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Limpiar biometr\u00edas",
+            "description": "Elimina duplicados, hu\u00e9rfanas e inv\u00e1lidas"
+          }
+        }
+      }
+    ]
+  },
+  "name": "Limpieza Biometrica",
+  "description": "Limpieza autom\u00e1tica diaria de biometr\u00edas: elimina hu\u00e9rfanas, sin descriptor, revocadas, pendientes y caras duplicadas entre personas distintas",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "0 3 * * *",
+      "one_time_date": null,
+      "timezone": "America/Cordoba",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  }
+}
