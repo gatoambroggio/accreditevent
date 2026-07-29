@@ -144,6 +144,8 @@ export default function EntityModal({
       const filteredOptions = (f.options || []).filter((o) =>
         o.label.toLowerCase().includes(searchQuery.toLowerCase())
       ).slice(0, 10);
+      const exactMatch = (f.options || []).some((o) => o.label.toLowerCase() === searchQuery.toLowerCase());
+      const canCreate = f.allowCreate && searchQuery && !exactMatch;
 
       return (
         <div key={f.name} className="relative" style={{ gridColumn: f.full ? 'span 2' : undefined }}>
@@ -161,7 +163,7 @@ export default function EntityModal({
           {selectedOption && (
             <p className="mt-1 text-xs font-medium text-emerald-600">✓ {selectedOption.label}</p>
           )}
-          {showResults && filteredOptions.length > 0 && (
+          {showResults && (filteredOptions.length > 0 || canCreate) && (
             <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
               {filteredOptions.map((o) => (
                 <button
@@ -176,9 +178,21 @@ export default function EntityModal({
                   {o.label}
                 </button>
               ))}
+              {canCreate && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setField(f.name, searchQuery);
+                    setField(`_search_${f.name}`, '');
+                  }}
+                  className="block w-full border-t border-slate-100 px-3 py-2 text-left text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+                >
+                  + Crear: "{searchQuery}"
+                </button>
+              )}
             </div>
           )}
-          {showResults && filteredOptions.length === 0 && (
+          {showResults && filteredOptions.length === 0 && !canCreate && (
             <p className="mt-1 text-xs text-slate-400">Sin resultados.</p>
           )}
         </div>

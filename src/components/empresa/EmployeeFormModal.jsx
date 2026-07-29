@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, UserPlus, FileImage, ScanFace, CheckCircle2, FileText, CalendarDays, MapPin } from 'lucide-react';
+import { X, Loader2, UserPlus, FileImage, ScanFace, CheckCircle2, FileText, CalendarDays, MapPin, ScanLine } from 'lucide-react';
+import DniScannerModal from '@/components/DniScannerModal';
 import { base44 } from '@/api/base44Client';
 import { Image } from '@/components/ui/image';
 import FaceCapture from '@/components/FaceCapture';
@@ -42,6 +43,9 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
   const [faceDescriptor, setFaceDescriptor] = useState(null);
   const [existingDni, setExistingDni] = useState(null);
   const [existingFaceUrl, setExistingFaceUrl] = useState(null);
+  const [dniScannerOpen, setDniScannerOpen] = useState(false);
+  const [dniFaceUrl, setDniFaceUrl] = useState(null);
+  const [dniFaceDescriptor, setDniFaceDescriptor] = useState(null);
 
   useEffect(() => {
     if (!open) return;
@@ -49,6 +53,8 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
     setDniFile(null);
     setFaceFile(null);
     setFaceDescriptor(null);
+    setDniFaceUrl(null);
+    setDniFaceDescriptor(null);
     if (editing?.id) {
       base44.entities.Document.filter({ person_id: editing.id, document_type: 'dni' })
         .then((docs) => setExistingDni(docs[0] || null))
@@ -63,6 +69,20 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
   }, [editing, open]);
 
   const setField = (name, value) => setForm((f) => ({ ...f, [name]: value }));
+
+  const handleDniScanned = (data) => {
+    setForm((f) => ({
+      ...f,
+      first_name: data.nombre || f.first_name,
+      last_name: data.apellido || f.last_name,
+      document: data.dni || f.document,
+    }));
+    if (data.faceUrl) {
+      setExistingFaceUrl(data.faceUrl);
+      setDniFaceUrl(data.faceUrl);
+      setDniFaceDescriptor(data.faceDescriptor);
+    }
+  };
 
   const togglePhase = (phase) => {
     setForm((f) => ({
@@ -153,6 +173,22 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
             face_descriptor: faceDescriptor || [],
             status: 'active',
           });
+        } else if (dniFaceUrl && dniFaceDescriptor) {
+          setStatus('Registrando biometría del DNI…');
+          try {
+            const existing = await base44.entities.Biometric.filter({ person_id: person.id, status: 'active' });
+            for (const b of existing) {
+              await base44.entities.Biometric.update(b.id, { status: 'revoked' });
+            }
+          } catch {}
+          await base44.entities.Biometric.create({
+            person_id: person.id,
+            person_name: full_name,
+            company: companyName,
+            face_photo_url: dniFaceUrl,
+            face_descriptor: dniFaceDescriptor,
+            status: 'active',
+          });
         }
       } catch (uploadErr) {
         uploadWarning = uploadErr.message || 'No se pudo completar la carga de DNI/biometría.';
@@ -190,6 +226,18 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
           </button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-5 px-6 py-5">
+          {!editing && (
+            <div className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+              <ScanLine className="h-5 w-5 shrink-0 text-emerald-600" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-slate-700">Escaneo de DNI</p>
+                <p className="text-xs text-slate-500">Extraé los datos del empleado desde su DNI.</p>
+              </div>
+              <button type="button" onClick={() => setDniScannerOpen(true)} className="shrink-0 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800">
+                Escanear
+              </button>
+            </div>
+          )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label className="block">
               <span className="mb-1.5 block text-xs font-semibold text-slate-600">Nombre *</span>
@@ -341,6 +389,7 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
           </div>
         </form>
       </div>
+      <DniScannerModal open={dniScannerOpen} onClose={() => setDniScannerOpen(false)} onScanned={handleDniScanned} />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useCrud } from '@/lib/crud';
-import { Plus, Pencil, Download, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Download, Trash2, ScanLine } from 'lucide-react';
+import DniScannerModal from '@/components/DniScannerModal';
 import { exportToExcel } from '@/lib/exportUtils';
 import { base44 } from '@/api/base44Client';
 import { useZones } from '@/lib/useZones';
@@ -45,6 +46,8 @@ export default function People() {
   const [statusFilter, setStatusFilter] = useState('');
   const [companyFilter, setCompanyFilter] = useState('');
   const [detailPerson, setDetailPerson] = useState(null);
+  const [dniScannerOpen, setDniScannerOpen] = useState(false);
+  const [dniPrefill, setDniPrefill] = useState(null);
   const [selected, setSelected] = useState(new Set());
   const [events, setEvents] = useState([]);
   const [companies, setCompanies] = useState([]);
@@ -179,9 +182,9 @@ export default function People() {
     },
     { name: 'document', label: 'Documento', type: 'dni', required: true, placeholder: 'Ej: 12345678' },
     {
-      name: 'company', label: 'Empresa', type: 'searchable-select', required: true,
+      name: 'company', label: 'Empresa', type: 'searchable-select', required: true, allowCreate: true,
       options: companies.map((c) => ({ value: c.name, label: c.name })),
-      placeholder: 'Buscar empresa…',
+      placeholder: 'Buscar o crear empresa…',
     },
     { name: 'phone', label: 'Teléfono', type: 'phone-ar', required: true, hint: 'Código de área sin 0 y número sin 15. Ej: 11 12345678' },
     { name: 'email', label: 'Email', type: 'email', placeholder: 'Ej: juan@empresa.com' },
@@ -191,8 +194,9 @@ export default function People() {
     ];
   }, [zones, events, editing, companies]);
 
-  const openNew = () => { setEditing(null); setModalOpen(true); };
+  const openNew = () => { setEditing(null); setDniPrefill(null); setModalOpen(true); };
   const openEdit = async (item) => {
+    setDniPrefill(null);
     const normalized = { ...item };
     if (!normalized.event_id && normalized.event_ids?.length) {
       normalized.event_id = normalized.event_ids[0];
@@ -209,9 +213,24 @@ export default function People() {
       }
     } catch {}
   };
+  const handleDniScanned = (data) => {
+    setEditing(null);
+    setDniPrefill({
+      full_name: `${data.nombre} ${data.apellido}`.trim(),
+      document: data.dni,
+      face_photo_url: data.faceUrl,
+      face_descriptor: data.faceDescriptor,
+    });
+    setModalOpen(true);
+  };
+
   const handleSubmit = async (data) => {
     const { face_photo_url, face_descriptor, ...personData } = data;
     personData.person_type = personData.access_area || 'general';
+    // Create ProviderCompany if it doesn't exist
+    if (personData.company && !companies.find((c) => c.name === personData.company)) {
+      try { await base44.entities.ProviderCompany.create({ name: personData.company }); } catch {}
+    }
     if (typeof personData.event_phases === 'string') {
       personData.event_phases = personData.event_phases.split(',').map((s) => s.trim()).filter(Boolean);
     }
@@ -253,6 +272,9 @@ export default function People() {
       <PageHeader kicker="Directorio" title="Personas">
         <button onClick={handleExport} className={btnOutline}>
           <Download className="h-4 w-4" /> Exportar
+        </button>
+        <button onClick={() => setDniScannerOpen(true)} className={btnOutline}>
+          <ScanLine className="h-4 w-4" /> Escanear DNI
         </button>
         <button onClick={openNew} className={btnPrimary}>
           <Plus className="h-4 w-4" /> Nueva persona
@@ -333,17 +355,19 @@ export default function People() {
 
       <EntityModal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => { setModalOpen(false); setDniPrefill(null); }}
         title={editing ? 'Editar persona' : 'Nueva persona'}
         kicker={editing ? 'EDITAR PERSONA' : 'CREAR PERSONA'}
         fields={fields}
-        initialData={editing || {}}
+        initialData={editing || dniPrefill || {}}
         onSubmit={handleSubmit}
         validate={validatePerson}
         onDelete={editing ? handleDelete : null}
         canDelete={!!editing}
         submitLabel={editing ? 'Guardar cambios' : 'Crear persona'}
       />
+
+      <DniScannerModal open={dniScannerOpen} onClose={() => setDniScannerOpen(false)} onScanned={handleDniScanned} />
 
       {detailPerson && (
         <PersonDetailModal person={detailPerson} onClose={() => setDetailPerson(null)} />
