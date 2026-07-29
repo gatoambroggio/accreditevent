@@ -9,6 +9,7 @@ import BatchVehicleBadgePrint from '@/components/BatchVehicleBadgePrint';
 import { useParkingSectors } from '@/lib/useParkingSectors';
 import { useAuth } from '@/lib/AuthContext';
 import { base44 } from '@/api/base44Client';
+import { computeSectorOccupancy, sectorStatus } from '@/lib/parkingCapacity';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
 import FilterSelect from '@/components/ui/filter-select';
@@ -22,6 +23,20 @@ const VEHICLE_STATUS_OPTIONS = [
   { value: 'pending', label: 'Pendiente' },
   { value: 'rejected', label: 'Rechazado' },
 ];
+
+const VEHICLE_TYPE_OPTIONS = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'moto', label: 'Moto' },
+  { value: 'camioneta', label: 'Camioneta' },
+  { value: 'camion', label: 'Camión' },
+];
+
+const VEHICLE_TYPE_LABELS = {
+  auto: 'Auto',
+  moto: 'Moto',
+  camioneta: 'Camioneta',
+  camion: 'Camión',
+};
 
 const VEHICLE_STATUS_LABELS = {
   approved: 'Aprobado',
@@ -46,6 +61,7 @@ export default function Vehicles() {
   const [editing, setEditing] = useState(null);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [eventFilter, setEventFilter] = useState('');
   const [people, setPeople] = useState([]);
   const [printingVehicle, setPrintingVehicle] = useState(null);
   const [selected, setSelected] = useState(new Set());
@@ -73,6 +89,10 @@ export default function Vehicles() {
         if (!userCompany || v.company !== userCompany) return false;
       }
       if (statusFilter && v.status !== statusFilter) return false;
+      if (eventFilter) {
+        const evIds = Array.isArray(v.event_ids) ? v.event_ids : [];
+        if (!evIds.includes(eventFilter)) return false;
+      }
       if (!q) {
         if (v.status === 'approved') return true;
         return false;
@@ -81,7 +101,10 @@ export default function Vehicles() {
       const personDoc = person?.document || '';
       return `${v.person_name || ''} ${v.brand || ''} ${v.model || ''} ${v.plate || ''} ${personDoc}`.toLowerCase().includes(q);
     });
-  }, [items, activeEventIds, isProductora, currentUser, query, statusFilter, people]);
+  }, [items, activeEventIds, isProductora, currentUser, query, statusFilter, eventFilter, people]);
+
+  const capacityEvent = useMemo(() => events.find((e) => e.id === eventFilter) || null, [events, eventFilter]);
+  const occupancy = useMemo(() => computeSectorOccupancy(items, eventFilter || null), [items, eventFilter]);
 
   const { page, setPage, totalPages, paginated } = usePagination(filtered, 15);
 
@@ -115,9 +138,10 @@ export default function Vehicles() {
 
   const handleExport = () => {
     exportToExcel(
-      ['Persona', 'Marca', 'Modelo', 'Patente', 'Color', 'Eventos', 'Estacionamiento', 'Estado', 'Notas'],
+      ['Persona', 'Tipo', 'Marca', 'Modelo', 'Patente', 'Color', 'Eventos', 'Estacionamiento', 'Estado', 'Notas'],
       filtered.map((v) => [
         v.person_name || '',
+        VEHICLE_TYPE_LABELS[v.vehicle_type] || 'Auto',
         v.brand || '',
         v.model || '',
         v.plate || '',
@@ -173,6 +197,7 @@ export default function Vehicles() {
     const selectedEventIds = data.event_ids ? String(data.event_ids).split(',').filter(Boolean) : [];
     const enriched = {
       ...data,
+      vehicle_type: data.vehicle_type || 'auto',
       status: data.status || (editing ? 'pending' : 'approved'),
       person_name: person?.full_name || editing?.person_name || '',
       company: events.find((e) => e.id === selectedEventIds[0])?.company || editing?.company || '',
@@ -195,6 +220,7 @@ export default function Vehicles() {
       options: people.map((p) => ({ value: p.id, label: `${p.full_name} · DNI ${p.document || '—'} · ${p.company || 'Sin empresa'}` })),
       placeholder: 'Buscar por nombre, DNI o empresa…',
     },
+    { name: 'vehicle_type', label: 'Tipo de vehículo', type: 'select', options: VEHICLE_TYPE_OPTIONS, required: true, defaultValue: 'auto' },
     { name: 'brand', label: 'Marca', type: 'text', required: true, placeholder: 'Ej: Ford' },
     { name: 'model', label: 'Modelo', type: 'text', required: true, placeholder: 'Ej: Fiesta' },
     { name: 'plate', label: 'Patente', type: 'text', required: true, placeholder: 'Ej: AB123CD', hint: 'Se guardará en mayúsculas.' },
@@ -239,7 +265,42 @@ export default function Vehicles() {
           options={VEHICLE_STATUS_OPTIONS}
           placeholder="Todos los estados"
         />
+        <FilterSelect
+          value={eventFilter}
+          onChange={setEventFilter}
+          options={events.map((e) => ({ value: e.id, label: e.name }))}
+          placeholder="Todos los eventos"
+        />
       </div>
+
+      {capacityEvent && sectors.length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Capacidad de estacionamiento — {capacityEvent.name}
+          </p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {sectors.map((s) => {
+              const st = sectorStatus(capacityEvent, s.value, occupancy);
+              return (
+                <div key={s.id} className={`rounded-lg border p-3 ${st.full ? 'border-red-200 bg-red-50' : st.cap ? 'border-emerald-200 bg-emerald-50/40' : 'border-slate-200 bg-slate-50'}`}>
+                  <p className="text-sm font-semibold text-slate-800">{s.label}</p>
+                  <div className="mt-1 flex items-center gap-2">
+                    {st.cap ? (
+                      <span className={`text-sm font-bold ${st.full ? 'text-red-600' : 'text-emerald-700'}`}>{st.label}</span>
+                    ) : (
+                      <span className="text-xs text-slate-400">Sin límite</span>
+                    )}
+                    {st.full && (
+                      <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">Agotado</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-xs text-slate-400">Podés seguir acreditando vehículos aunque un sector esté agotado.</p>
+        </div>
+      )}
 
       <DataTable
         loading={loading}
@@ -260,6 +321,7 @@ export default function Vehicles() {
               />
             </Th>
             <Th>Persona</Th>
+            <Th>Tipo</Th>
             <Th>Vehículo</Th>
             <Th>Patente</Th>
             <Th>Eventos</Th>
@@ -281,6 +343,11 @@ export default function Vehicles() {
                 />
               </Td>
               <Td className="text-sm font-semibold text-slate-900">{v.person_name || '—'}</Td>
+              <Td>
+                <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                  {VEHICLE_TYPE_LABELS[v.vehicle_type] || 'Auto'}
+                </span>
+              </Td>
               <Td className="text-sm text-slate-600">{v.brand} {v.model}</Td>
               <Td>
                 <span className="inline-flex items-center rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1 font-mono text-xs font-bold uppercase tracking-wider text-slate-700">

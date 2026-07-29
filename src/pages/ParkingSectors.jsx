@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { base44 } from '@/api/base44Client';
 import { useCrud } from '@/lib/crud';
-import { Plus, Pencil, SquareParking } from 'lucide-react';
+import { Plus, Pencil, SquareParking, Save } from 'lucide-react';
 import EntityModal from '@/components/EntityModal';
 import PageHeader from '@/components/ui/page-header';
 import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
 import { btnPrimary, btnIcon } from '@/components/ui/button-styles';
 import { slugify } from '@/lib/slugify';
+import FilterSelect from '@/components/ui/filter-select';
 
 const FIELDS = [
   { name: 'label', label: 'Nombre', type: 'text', required: true, placeholder: 'Ej: Estacionamiento VIP' },
@@ -16,6 +18,48 @@ export default function ParkingSectors() {
   const { items, loading, create, update, remove } = useCrud('ParkingSector');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+
+  const [events, setEvents] = useState([]);
+  const [selectedEventId, setSelectedEventId] = useState('');
+  const [capacities, setCapacities] = useState({});
+  const [savingCaps, setSavingCaps] = useState(false);
+  const [capSaved, setCapSaved] = useState(false);
+
+  useEffect(() => {
+    base44.entities.Event.list('-start_at', 200).then(setEvents).catch(() => {});
+  }, []);
+
+  const selectedEvent = useMemo(() => events.find((e) => e.id === selectedEventId), [events, selectedEventId]);
+
+  useEffect(() => {
+    const caps = selectedEvent?.parking_capacities || {};
+    const map = {};
+    items.forEach((s) => { map[s.value] = typeof caps[s.value] === 'number' ? caps[s.value] : ''; });
+    setCapacities(map);
+    setCapSaved(false);
+  }, [selectedEventId, selectedEvent, items]);
+
+  const handleCapChange = (sectorValue, val) => {
+    setCapacities((c) => ({ ...c, [sectorValue]: val }));
+    setCapSaved(false);
+  };
+
+  const handleSaveCapacities = async () => {
+    if (!selectedEventId) return;
+    setSavingCaps(true);
+    try {
+      const cleanCaps = {};
+      items.forEach((s) => {
+        const raw = capacities[s.value];
+        const num = parseInt(raw, 10);
+        if (!isNaN(num) && num > 0) cleanCaps[s.value] = num;
+      });
+      await base44.entities.Event.update(selectedEventId, { parking_capacities: cleanCaps });
+      setEvents((prev) => prev.map((e) => e.id === selectedEventId ? { ...e, parking_capacities: cleanCaps } : e));
+      setCapSaved(true);
+    } catch {}
+    setSavingCaps(false);
+  };
 
   const openNew = () => { setEditing(null); setModalOpen(true); };
   const openEdit = (item) => { setEditing(item); setModalOpen(true); };
@@ -69,6 +113,61 @@ export default function ParkingSectors() {
           ))}
         </tbody>
       </DataTable>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Capacidades por evento</h2>
+            <p className="mt-0.5 text-sm text-slate-500">Definí cuántos vehículos admite cada sector en un evento. Si un sector se agota, se visualiza pero podés seguir acreditando.</p>
+          </div>
+          <FilterSelect
+            value={selectedEventId}
+            onChange={setSelectedEventId}
+            options={events.map((e) => ({ value: e.id, label: e.name }))}
+            placeholder="Seleccionar evento…"
+            className="min-w-[220px]"
+          />
+        </div>
+
+        {selectedEventId ? (
+          <>
+            {items.length === 0 ? (
+              <p className="mt-4 text-sm text-slate-400">No hay sectores configurados.</p>
+            ) : (
+              <div className="mt-4 space-y-2.5">
+                {items.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50/50 px-4 py-2.5">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">{s.label}</p>
+                      <p className="font-mono text-[10px] uppercase tracking-wider text-slate-400">{s.value}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-slate-500">Capacidad máx.</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={capacities[s.value] ?? ''}
+                        onChange={(e) => handleCapChange(s.value, e.target.value)}
+                        placeholder="Sin límite"
+                        className="w-28 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                      />
+                      <span className="text-xs text-slate-400">vehículos</span>
+                    </div>
+                  </div>
+                ))}
+                <div className="flex items-center gap-3 pt-1">
+                  <button onClick={handleSaveCapacities} disabled={savingCaps} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50">
+                    {savingCaps ? 'Guardando…' : <><Save className="h-4 w-4" /> Guardar capacidades</>}
+                  </button>
+                  {capSaved && <span className="text-sm font-medium text-emerald-600">✓ Capacidades guardadas</span>}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="mt-4 text-sm text-slate-400">Seleccioná un evento para configurar las capacidades por sector.</p>
+        )}
+      </div>
 
       <EntityModal
         open={modalOpen}

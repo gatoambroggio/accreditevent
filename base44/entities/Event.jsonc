@@ -102,6 +102,11 @@
       "type": "number",
       "description": "Monto asegurado m\u00ednimo requerido por el evento"
     },
+    "parking_capacities": {
+      "type": "object",
+      "description": "Capacidad m\u00e1xima de veh\u00edculos por sector para este evento ({ sectorValue: number })",
+      "default": {}
+    },
     "custom_fields": {
       "type": "object",
       "description": "Campos personalizados definidos por el administrador",
