@@ -208,6 +208,7 @@ export default function AccessStation() {
           ok: false,
           person_name: accred.person_name,
           access_level: accred.access_level,
+          event_phases: accred.event_phases || [],
           message: `Acceso restringido para la zona: ${zoneLabel}.`,
         });
         return;
@@ -219,13 +220,14 @@ export default function AccessStation() {
           ok: false,
           person_name: accred.person_name,
           access_level: accred.access_level,
+          event_phases: accred.event_phases || [],
           message: 'Acceso fuera del rango de fechas autorizado para las fases asignadas.',
         });
         return;
       }
 
       await logAccess('granted', accred);
-      setResult({ ok: true, person_name: accred.person_name, access_level: accred.access_level, accred });
+      setResult({ ok: true, person_name: accred.person_name, access_level: accred.access_level, event_phases: accred.event_phases || [], accred });
     } catch (err) {
       setResult({ ok: false, message: err.message || 'Error en la verificación.' });
     } finally {
@@ -442,6 +444,29 @@ export default function AccessStation() {
               <p className="mt-1 text-base font-semibold text-white/90">
                 Nivel: {lvl?.label || result.access_level}
               </p>
+            );
+          })()}
+          {(() => {
+            const phases = result.event_phases || result.accred?.event_phases || [];
+            if (phases.length === 0 && !result.accred) return null;
+            const PHASE_LABELS = { armado: 'Armado', dia_evento: 'Show', desarme: 'Desarme' };
+            const ALL_PHASES = ['armado', 'dia_evento', 'desarme'];
+            return (
+              <div className="mt-2 flex items-center gap-2">
+                {ALL_PHASES.map((ph) => {
+                  const enabled = phases.includes(ph);
+                  return (
+                    <span
+                      key={ph}
+                      className={`rounded-full px-3 py-0.5 text-xs font-semibold ring-1 ring-inset ${
+                        enabled ? 'bg-white/20 text-white ring-white/30' : 'bg-white/5 text-white/40 ring-white/10'
+                      }`}
+                    >
+                      {enabled ? '✓' : '✗'} {PHASE_LABELS[ph]}
+                    </span>
+                  );
+                })}
+              </div>
             );
           })()}
           {!result.ok && result.message && (

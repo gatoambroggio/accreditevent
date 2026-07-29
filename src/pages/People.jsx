@@ -24,8 +24,7 @@ const validatePerson = (data) => {
   if (!data.company?.trim()) e.company = 'La empresa es obligatoria';
   if (!data.phone?.trim()) e.phone = 'El teléfono es obligatorio';
   else if (data.phone.replace(/\D/g, '').length < 12) e.phone = 'Teléfono incompleto (código de área + número)';
-  if (!data.email?.trim()) e.email = 'El email es obligatorio';
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e.email = 'Email inválido';
+  if (data.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e.email = 'Email inválido';
   if (!data.status) e.status = 'Seleccioná un estado';
   return e;
 };
@@ -185,7 +184,7 @@ export default function People() {
       placeholder: 'Buscar empresa…',
     },
     { name: 'phone', label: 'Teléfono', type: 'phone-ar', required: true, hint: 'Código de área sin 0 y número sin 15. Ej: 11 12345678' },
-    { name: 'email', label: 'Email', type: 'email', required: true, placeholder: 'Ej: juan@empresa.com' },
+    { name: 'email', label: 'Email', type: 'email', placeholder: 'Ej: juan@empresa.com' },
     { name: 'status', label: 'Estado', type: 'select', required: true, options: STATUS_OPTIONS },
       { name: 'notes', label: 'Notas', type: 'textarea', full: true, placeholder: 'Ej: Responsable de montaje audiovisual' },
       { name: '_face', label: 'Registro facial', type: 'face-capture', full: true },
