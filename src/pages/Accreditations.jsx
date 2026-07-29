@@ -107,6 +107,8 @@ export default function Accreditations() {
   const handleBulkDelete = async () => {
     if (!confirm(`¿Eliminar ${selected.size} acreditación(es)? Esta acción no se puede deshacer.`)) return;
     for (const id of selected) {
+      const accred = items.find((a) => a.id === id);
+      if (accred) await deleteVehiclesForPersonEvent(accred.person_id, accred.event_id);
       try { await base44.entities.Accreditation.delete(id); } catch {}
     }
     setSelected(new Set());
@@ -369,8 +371,20 @@ export default function Accreditations() {
     setVehicleApprovals({});
   };
 
+  const deleteVehiclesForPersonEvent = async (personId, eventId) => {
+    if (!personId || !eventId) return;
+    try {
+      const vehs = await base44.entities.Vehicle.filter({ person_id: personId }, '-created_date', 50);
+      const linked = vehs.filter((v) => Array.isArray(v.event_ids) && v.event_ids.includes(eventId));
+      for (const v of linked) {
+        try { await base44.entities.Vehicle.delete(v.id); } catch {}
+      }
+    } catch {}
+  };
+
   const handleDelete = async () => {
     await logAudit('delete-accreditation', 'Accreditation', editing.id, editing.person_name);
+    await deleteVehiclesForPersonEvent(editing.person_id, editing.event_id);
     await remove(editing.id);
   };
 
