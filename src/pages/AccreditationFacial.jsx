@@ -112,16 +112,9 @@ export default function AccreditationFacial() {
         return;
       }
 
-      let personType = 'guest';
-      let personEmail = '';
-      let personAccessArea = 'general';
-      let personPhases = [];
+      let person = null;
       try {
-        const person = await base44.entities.Person.get(personId);
-        if (person?.person_type) personType = person.person_type;
-        if (person?.email) personEmail = person.email;
-        if (person?.access_area) personAccessArea = person.access_area;
-        if (Array.isArray(person?.event_phases)) personPhases = person.event_phases;
+        person = await base44.entities.Person.get(personId);
       } catch {}
 
       // Block accreditation if the person has pending/rejected/expired documentation
@@ -135,6 +128,11 @@ export default function AccreditationFacial() {
         return;
       }
 
+      // Asegurar que la persona identificada esté en la lista para el formulario
+      if (person) {
+        setPeople((prev) => prev.some((p) => p.id === person.id) ? prev : [person, ...prev]);
+      }
+
       // Abrir formulario completo (como nueva acreditación manual) con la persona identificada
       setResult({
         ok: 'identified',
@@ -142,12 +140,9 @@ export default function AccreditationFacial() {
         face_photo_url: match.face_photo_url,
       });
       setPendingPerson({
+        ...(person || {}),
         id: personId,
-        full_name: personName,
-        person_type: personType,
-        email: personEmail,
-        access_area: personAccessArea,
-        event_phases: personPhases,
+        full_name: person?.full_name || personName,
         face_photo_url: match.face_photo_url,
       });
       setFormOpen(true);

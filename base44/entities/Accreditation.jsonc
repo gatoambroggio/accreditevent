@@ -75,6 +75,16 @@
       "default": false,
       "description": "Indica si tiene biometr\u00eda registrada"
     },
+    "delivered_personal": {
+      "type": "boolean",
+      "default": false,
+      "description": "Indica si la credencial personal fue impresa/entregada"
+    },
+    "delivered_vehicular": {
+      "type": "boolean",
+      "default": false,
+      "description": "Indica si la credencial vehicular fue impresa/entregada"
+    },
     "custom_fields": {
       "type": "object",
       "description": "Campos personalizados definidos por el administrador",

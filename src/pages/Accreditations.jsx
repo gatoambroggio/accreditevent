@@ -61,6 +61,7 @@ export default function Accreditations() {
   const [settings, setSettings] = useState(null);
   const [detailPerson, setDetailPerson] = useState(null);
   const [vehicleBatchPrint, setVehicleBatchPrint] = useState(null);
+  const [newInitial, setNewInitial] = useState({});
 
   useEffect(() => {
     (async () => {
@@ -183,9 +184,20 @@ export default function Accreditations() {
         hint: 'Seleccioná personal, vehicular o ambas.',
       },
     ]),
+    { name: 'delivered_personal', label: 'Credencial personal entregada', type: 'checkbox' },
+    { name: 'delivered_vehicular', label: 'Credencial vehicular entregada', type: 'checkbox' },
   ];
 
-  const openNew = () => { setEditing(null); setPersonVehicles([]); setVehicleApprovals({}); setSelectedEventId(''); setModalOpen(true); };
+  const openNew = () => {
+    setEditing(null);
+    setPersonVehicles([]);
+    setVehicleApprovals({});
+    const activeEvent = events.find((e) => e.status === 'active');
+    const defaultEventId = activeEvent?.id || '';
+    setSelectedEventId(defaultEventId);
+    setNewInitial({ event_id: defaultEventId });
+    setModalOpen(true);
+  };
   const openEdit = (item) => {
     const normalized = { ...item, access_level: item.access_level || item.area || '' };
     setPersonVehicles([]);
@@ -264,6 +276,8 @@ export default function Accreditations() {
       : (Array.isArray(data.event_phases) ? data.event_phases : []);
     const personPhases = Array.isArray(person?.event_phases) ? person.event_phases : [];
     const finalPhases = phasesFromForm.length > 0 ? phasesFromForm : personPhases;
+    const approvedVehicles = personVehicles.filter((v) => vehicleApprovals[v.id]?.approved);
+    const printTypes = String(data.print_type || '').split(',').map((s) => s.trim()).filter(Boolean);
     const payload = {
       event_id: data.event_id,
       person_id: data.person_id,
@@ -279,6 +293,8 @@ export default function Accreditations() {
       status: data.status || 'active',
       block_reason: data.block_reason || '',
       has_biometric: data.has_biometric || false,
+      delivered_personal: (!editing && data.print_badge && printTypes.includes('personal')) || !!data.delivered_personal,
+      delivered_vehicular: (!editing && data.print_badge && printTypes.includes('vehicular') && approvedVehicles.length > 0) || !!data.delivered_vehicular,
     };
     let createdAccred = null;
     if (editing) {
@@ -378,7 +394,6 @@ export default function Accreditations() {
       }
     }
     // Vehicle accreditation — apply per-vehicle approvals
-    const approvedVehicles = personVehicles.filter((v) => vehicleApprovals[v.id]?.approved);
     if (approvedVehicles.length > 0) {
       for (const v of approvedVehicles) {
         try {
@@ -402,7 +417,6 @@ export default function Accreditations() {
     }
     // Impresión opcional tras acreditar
     if (!editing && data.print_badge) {
-      const printTypes = String(data.print_type || '').split(',').map((s) => s.trim()).filter(Boolean);
       if (printTypes.includes('personal')) {
         setBadgeAccred(createdAccred);
       }
@@ -492,6 +506,7 @@ export default function Accreditations() {
             <Th>Código</Th>
             <Th>Área de acceso</Th>
             <Th>Estado</Th>
+            <Th>Entrega</Th>
             <Th>Bio</Th>
             <Th />
           </tr>
@@ -520,6 +535,17 @@ export default function Accreditations() {
               <Td><code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700">{a.badge_code}</code></Td>
               <Td className="text-sm text-slate-500">{(a.access_level || a.area || '').split(',').map((z) => zones.find((zz) => zz.value === z.trim())?.label || z.trim()).filter(Boolean).join(', ') || '—'}</Td>
               <Td><StatusBadge status={a.status} /></Td>
+              <Td>
+                {a.delivered_personal && a.delivered_vehicular ? (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">Completa</span>
+                ) : a.delivered_personal ? (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 ring-1 ring-blue-200">Personal</span>
+                ) : a.delivered_vehicular ? (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-200">Vehicular</span>
+                ) : (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500 ring-1 ring-slate-200">Pendiente</span>
+                )}
+              </Td>
               <Td>
                 <BiometricButton accreditation={a} onRegistered={reload} />
               </Td>
@@ -551,7 +577,7 @@ export default function Accreditations() {
         title={editing ? 'Editar acreditación' : 'Nueva acreditación'}
         kicker={editing ? 'EDITAR ACREDITACIÓN' : 'CREAR ACREDITACIÓN'}
         fields={fields}
-        initialData={editing || {}}
+        initialData={editing || newInitial}
         onSubmit={handleSubmit}
         onDelete={editing ? handleDelete : null}
         canDelete={!!editing}

@@ -25,10 +25,24 @@ export default function FacialAccreditationForm({ open, event, identifiedPerson,
     return map;
   }, [personTypes]);
 
-  const [initialData, setInitialData] = useState({});
   const [personVehicles, setPersonVehicles] = useState([]);
   const [vehicleApprovals, setVehicleApprovals] = useState({});
   const [selectedEventId, setSelectedEventId] = useState('');
+
+  // Datos iniciales calculados sincrónicamente para que el formulario se complete en el primer escaneo
+  const initialData = useMemo(() => {
+    if (!identifiedPerson) return {};
+    const p = identifiedPerson;
+    const defaultEventId = pickPersonDefaultEvent(p, events) || event?.id || '';
+    return {
+      event_id: defaultEventId,
+      person_id: p.id || '',
+      access_level: p.access_area || '',
+      event_phases: Array.isArray(p.event_phases) ? p.event_phases.join(',') : '',
+      status: 'active',
+      has_biometric: true,
+    };
+  }, [identifiedPerson, events, event]);
 
   useEffect(() => {
     if (!open || !identifiedPerson) return;
@@ -37,14 +51,6 @@ export default function FacialAccreditationForm({ open, event, identifiedPerson,
     setSelectedEventId(defaultEventId);
     setPersonVehicles([]);
     setVehicleApprovals({});
-    setInitialData({
-      event_id: defaultEventId,
-      person_id: p.id || '',
-      access_level: p.access_area || '',
-      event_phases: Array.isArray(p.event_phases) ? p.event_phases.join(',') : '',
-      status: 'active',
-      has_biometric: true,
-    });
     (async () => {
       try {
         const [bios, vehs] = await Promise.all([
@@ -55,10 +61,12 @@ export default function FacialAccreditationForm({ open, event, identifiedPerson,
         const init = {};
         vehs.forEach((v) => { init[v.id] = { approved: false, sector: v.parking_sector || '' }; });
         setVehicleApprovals(init);
-        setInitialData((d) => ({ ...d, has_biometric: bios.length > 0 || true }));
-      } catch {}
+      } catch {
+        setPersonVehicles([]);
+        setVehicleApprovals({});
+      }
     })();
-  }, [open, identifiedPerson, event]);
+  }, [open, identifiedPerson, event, events]);
 
   const eventOptions = useMemo(
     () => (events || []).filter((e) => e.status !== 'closed').map((e) => ({ value: e.id, label: e.name })),
@@ -99,6 +107,8 @@ export default function FacialAccreditationForm({ open, event, identifiedPerson,
       ],
       hint: 'Seleccioná personal, vehicular o ambas.',
     },
+    { name: 'delivered_personal', label: 'Credencial personal entregada', type: 'checkbox' },
+    { name: 'delivered_vehicular', label: 'Credencial vehicular entregada', type: 'checkbox' },
   ];
 
   const handleFieldChange = async (name, value, setField) => {
@@ -159,6 +169,8 @@ export default function FacialAccreditationForm({ open, event, identifiedPerson,
     const finalPhases = phasesFromForm.length > 0 ? phasesFromForm : personPhases;
     const allAccreditations = await base44.entities.Accreditation.list('-created_date', 500);
     const badgeCode = generateBadgeCode(person?.person_type, allAccreditations.map((a) => a.badge_code), typePrefixes);
+    const approvedVehicles = personVehicles.filter((v) => vehicleApprovals[v.id]?.approved);
+    const printTypes = String(data.print_type || '').split(',').map((s) => s.trim()).filter(Boolean);
     const payload = {
       event_id: data.event_id,
       person_id: data.person_id,
@@ -174,10 +186,11 @@ export default function FacialAccreditationForm({ open, event, identifiedPerson,
       status: data.status || 'active',
       block_reason: data.block_reason || '',
       has_biometric: data.has_biometric || false,
+      delivered_personal: (data.print_badge && printTypes.includes('personal')) || !!data.delivered_personal,
+      delivered_vehicular: (data.print_badge && printTypes.includes('vehicular') && approvedVehicles.length > 0) || !!data.delivered_vehicular,
     };
     const created = await base44.entities.Accreditation.create(payload);
     // Vehicle accreditation
-    const approvedVehicles = personVehicles.filter((v) => vehicleApprovals[v.id]?.approved);
     for (const v of approvedVehicles) {
       try {
         const currentEventIds = Array.isArray(v.event_ids) ? v.event_ids : [];
@@ -197,7 +210,6 @@ export default function FacialAccreditationForm({ open, event, identifiedPerson,
     }
     let printInfo = null;
     if (data.print_badge) {
-      const printTypes = String(data.print_type || '').split(',').map((s) => s.trim()).filter(Boolean);
       printInfo = {};
       if (printTypes.includes('personal')) printInfo.personal = true;
       if (printTypes.includes('vehicular') && approvedVehicles.length > 0) {
