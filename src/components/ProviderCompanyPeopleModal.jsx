@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Users, UserPlus, Link2, Search, Loader2 } from 'lucide-react';
+import { X, Users, UserPlus, Link2, Search, Loader2, FileSpreadsheet, FileText } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import AdminEmployeeImportModal from '@/components/AdminEmployeeImportModal';
+import CompanyDocUploadModal from '@/components/CompanyDocUploadModal';
 
 export default function ProviderCompanyPeopleModal({ company, onClose }) {
   const [people, setPeople] = useState([]);
@@ -8,6 +10,9 @@ export default function ProviderCompanyPeopleModal({ company, onClose }) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [linking, setLinking] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [docOpen, setDocOpen] = useState(false);
+  const [events, setEvents] = useState([]);
 
   const loadPeople = async () => {
     try {
@@ -37,6 +42,7 @@ export default function ProviderCompanyPeopleModal({ company, onClose }) {
 
   useEffect(() => {
     loadAllForSearch();
+    base44.entities.Event.list('-start_at', 200).then(setEvents).catch(() => {});
   }, []);
 
   const searchResults = useMemo(() => {
@@ -55,6 +61,19 @@ export default function ProviderCompanyPeopleModal({ company, onClose }) {
       setSearch('');
     } catch {}
     setLinking(null);
+  };
+
+  const handleImport = async (rows, companyName, eventId) => {
+    const ev = events.find((e) => e.id === eventId);
+    const enrichedRows = rows.map((r) => ({
+      ...r,
+      company: companyName,
+      event_ids: eventId ? [eventId] : [],
+      event_names: eventId ? [ev?.name] : [],
+      productora: ev?.company || '',
+    }));
+    await base44.entities.Person.bulkCreate(enrichedRows);
+    loadPeople();
   };
 
   const handleUnlink = async (person) => {
@@ -84,12 +103,20 @@ export default function ProviderCompanyPeopleModal({ company, onClose }) {
         </div>
 
         <div className="space-y-5 px-6 py-5">
-          {/* Stats */}
-          <div className="flex items-center gap-3">
+          {/* Stats + actions */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-200">
               <Users className="h-3.5 w-3.5" />
               {loading ? '…' : people.length} {people.length === 1 ? 'persona' : 'personas'}
             </span>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setImportOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                <FileSpreadsheet className="h-4 w-4" /> Importar Excel
+              </button>
+              <button type="button" onClick={() => setDocOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800">
+                <FileText className="h-4 w-4" /> Subir documento
+              </button>
+            </div>
           </div>
 
           {/* Link existing person */}
@@ -178,6 +205,20 @@ export default function ProviderCompanyPeopleModal({ company, onClose }) {
           </button>
         </div>
       </div>
+
+      <AdminEmployeeImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImport={handleImport}
+        companies={[company]}
+        events={events}
+        defaultCompany={company.name}
+      />
+
+      <CompanyDocUploadModal
+        company={docOpen ? company : null}
+        onClose={() => setDocOpen(false)}
+      />
     </div>
   );
 }

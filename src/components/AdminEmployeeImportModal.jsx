@@ -2,13 +2,13 @@ import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { X, Upload, Download, FileSpreadsheet, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 
-export default function AdminEmployeeImportModal({ open, onClose, onImport, companies, events }) {
+export default function AdminEmployeeImportModal({ open, onClose, onImport, companies, events, defaultCompany }) {
   const [rows, setRows] = useState([]);
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
-  const [companyName, setCompanyName] = useState('');
+  const [companyName, setCompanyName] = useState(defaultCompany || '');
   const [eventId, setEventId] = useState('');
   const fileRef = useRef(null);
 
@@ -88,7 +88,7 @@ export default function AdminEmployeeImportModal({ open, onClose, onImport, comp
     setFileName('');
     setResult(null);
     setError('');
-    setCompanyName('');
+    setCompanyName(defaultCompany || '');
     setEventId('');
     if (fileRef.current) fileRef.current.value = '';
     onClose();
@@ -123,14 +123,16 @@ export default function AdminEmployeeImportModal({ open, onClose, onImport, comp
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <label className="block">
-                  <span className="mb-1.5 block text-xs font-semibold text-slate-600">Empresa destinataria *</span>
-                  <select value={companyName} onChange={(e) => setCompanyName(e.target.value)} className={inputCls}>
-                    <option value="">Seleccionar empresa…</option>
-                    {companies.map((c) => (<option key={c.id} value={c.name}>{c.name}</option>))}
-                  </select>
-                </label>
+              <div className={`grid grid-cols-1 gap-4 ${defaultCompany ? '' : 'sm:grid-cols-2'}`}>
+                {!defaultCompany && (
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-semibold text-slate-600">Empresa destinataria *</span>
+                    <select value={companyName} onChange={(e) => setCompanyName(e.target.value)} className={inputCls}>
+                      <option value="">Seleccionar empresa…</option>
+                      {companies.map((c) => (<option key={c.id} value={c.name}>{c.name}</option>))}
+                    </select>
+                  </label>
+                )}
                 <label className="block">
                   <span className="mb-1.5 block text-xs font-semibold text-slate-600">Asignar al evento (opcional)</span>
                   <select value={eventId} onChange={(e) => setEventId(e.target.value)} className={inputCls}>
