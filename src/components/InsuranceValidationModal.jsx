@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, X, Loader2, AlertTriangle, CheckCircle2, XCircle, FileText, Calendar, User, Building2 } from 'lucide-react';
+import { ShieldCheck, X, Loader2, AlertTriangle, CheckCircle2, XCircle, FileText, Calendar, User, Building2, Users } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 
 export default function InsuranceValidationModal({ document: doc, onClose, onValidated }) {
@@ -38,8 +38,8 @@ export default function InsuranceValidationModal({ document: doc, onClose, onVal
       await base44.entities.Document.update(doc.id, {
         status,
         review_note: status === 'approved'
-          ? 'Seguro validado automáticamente (DNI y fechas verificadas)'
-          : 'Seguro rechazado: validación automática falló',
+          ? 'Seguro validado automáticamente (fechas, DNI y nómina de empleados verificados)'
+          : 'Seguro rechazado: validación automática falló (DNI, fechas o nómina de empleados)',
         reviewed_by: me?.full_name || me?.email || '',
         reviewed_at: new Date().toISOString(),
         ...(result?.extracted?.valid_until ? { expires_at: result.extracted.valid_until } : {}),
@@ -130,8 +130,70 @@ export default function InsuranceValidationModal({ document: doc, onClose, onVal
                       passed={result.validation.event_coverage.covers_event}
                       detail={`${fmtDate(result.validation.event_coverage.event_start)} → ${fmtDate(result.validation.event_coverage.event_end)}`} />
                   )}
+                  {result.validation.employee_validation && result.validation.employee_validation.total_employees > 0 && (
+                    <CheckRow
+                      label={`Nómina de empleados (${result.validation.employee_validation.covered_count}/${result.validation.employee_validation.total_employees} cubiertos)`}
+                      passed={result.validation.employee_validation.all_covered}
+                      detail={result.validation.employee_validation.uncovered_count > 0
+                        ? `${result.validation.employee_validation.uncovered_count} empleado(s) no aparecen en la póliza`
+                        : 'Todos los empleados están en la nómina de la póliza'} />
+                  )}
                 </div>
               </div>
+
+              {result.validation.employee_validation && result.validation.employee_validation.total_employees > 0 && (
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    Conciliación de nómina — {result.validation.employee_validation.company}
+                  </p>
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                      <Users className="h-3 w-3" /> {result.validation.employee_validation.total_employees} empleados
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                      <CheckCircle2 className="h-3 w-3" /> {result.validation.employee_validation.covered_count} cubiertos
+                    </span>
+                    {result.validation.employee_validation.uncovered_count > 0 && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700 ring-1 ring-red-200">
+                        <XCircle className="h-3 w-3" /> {result.validation.employee_validation.uncovered_count} sin cobertura
+                      </span>
+                    )}
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-200">
+                      <FileText className="h-3 w-3" /> {result.validation.employee_validation.insured_in_policy} en póliza
+                    </span>
+                  </div>
+                  <div className="max-h-[240px] overflow-y-auto rounded-lg border border-slate-200">
+                    <table className="w-full text-left text-sm">
+                      <thead className="sticky top-0 bg-slate-50">
+                        <tr className="border-b border-slate-100">
+                          <th className="px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-slate-500">Empleado</th>
+                          <th className="px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-slate-500">DNI</th>
+                          <th className="px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-slate-500">Cobertura</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {result.validation.employee_validation.reconciliation.map((emp) => (
+                          <tr key={emp.person_id} className="border-b border-slate-50">
+                            <td className="px-3 py-2 font-medium text-slate-800">{emp.full_name}</td>
+                            <td className="px-3 py-2 text-slate-500">{emp.document || '—'}</td>
+                            <td className="px-3 py-2">
+                              {emp.is_covered ? (
+                                <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
+                                  <CheckCircle2 className="h-3 w-3" /> Cubierto
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600">
+                                  <XCircle className="h-3 w-3" /> No cubierto
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

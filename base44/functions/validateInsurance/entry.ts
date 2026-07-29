@@ -23,6 +23,17 @@ export default async function(req) {
       try { event = await base44.entities.Event.get(doc.event_id); } catch {}
     }
 
+    // Load company employees for reconciliation
+    let companyEmployees = [];
+    if (doc.company) {
+      try {
+        companyEmployees = await base44.entities.Person.filter(
+          { company: doc.company, tipo_vinculo: 'empresa' },
+          '-created_date', 500
+        );
+      } catch {}
+    }
+
     const extractResult = await base44.integrations.Core.ExtractDataFromUploadedFile({
       file_url: doc.file_url,
       json_schema: {
@@ -35,7 +46,18 @@ export default async function(req) {
           coverage_amount: { type: 'number', description: 'Monto de cobertura (valor numérico)' },
           valid_from: { type: 'string', description: 'Fecha de inicio de cobertura en formato YYYY-MM-DD' },
           valid_until: { type: 'string', description: 'Fecha de vencimiento de cobertura en formato YYYY-MM-DD' },
-          coverage_type: { type: 'string', description: 'Tipo de cobertura: ART, responsabilidad civil, accidentes personales, etc.' }
+          coverage_type: { type: 'string', description: 'Tipo de cobertura: ART, responsabilidad civil, accidentes personales, etc.' },
+          insured_employees: {
+            type: 'array',
+            description: 'Lista de empleados asegurados que aparecen en la nómina de la póliza',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string', description: 'Nombre completo del empleado asegurado' },
+                dni: { type: 'string', description: 'DNI del empleado asegurado' }
+              }
+            }
+          }
         }
       }
     });
@@ -49,8 +71,11 @@ export default async function(req) {
 
     const extracted = extractResult.output;
 
-    // Normalize DNI for comparison
+    // Normalize helpers
     const normalizeDni = (s) => (s || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    const normalizeName = (s) => (s || '').toLowerCase().trim().replace(/\s+/g, ' ');
+
+    // DNI validation (person-level)
     const personDni = normalizeDni(person?.document || '');
     const policyDni = normalizeDni(extracted.policyholder_dni || '');
     const dniMatch = !!(personDni && policyDni && personDni === policyDni);
@@ -99,10 +124,49 @@ export default async function(req) {
       }
     }
 
-    const overallValid = dniMatch && dateValid && (!eventCoverage || eventCoverage.covers_event);
+    // Employee reconciliation (company-level ART insurance)
+    const insuredList = Array.isArray(extracted.insured_employees) ? extracted.insured_employees : [];
+    const hasInsuredList = insuredList.length > 0;
+    const insuredDnis = new Set(insuredList.map(e => normalizeDni(e.dni)).filter(Boolean));
+    const insuredNames = new Set(insuredList.map(e => normalizeName(e.name)).filter(Boolean));
+
+    const reconciliation = companyEmployees.map(emp => {
+      const empDni = normalizeDni(emp.document || '');
+      const empName = normalizeName(emp.full_name || '');
+      const dniMatchEmp = empDni && insuredDnis.has(empDni);
+      const nameMatchEmp = empName && insuredNames.has(empName);
+      return {
+        person_id: emp.id,
+        full_name: emp.full_name,
+        document: emp.document || '',
+        is_covered: dniMatchEmp || nameMatchEmp,
+      };
+    });
+
+    const coveredCount = reconciliation.filter(e => e.is_covered).length;
+    const uncoveredCount = reconciliation.length - coveredCount;
+
+    const employeeValidation = companyEmployees.length > 0 ? {
+      company: doc.company || '',
+      total_employees: companyEmployees.length,
+      insured_in_policy: insuredList.length,
+      has_insured_list: hasInsuredList,
+      covered_count: coveredCount,
+      uncovered_count: uncoveredCount,
+      all_covered: !hasInsuredList || uncoveredCount === 0,
+      reconciliation,
+    } : null;
+
+    // Overall validity — employee coverage only blocks if the policy has a nómina
+    const isCompanyLevelDoc = !doc.person_id && !!doc.company;
+    const employeeCoverageOk = !employeeValidation || !hasInsuredList || uncoveredCount === 0;
+    const overallValid = isCompanyLevelDoc
+      ? dateValid && (!eventCoverage || eventCoverage.covers_event) && employeeCoverageOk
+      : dniMatch && dateValid && (!eventCoverage || eventCoverage.covers_event) && employeeCoverageOk;
 
     return Response.json({
       valid: overallValid,
+      is_company_level: isCompanyLevelDoc,
       extracted: {
         policyholder_name: extracted.policyholder_name || '',
         policyholder_dni: extracted.policyholder_dni || '',
@@ -120,7 +184,8 @@ export default async function(req) {
         date_valid: dateValid,
         date_issues: dateIssues,
         event_coverage: eventCoverage,
-        coverage_amount: extracted.coverage_amount || 0
+        coverage_amount: extracted.coverage_amount || 0,
+        employee_validation: employeeValidation
       },
       person: { full_name: person?.full_name || '', document: person?.document || '' },
       event: event ? { name: event.name } : null
