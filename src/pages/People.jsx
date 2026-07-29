@@ -308,7 +308,7 @@ export default function People() {
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="Directorio" title="Empleados">
+      <PageHeader kicker="Directorio" title="Personal de Empresas">
         <button onClick={handleExport} className={btnOutline}>
           <Download className="h-4 w-4" /> Exportar
         </button>
