@@ -94,6 +94,10 @@ export const AuthProvider = ({ children }) => {
       // Now check if the user is authenticated
       setIsLoadingAuth(true);
       const currentUser = await base44.auth.me();
+      if (currentUser?.blocked || currentUser?.data?.blocked) {
+        base44.auth.logout(window.location.origin + '/login');
+        return;
+      }
       setUser(currentUser);
       setIsAuthenticated(true);
       setIsLoadingAuth(false);

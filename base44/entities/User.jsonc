@@ -29,6 +29,11 @@
       },
       "description": "M\u00f3dulos (rutas) permitidos para este usuario. Vac\u00edo = sin restricci\u00f3n (seg\u00fan rol)."
     },
+    "blocked": {
+      "type": "boolean",
+      "default": false,
+      "description": "Indica si el usuario est\u00e1 bloqueado y no puede iniciar sesi\u00f3n"
+    },
     "company": {
       "type": "string",
       "description": "Empresa a la que pertenece el usuario"
@@ -38,5 +43,85 @@
     "role"
   ],
   "name": "User",
-  "type": "object"
+  "type": "object",
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        }
+      ]
+    }
+  }
 }

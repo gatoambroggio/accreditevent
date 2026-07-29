@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { logAudit } from '@/lib/audit';
-import { UserPlus, Loader2, Pencil, KeyRound, Building2, ShieldCheck } from 'lucide-react';
+import { UserPlus, Loader2, Pencil, KeyRound, Building2, ShieldCheck, Ban } from 'lucide-react';
 import EntityModal from '@/components/EntityModal';
+import { useAuth } from '@/lib/AuthContext';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
 import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
@@ -61,6 +62,9 @@ const ROLE_STYLES = {
 };
 
 export default function Users() {
+  const { user: currentUser } = useAuth();
+  const isProductora = currentUser?.role === 'productora';
+  const myCompany = currentUser?.company || currentUser?.data?.company || '';
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -75,10 +79,21 @@ export default function Users() {
   const [resetting, setResetting] = useState(false);
   const [resetMsg, setResetMsg] = useState('');
 
+  const availableRoles = isProductora ? ROLES.filter((r) => r.value === 'operador') : ROLES;
+  const canManageUser = (u) => {
+    if (!u) return false;
+    if (u.id === currentUser?.id) return false;
+    if (isProductora) return u.role === 'operador' && (u.company || '') === myCompany;
+    return true;
+  };
+
   const load = async () => {
     setLoading(true);
     try {
-      const data = await base44.entities.User.list('-created_date', 200);
+      let data = await base44.entities.User.list('-created_date', 200);
+      if (isProductora && myCompany) {
+        data = data.filter((u) => (u.company || '') === myCompany);
+      }
       setUsers(data);
     } catch (err) {
       setError(err.message || 'Error al cargar usuarios.');
@@ -101,8 +116,8 @@ export default function Users() {
   }, [users, search]);
 
   const fields = useMemo(() => [
-    { name: 'company', label: 'Empresa', type: 'text', placeholder: 'Ej: Producciones SA', full: true },
-    { name: 'role', label: 'Rol', type: 'select', options: ROLES, required: true },
+    ...(isProductora ? [] : [{ name: 'company', label: 'Empresa', type: 'text', placeholder: 'Ej: Producciones SA', full: true }]),
+    { name: 'role', label: 'Rol', type: 'select', options: availableRoles, required: true },
     {
       name: 'assigned_event_ids', label: 'Eventos asignados', type: 'toggle-group',
       options: events.map((e) => ({ value: e.id, label: e.name })),
@@ -112,8 +127,9 @@ export default function Users() {
       name: 'allowed_paths', label: 'Módulos permitidos', type: 'toggle-group',
       options: MODULE_OPTIONS, full: true, hint: 'Si seleccionás módulos, el usuario solo verá esos. Vacío = sin restricción.',
     },
+    { name: 'blocked', label: 'Bloqueado (sin acceso al sistema)', type: 'checkbox' },
     { name: 'password', label: 'Nueva contraseña', type: 'password', placeholder: 'Dejar en blanco para no cambiar', full: true, hint: 'Mínimo 6 caracteres' },
-  ], [events]);
+  ], [events, availableRoles]);
 
   const openEdit = (u) => { setEditing(u); setModalOpen(true); setResetMsg(''); };
 
@@ -148,17 +164,27 @@ export default function Users() {
       }
     }
     const oldCompany = editing.company || '';
-    const newCompany = data.company || '';
+    const newCompany = isProductora ? (editing.company || myCompany) : (data.company || '');
     const assignedEventIds = typeof data.assigned_event_ids === 'string'
       ? data.assigned_event_ids.split(',').map((s) => s.trim()).filter(Boolean)
       : (Array.isArray(data.assigned_event_ids) ? data.assigned_event_ids : []);
     const allowedPaths = typeof data.allowed_paths === 'string'
       ? data.allowed_paths.split(',').map((s) => s.trim()).filter(Boolean)
       : (Array.isArray(data.allowed_paths) ? data.allowed_paths : []);
-    await base44.entities.User.update(editing.id, { role: data.role, company: newCompany, assigned_event_ids: assignedEventIds, allowed_paths: allowedPaths });
+    await base44.entities.User.update(editing.id, { role: data.role, company: newCompany, assigned_event_ids: assignedEventIds, allowed_paths: allowedPaths, blocked: !!data.blocked });
     await syncUserCompany(editing.id, oldCompany, newCompany);
     await logAudit('update', 'User', editing.id, `Rol: ${data.role}, Empresa: ${newCompany || '—'}`);
-    setUsers((prev) => prev.map((u) => (u.id === editing.id ? { ...u, role: data.role, company: newCompany, assigned_event_ids: assignedEventIds, allowed_paths: allowedPaths } : u)));
+    setUsers((prev) => prev.map((u) => (u.id === editing.id ? { ...u, role: data.role, company: newCompany, assigned_event_ids: assignedEventIds, allowed_paths: allowedPaths, blocked: !!data.blocked } : u)));
+  };
+
+  const handleToggleBlock = async (u) => {
+    try {
+      await base44.entities.User.update(u.id, { blocked: !u.blocked });
+      await logAudit(!u.blocked ? 'block-user' : 'unblock-user', 'User', u.id, !u.blocked ? 'Bloqueado' : 'Desbloqueado');
+      setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, blocked: !u.blocked } : x)));
+    } catch (err) {
+      alert('No se pudo actualizar: ' + (err.message || err));
+    }
   };
 
   const handleDelete = async () => {
@@ -200,8 +226,14 @@ export default function Users() {
     setInviting(true);
     setError('');
     try {
-      await base44.users.inviteUser(inviteEmail, inviteRole);
-      await logAudit('invite', 'User', '', `Invitación a ${inviteEmail} (${inviteRole})`);
+      if (isProductora) {
+        const res = await base44.functions.invoke('assignOperator', { email: inviteEmail });
+        if (res.data?.error) throw new Error(res.data.error);
+        await logAudit('assign-operator', 'User', '', `Operador asignado: ${inviteEmail}`);
+      } else {
+        await base44.users.inviteUser(inviteEmail, inviteRole);
+        await logAudit('invite', 'User', '', `Invitación a ${inviteEmail} (${inviteRole})`);
+      }
       setInviteOpen(false);
       setInviteEmail('');
       setInviteRole('provider');
@@ -216,8 +248,8 @@ export default function Users() {
   return (
     <div className="space-y-6">
       <PageHeader kicker="Administración" title="Usuarios y roles">
-        <button onClick={() => setInviteOpen(true)} className={btnPrimary}>
-          <UserPlus className="h-4 w-4" /> Invitar usuario
+        <button onClick={() => { setInviteOpen(true); if (isProductora) setInviteRole('operador'); }} className={btnPrimary}>
+          <UserPlus className="h-4 w-4" /> {isProductora ? 'Asignar operador' : 'Invitar usuario'}
         </button>
       </PageHeader>
 
@@ -263,6 +295,9 @@ export default function Users() {
                   <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${roleStyle}`}>
                     <ShieldCheck className="h-3 w-3" /> {roleLabel}
                   </span>
+                  {u.blocked && (
+                    <span className="mt-1 inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700 ring-1 ring-red-200">Bloqueado</span>
+                  )}
                 </Td>
                 <Td className="text-sm text-slate-500">
                   {eventCount > 0 ? (
@@ -273,13 +308,23 @@ export default function Users() {
                 </Td>
                 <Td className="text-right">
                   <div className="inline-flex items-center gap-1">
-                    <button onClick={() => handleResetPasswordRow(u)} title="Reseteo de contraseña"
-                      className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-amber-50 hover:text-amber-600">
-                      <KeyRound className="h-3.5 w-3.5" />
-                    </button>
-                    <button onClick={() => openEdit(u)} title="Editar" className={btnIcon}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
+                    {canManageUser(u) && (
+                      <button onClick={() => handleToggleBlock(u)} title={u.blocked ? 'Desbloquear' : 'Bloquear'}
+                        className={`rounded-md border p-1.5 transition ${u.blocked ? 'border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-100' : 'border-slate-200 bg-white text-slate-500 hover:bg-amber-50 hover:text-amber-600'}`}>
+                        <Ban className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {canManageUser(u) && (
+                      <button onClick={() => handleResetPasswordRow(u)} title="Reseteo de contraseña"
+                        className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-amber-50 hover:text-amber-600">
+                        <KeyRound className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {canManageUser(u) && (
+                      <button onClick={() => openEdit(u)} title="Editar" className={btnIcon}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
                 </Td>
               </Tr>
@@ -299,13 +344,18 @@ export default function Users() {
                 <input type="email" required value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
               </label>
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Rol *</span>
-                <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20">
-                  {ROLES.map((r) => (<option key={r.value} value={r.value}>{r.label}</option>))}
-                </select>
-              </label>
+              {!isProductora && (
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-semibold text-slate-600">Rol *</span>
+                  <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20">
+                    {availableRoles.map((r) => (<option key={r.value} value={r.value}>{r.label}</option>))}
+                  </select>
+                </label>
+              )}
+              {isProductora && (
+                <p className="text-xs text-slate-500">Se asignará el email ingresado como <strong>operador</strong> de tu productora. La persona debe estar registrada en el sistema.</p>
+              )}
               {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setInviteOpen(false)} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">Cancelar</button>
@@ -327,7 +377,7 @@ export default function Users() {
         initialData={editing || {}}
         onSubmit={handleUpdate}
         onDelete={editing ? handleDelete : null}
-        canDelete={!!editing}
+        canDelete={!!editing && canManageUser(editing)}
         submitLabel="Guardar cambios"
         topContent={
           editing?.email ? (

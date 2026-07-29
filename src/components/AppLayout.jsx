@@ -71,7 +71,7 @@ const NAV_ITEMS = [
   { path: '/messages', label: 'Mensajes', icon: MessageSquare, minLevel: 1, module: 'whatsapp' },
   // Administración
   { path: '/companies', label: 'Empresas', icon: Building2, minLevel: 2 },
-  { path: '/users', label: 'Usuarios y roles', icon: ShieldCheck, minLevel: 2 },
+  { path: '/users', label: 'Usuarios y roles', icon: ShieldCheck, minLevel: 2, roles: ['productora', 'admin', 'superadmin'] },
   { path: '/audit', label: 'Auditoría', icon: ScrollText, minLevel: 2 },
   { path: '/custom-fields', label: 'Campos personalizados', icon: ListPlus, minLevel: 2 },
   { path: '/apariencia', label: 'Apariencia', icon: Palette, minLevel: 2 },
@@ -135,6 +135,9 @@ export default function AppLayout() {
       if (item.path === '/') return true;
       if (item.expandable && item.children?.some((c) => userAllowedPaths.includes(c.path))) return true;
       if (!userAllowedPaths.includes(item.path)) return false;
+    }
+    if (item.roles) {
+      return item.roles.includes(user?.role);
     }
     if (settings?.role_access?.[item.path]) {
       return settings.role_access[item.path].includes(user?.role);
