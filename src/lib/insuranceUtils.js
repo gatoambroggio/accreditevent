@@ -22,6 +22,7 @@ const isCoveredByDoc = (d, personId) => {
 };
 
 // Get insurance status for a single person — checks company-level and person-level docs
+// Productora users fetch via the getProductoraDocuments backend (RLS blocks provider-company docs)
 export async function getInsuranceStatus(person) {
   if (!person) return { insured: false, status: 'none', docs: [], approvedDoc: null };
 
@@ -29,16 +30,27 @@ export async function getInsuranceStatus(person) {
   let allDocs = [];
 
   try {
-    const personDocs = await base44.entities.Document.filter({ person_id: person.id }, '-created_date', 50);
-    allDocs = allDocs.concat(personDocs);
-  } catch {}
+    const me = await base44.auth.me().catch(() => null);
+    const role = me?.data?.role || me?.role || '';
 
-  if (company) {
-    try {
-      const companyDocs = await base44.entities.Document.filter({ company }, '-created_date', 100);
-      allDocs = allDocs.concat(companyDocs.filter((d) => !d.person_id));
-    } catch {}
-  }
+    if (role === 'productora') {
+      // Service-role backend aggregates docs across the productora's provider companies
+      const res = await base44.functions.invoke('getProductoraDocuments', {});
+      const backendDocs = res?.data?.documents || [];
+      // Person-level docs for this person + company-level docs (no person_id) for this person's company
+      allDocs = backendDocs.filter(
+        (d) => (d.person_id === person.id) || (d.company === company && !d.person_id)
+      );
+    } else {
+      const personDocs = await base44.entities.Document.filter({ person_id: person.id }, '-created_date', 50);
+      allDocs = allDocs.concat(personDocs);
+
+      if (company) {
+        const companyDocs = await base44.entities.Document.filter({ company }, '-created_date', 100);
+        allDocs = allDocs.concat(companyDocs.filter((d) => !d.person_id));
+      }
+    }
+  } catch {}
 
   const insuranceDocs = allDocs.filter((d) => isInsuranceDocType(d.document_type));
   const activeInsuranceDocs = insuranceDocs.filter((d) => !isDocExpired(d));
