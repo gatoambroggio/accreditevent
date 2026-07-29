@@ -41,6 +41,8 @@ export default function EmpresaPortal() {
   const [importOpen, setImportOpen] = useState(false);
   const [viewingDoc, setViewingDoc] = useState(null);
   const [approvals, setApprovals] = useState([]);
+  const [selected, setSelected] = useState(new Set());
+  const [bulkEventId, setBulkEventId] = useState('');
 
   const companyName = user?.company || user?.data?.company || '';
   const approvedEvents = approvals.filter((a) => a.status === 'approved').map((a) => a.event_name);
@@ -85,6 +87,53 @@ export default function EmpresaPortal() {
   }, [employees, search, filterType]);
 
   const { page, setPage, totalPages, paginated } = usePagination(filtered, 15);
+
+  const allFilteredIds = useMemo(() => filtered.map((e) => e.id), [filtered]);
+  const isAllSelected = allFilteredIds.length > 0 && allFilteredIds.every((id) => selected.has(id));
+  const toggleSelect = (id) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAll = () => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (isAllSelected) {
+        allFilteredIds.forEach((id) => next.delete(id));
+      } else {
+        allFilteredIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const handleBulkAssign = async () => {
+    if (!bulkEventId || selected.size === 0) return;
+    const ev = approvedEventList.find((e) => e.event_id === bulkEventId);
+    if (!ev) return;
+    const count = selected.size;
+    for (const empId of selected) {
+      const emp = employees.find((e) => e.id === empId);
+      if (!emp) continue;
+      const currentEventIds = Array.isArray(emp.event_ids) ? emp.event_ids : [];
+      if (!currentEventIds.includes(bulkEventId)) {
+        const newEventIds = [...currentEventIds, bulkEventId];
+        const newEventNames = [...(emp.event_names || []), ev.event_name];
+        const updated = await base44.entities.Person.update(emp.id, {
+          event_ids: newEventIds,
+          event_names: newEventNames,
+        });
+        await syncAccreditations(updated, newEventIds, emp.access_area, approvedEventList, emp.event_phases);
+      }
+    }
+    setSelected(new Set());
+    setBulkEventId('');
+    await load();
+    setMsg(`${count} empleado(s) asignado(s) al evento.`);
+    setTimeout(() => setMsg(''), 4000);
+  };
 
   const stats = useMemo(() => ({
     total: employees.length,
@@ -328,6 +377,20 @@ export default function EmpresaPortal() {
             </select>
           </div>
 
+          {selected.size > 0 && (
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5">
+              <span className="text-sm font-semibold text-emerald-700">{selected.size} seleccionado(s)</span>
+              <select value={bulkEventId} onChange={(e) => setBulkEventId(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500">
+                <option value="">Seleccionar evento…</option>
+                {approvedEventList.map((ev) => (<option key={ev.event_id} value={ev.event_id}>{ev.event_name}</option>))}
+              </select>
+              <button onClick={handleBulkAssign} disabled={!bulkEventId} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">
+                Asignar al evento
+              </button>
+              <button onClick={() => setSelected(new Set())} className="text-sm text-slate-500 hover:text-slate-700">Limpiar</button>
+            </div>
+          )}
+
           <DataTable
             isEmpty={filtered.length === 0}
             emptyIcon={Users}
@@ -336,6 +399,9 @@ export default function EmpresaPortal() {
           >
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
+                <Th className="w-10">
+                  <input type="checkbox" checked={isAllSelected} onChange={toggleSelectAll} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                </Th>
                 <Th>Nombre</Th>
                 <Th>DNI</Th>
                 <Th>Contacto</Th>
@@ -349,6 +415,9 @@ export default function EmpresaPortal() {
             <tbody>
               {paginated.map((emp) => (
                 <Tr key={emp.id}>
+                  <Td className="w-10">
+                    <input type="checkbox" checked={selected.has(emp.id)} onChange={() => toggleSelect(emp.id)} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                  </Td>
                   <Td>
                     <button onClick={() => { setEditingEmployee(emp); setFormOpen(true); }} className="text-left text-sm font-semibold text-slate-900 transition hover:text-emerald-700 hover:underline">
                       {emp.full_name}
