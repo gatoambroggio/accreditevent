@@ -90,10 +90,13 @@
       },
       "description": "IDs de usuarios asignados a este evento"
     },
-    "insurance_non_repetition": {
-      "type": "boolean",
-      "default": false,
-      "description": "Requiere que la p\u00f3liza contenga cl\u00e1usula de no repetici\u00f3n"
+    "insurance_non_repetition_clauses": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Cl\u00e1usulas de no repetici\u00f3n que la p\u00f3liza debe contener (texto libre, varias)"
     },
     "insurance_insured_amount": {
       "type": "number",

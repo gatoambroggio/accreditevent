@@ -142,12 +142,12 @@ export default function InsuranceValidationModal({ document: doc, onClose, onVal
                     detail={`Persona: ${result.validation.person_dni || '—'} · Póliza: ${result.validation.policy_dni || '—'}${result.extracted.policy_dni_was_cuit ? ' (extraído de CUIT/CUIL)' : ''}`} />
                   <CheckRow label="Vigencia de fechas" passed={result.validation.date_valid}
                     detail={result.validation.date_issues.length > 0 ? result.validation.date_issues.join(' · ') : 'Fechas válidas y vigentes'} />
-                  {result.validation.insurance_config && result.validation.insurance_config.non_repetition_required && (
-                    <CheckRow label="Cláusula de no repetición"
+                  {result.validation.insurance_config && result.validation.insurance_config.non_repetition_clauses?.length > 0 && (
+                    <CheckRow label={`Cláusulas de no repetición (${(result.validation.insurance_config.clause_validation?.clauses || []).filter(c => c.found).length}/${result.validation.insurance_config.non_repetition_clauses.length} encontradas)`}
                       passed={result.validation.insurance_config.non_repetition_ok}
-                      detail={result.validation.insurance_config.has_non_repetition_clause
-                        ? 'La póliza contiene la cláusula de no repetición requerida'
-                        : 'La póliza NO contiene la cláusula de no repetición requerida por el evento'} />
+                      detail={result.validation.insurance_config.non_repetition_ok
+                        ? 'Todas las cláusulas requeridas están presentes en la póliza'
+                        : 'Faltan cláusulas requeridas en la póliza'} />
                   )}
                   {result.validation.insurance_config && result.validation.insurance_config.required_amount > 0 && (
                     <CheckRow label="Monto asegurado"
@@ -164,6 +164,28 @@ export default function InsuranceValidationModal({ document: doc, onClose, onVal
                   )}
                 </div>
               </div>
+
+              {result.validation.insurance_config && result.validation.insurance_config.non_repetition_clauses?.length > 0 && (
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    Cláusulas de no repetición requeridas
+                  </p>
+                  <div className="space-y-2">
+                    {(result.validation.insurance_config.clause_validation?.clauses || result.validation.insurance_config.non_repetition_clauses.map(c => ({ clause: c, found: false, excerpt: '' }))).map((c, idx) => (
+                      <div key={idx} className={`flex items-start gap-2.5 rounded-lg border p-3 ${c.found ? 'border-emerald-100 bg-emerald-50/50' : 'border-red-100 bg-red-50/50'}`}>
+                        {c.found ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /> : <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />}
+                        <div className="min-w-0">
+                          <p className={`text-sm font-semibold ${c.found ? 'text-emerald-800' : 'text-red-800'}`}>
+                            {c.found ? 'Presente' : 'No encontrada'}
+                          </p>
+                          <p className="text-xs text-slate-600 break-words">{c.clause}</p>
+                          {c.excerpt && <p className="mt-1 text-xs text-slate-400 italic break-words">"{c.excerpt}"</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {result.validation.employee_validation && result.validation.employee_validation.total_employees > 0 && (
                 <div>

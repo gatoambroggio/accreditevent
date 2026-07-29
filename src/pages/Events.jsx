@@ -70,7 +70,7 @@ export default function Events() {
       { name: 'armado_end', label: 'Armado - Fin', type: 'datetime-local' },
       { name: 'desarme_start', label: 'Desarme - Inicio', type: 'datetime-local' },
       { name: 'desarme_end', label: 'Desarme - Fin', type: 'datetime-local' },
-      { name: 'insurance_non_repetition', label: 'Requiere cláusula de no repetición', type: 'checkbox', full: true, hint: 'La póliza debe contener una cláusula de no repetición para aprobarse' },
+      { name: 'insurance_non_repetition_clauses', label: 'Cláusulas de no repetición', type: 'string-list', full: true, hint: 'Agregá cada cláusula que la póliza debe contener. La validación OCR verificará que todas estén presentes.', addLabel: 'Agregar cláusula' },
       { name: 'insurance_insured_amount', label: 'Monto asegurado mínimo', type: 'number', full: true, hint: 'La póliza debe cubrir al menos este monto. Dejar en 0 para no validar.' },
       { name: 'pickup_date', label: 'Fecha de retiro', type: 'date' },
       { name: 'pickup_start_time', label: 'Retiro desde', type: 'time' },

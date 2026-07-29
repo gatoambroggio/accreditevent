@@ -47,7 +47,6 @@ export default async function(req) {
           valid_from: { type: 'string', description: 'Fecha de inicio de cobertura en formato YYYY-MM-DD' },
           valid_until: { type: 'string', description: 'Fecha de vencimiento de cobertura en formato YYYY-MM-DD' },
           coverage_type: { type: 'string', description: 'Tipo de cobertura: ART, responsabilidad civil, accidentes personales, etc.' },
-          has_non_repetition_clause: { type: 'boolean', description: 'Indica si la póliza contiene una cláusula de no repetición (cláusula de no repetición / non repetition / sin repetición). Buscar frases como "cláusula de no repetición", "no repetición", "non repetition", "sin repetición"' },
           insured_employees: {
             type: 'array',
             description: 'Lista de empleados asegurados que aparecen en la nómina de la póliza. Incluir todos los nombres y DNI/CUIT/CUIL que aparezcan',
@@ -155,17 +154,52 @@ export default async function(req) {
     });
 
     // Insurance config validation (event-level requirements)
-    const nonRepetitionRequired = event?.insurance_non_repetition === true;
-    const hasNonRepetition = extracted.has_non_repetition_clause === true;
-    const nonRepetitionOk = !nonRepetitionRequired || hasNonRepetition;
+    const nonRepetitionClauses = Array.isArray(event?.insurance_non_repetition_clauses)
+      ? event.insurance_non_repetition_clauses.map(c => (c || '').trim()).filter(Boolean)
+      : [];
+
+    // Verify each non-repetition clause is present in the document using LLM
+    let clauseValidation = null;
+    if (nonRepetitionClauses.length > 0) {
+      try {
+        const clausePrompt = `Analizá el siguiente documento de póliza de seguro. Verificá si cada una de las siguientes cláusulas está presente en el documento. Para cada cláusula, indicá si está presente (true/false) y, si lo está, un breve extracto del texto que coincide.\n\nCláusulas a verificar:\n${nonRepetitionClauses.map((c, i) => `${i + 1}. ${c}`).join('\n')}`;
+        const clauseResult = await base44.integrations.Core.InvokeLLM({
+          prompt: clausePrompt,
+          file_urls: [doc.file_url],
+          response_json_schema: {
+            type: 'object',
+            properties: {
+              clauses: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    clause: { type: 'string', description: 'Texto de la cláusula verificada' },
+                    found: { type: 'boolean', description: 'Indica si la cláusula está presente en el documento' },
+                    excerpt: { type: 'string', description: 'Extracto del texto encontrado en el documento que coincide con la cláusula' }
+                  }
+                }
+              },
+              all_found: { type: 'boolean', description: 'Indica si todas las cláusulas fueron encontradas' }
+            }
+          }
+        });
+        clauseValidation = clauseResult;
+      } catch (e) {
+        clauseValidation = { error: e.message, clauses: [], all_found: false };
+      }
+    }
+
+    const nonRepetitionOk = nonRepetitionClauses.length === 0 || (clauseValidation?.all_found === true);
 
     const requiredAmount = event?.insurance_insured_amount || 0;
     const docAmount = extracted.coverage_amount || 0;
     const amountOk = !requiredAmount || docAmount >= requiredAmount;
 
     const insuranceIssues = [];
-    if (nonRepetitionRequired && !hasNonRepetition) {
-      insuranceIssues.push('La póliza no contiene la cláusula de no repetición requerida por el evento');
+    if (nonRepetitionClauses.length > 0 && !nonRepetitionOk) {
+      const missing = (clauseValidation?.clauses || []).filter(c => !c.found).map(c => c.clause);
+      insuranceIssues.push(`Faltan ${missing.length} cláusula(s) de no repetición en la póliza`);
     }
     if (requiredAmount && docAmount < requiredAmount) {
       insuranceIssues.push(`El monto asegurado ($${docAmount.toLocaleString('es-AR')}) es menor al mínimo requerido ($${requiredAmount.toLocaleString('es-AR')})`);
@@ -219,8 +253,8 @@ export default async function(req) {
         event_coverage: eventCoverage,
         coverage_amount: extracted.coverage_amount || 0,
         insurance_config: {
-          non_repetition_required: nonRepetitionRequired,
-          has_non_repetition_clause: hasNonRepetition,
+          non_repetition_clauses: nonRepetitionClauses,
+          clause_validation: clauseValidation,
           non_repetition_ok: nonRepetitionOk,
           required_amount: requiredAmount,
           document_amount: docAmount,

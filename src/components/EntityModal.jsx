@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Trash2, Loader2, Upload } from 'lucide-react';
+import { X, Trash2, Loader2, Upload, Plus } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import AddressInput from '@/components/AddressInput';
 import FaceCapture from '@/components/FaceCapture';
@@ -162,6 +162,43 @@ export default function EntityModal({
               );
             })}
           </div>
+        </div>
+      );
+    }
+
+    if (f.type === 'string-list') {
+      const items = Array.isArray(value) ? value : [];
+      return (
+        <div key={f.name} className={f.full ? 'sm:col-span-2' : ''}>
+          <span className="mb-1.5 block text-xs font-semibold text-slate-600">{f.label}{f.required && ' *'}</span>
+          <div className="space-y-2">
+            {items.map((item, idx) => (
+              <div key={idx} className="flex items-start gap-2">
+                <textarea
+                  value={item || ''}
+                  onChange={(e) => {
+                    const next = [...items];
+                    next[idx] = e.target.value.toUpperCase();
+                    setField(f.name, next);
+                  }}
+                  rows={2}
+                  placeholder={f.placeholder || 'Escribí el texto de la cláusula…'}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                />
+                <button type="button"
+                  onClick={() => setField(f.name, items.filter((_, i) => i !== idx))}
+                  className="mt-1 rounded-lg p-2 text-red-500 transition hover:bg-red-50">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+            <button type="button"
+              onClick={() => setField(f.name, [...items, ''])}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50">
+              <Plus className="h-4 w-4" /> {f.addLabel || 'Agregar cláusula'}
+            </button>
+          </div>
+          {f.hint && <p className="mt-1 text-xs text-slate-400">{f.hint}</p>}
         </div>
       );
     }
