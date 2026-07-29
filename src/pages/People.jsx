@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useCrud } from '@/lib/crud';
-import { Plus, Pencil, Download, Trash2, ScanLine } from 'lucide-react';
+import { Plus, Pencil, Download, Trash2, ScanLine, FileSpreadsheet, FileText } from 'lucide-react';
 import DniScannerModal from '@/components/DniScannerModal';
 import { exportToExcel } from '@/lib/exportUtils';
 import { base44 } from '@/api/base44Client';
@@ -9,6 +9,8 @@ import { useParkingSectors } from '@/lib/useParkingSectors';
 import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
 import PersonDetailModal from '@/components/PersonDetailModal';
+import AdminEmployeeImportModal from '@/components/AdminEmployeeImportModal';
+import PersonDocUploadModal from '@/components/PersonDocUploadModal';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
 import FilterSelect from '@/components/ui/filter-select';
@@ -53,6 +55,8 @@ export default function People() {
   const [selected, setSelected] = useState(new Set());
   const [events, setEvents] = useState([]);
   const [companies, setCompanies] = useState([]);
+  const [importOpen, setImportOpen] = useState(false);
+  const [docUploadPerson, setDocUploadPerson] = useState(null);
 
   React.useEffect(() => {
     (async () => {
@@ -144,6 +148,19 @@ export default function People() {
       ]),
       'personas'
     );
+  };
+
+  const handleImport = async (rows, companyName, eventId) => {
+    const ev = events.find((e) => e.id === eventId);
+    const enrichedRows = rows.map((r) => ({
+      ...r,
+      company: companyName,
+      event_ids: eventId ? [eventId] : [],
+      event_names: eventId ? [ev?.name] : [],
+      productora: ev?.company || '',
+    }));
+    await base44.entities.Person.bulkCreate(enrichedRows);
+    await reload();
   };
 
   const fields = useMemo(() => {
@@ -359,6 +376,9 @@ export default function People() {
         <button onClick={() => setDniScannerOpen(true)} className={btnOutline}>
           <ScanLine className="h-4 w-4" /> Escanear DNI
         </button>
+        <button onClick={() => setImportOpen(true)} className={btnOutline}>
+          <FileSpreadsheet className="h-4 w-4" /> Importar Excel
+        </button>
         <button onClick={openNew} className={btnPrimary}>
           <Plus className="h-4 w-4" /> Nuevo empleado
         </button>
@@ -423,9 +443,14 @@ export default function People() {
               <Td className="text-sm text-slate-500">{p.phone || p.email || '—'}</Td>
               <Td><StatusBadge status={p.status} /></Td>
               <Td className="text-right">
-                <button onClick={() => openEdit(p)} className={btnIcon}>
-                  <Pencil className="h-3.5 w-3.5" />
-                </button>
+                <div className="inline-flex items-center gap-1">
+                  <button onClick={() => setDocUploadPerson(p)} className={btnIcon} title="Subir documento">
+                    <FileText className="h-3.5 w-3.5" />
+                  </button>
+                  <button onClick={() => openEdit(p)} className={btnIcon} title="Editar">
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </Td>
             </Tr>
           ))}
@@ -456,6 +481,20 @@ export default function People() {
       {detailPerson && (
         <PersonDetailModal person={detailPerson} onClose={() => setDetailPerson(null)} />
       )}
+
+      <AdminEmployeeImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImport={handleImport}
+        companies={companies}
+        events={events}
+      />
+
+      <PersonDocUploadModal
+        person={docUploadPerson}
+        onClose={() => setDocUploadPerson(null)}
+        onUploaded={() => setDocUploadPerson(null)}
+      />
     </div>
   );
 }
