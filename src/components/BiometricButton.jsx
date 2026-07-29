@@ -19,6 +19,16 @@ export default function BiometricButton({ accreditation, onRegistered }) {
 
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
 
+      // SECURITY: Check face duplicate on a different person before saving
+      const dupCheck = await base44.functions.invoke('checkFaceDuplicate', {
+        face_descriptor: descriptor,
+        person_id: accreditation.person_id,
+      });
+      if (dupCheck.is_duplicate) {
+        setError(`Este rostro ya está registrado para "${dupCheck.duplicates[0].person_name}". No se puede registrar la misma cara en dos personas distintas.`);
+        return;
+      }
+
       const existing = await base44.entities.Biometric.filter({
         person_id: accreditation.person_id,
         status: 'active',

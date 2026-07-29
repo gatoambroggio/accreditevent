@@ -50,6 +50,16 @@ export async function extractFaceFromDni(file, person, company) {
   const faceFile = new File([faceBlob], `dni-face-${person.id}.jpg`, { type: 'image/jpeg' });
 
   const { file_url: faceUrl } = await base44.integrations.Core.UploadFile({ file: faceFile });
+  const descriptor = Array.from(detection.descriptor);
+
+  // SECURITY: Check face duplicate on a different person before saving
+  const dupCheck = await base44.functions.invoke('checkFaceDuplicate', {
+    face_descriptor: descriptor,
+    person_id: person.id,
+  });
+  if (dupCheck.is_duplicate) {
+    throw new Error(`Este rostro ya está registrado para "${dupCheck.duplicates[0].person_name}". No se puede registrar la misma cara en dos personas distintas.`);
+  }
 
   const existing = await base44.entities.Biometric.filter({ person_id: person.id, status: 'active' });
   for (const b of existing) {
@@ -61,7 +71,7 @@ export async function extractFaceFromDni(file, person, company) {
     person_name: person.full_name || '',
     company: company || person.company || person.productora || '',
     face_photo_url: faceUrl,
-    face_descriptor: Array.from(detection.descriptor),
+    face_descriptor: descriptor,
     status: 'active',
   });
 

@@ -25,10 +25,12 @@ export default async function (req) {
       return Response.json({ error: 'face_descriptor es obligatorio' }, { status: 400 });
     }
 
-    // Get all active biometrics with descriptors
-    const filter = { status: 'active' };
-    if (event_id) filter.event_id = event_id;
-    const bios = await base44.asServiceRole.entities.Biometric.filter(filter, '-created_date', 500);
+    // Get ALL active biometrics globally — duplicates must be caught across ALL events
+    const bios = await base44.asServiceRole.entities.Biometric.filter(
+      { status: 'active' },
+      '-created_date',
+      500
+    );
 
     const duplicates = [];
     for (const b of bios) {

@@ -241,6 +241,16 @@ export default function People() {
       userCompany = me?.company || me?.data?.company || '';
       if (!personData.productora) personData.productora = userCompany;
     } catch {}
+    // SECURITY: Check face duplicate BEFORE creating/updating person
+    if (face_photo_url && face_descriptor?.length) {
+      const dupCheck = await base44.functions.invoke('checkFaceDuplicate', {
+        face_descriptor,
+        person_id: editing?.id || null,
+      });
+      if (dupCheck.is_duplicate) {
+        throw new Error(`Este rostro ya está registrado para "${dupCheck.duplicates[0].person_name}". No se puede registrar la misma cara en dos personas distintas.`);
+      }
+    }
     let personId;
     if (editing) {
       await update(editing.id, personData);
@@ -250,16 +260,6 @@ export default function People() {
       personId = created.id;
     }
     if (face_photo_url && face_descriptor?.length) {
-      // SECURITY: Check for face duplicate on a different person
-      const dupCheck = await base44.functions.invoke('checkFaceDuplicate', {
-        face_descriptor,
-        person_id: personId,
-        event_id: personData.event_id,
-      });
-      if (dupCheck.is_duplicate) {
-        alert(`SECURIDAD: Este rostro ya está registrado para "${dupCheck.duplicates[0].person_name}". No se puede registrar la misma cara en dos personas distintas.`);
-        return;
-      }
       const existing = await base44.entities.Biometric.filter({ person_id: personId, status: 'active' });
       if (existing.length > 0) {
         await base44.entities.Biometric.updateMany(
