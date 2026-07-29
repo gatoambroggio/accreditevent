@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 
 const DUPLICATE_THRESHOLD = 0.5;
+const PAGE_SIZE = 500;
 
 function euclideanDistance(a, b) {
   if (!a || !b || a.length !== b.length) return Infinity;
@@ -12,11 +13,28 @@ function euclideanDistance(a, b) {
   return Math.sqrt(sum);
 }
 
+async function fetchAll(base44, entityName, filter, sort) {
+  let all = [];
+  let skip = 0;
+  while (true) {
+    const batch = await base44.asServiceRole.entities[entityName].filter(
+      filter,
+      sort,
+      PAGE_SIZE,
+      skip
+    );
+    all = all.concat(batch);
+    if (batch.length < PAGE_SIZE) break;
+    skip += PAGE_SIZE;
+    if (skip > 10000) break;
+  }
+  return all;
+}
+
 export default async function (req) {
   try {
     const base44 = createClientFromRequest(req);
 
-    // Authorize: admin user OR service-role (from workflow)
     let isAuthorized = false;
     try {
       const user = await base44.auth.me();
@@ -24,7 +42,7 @@ export default async function (req) {
         isAuthorized = true;
       }
     } catch {
-      isAuthorized = true; // service-role call from workflow
+      isAuthorized = true;
     }
     if (!isAuthorized) {
       return Response.json({ error: 'No autorizado' }, { status: 401 });
@@ -42,12 +60,12 @@ export default async function (req) {
     };
 
     const [biometrics, persons] = await Promise.all([
-      base44.asServiceRole.entities.Biometric.list('-created_date', 500),
-      base44.asServiceRole.entities.Person.list('-created_date', 500),
+      fetchAll(base44, 'Biometric', {}, '-created_date'),
+      fetchAll(base44, 'Person', {}, '-created_date'),
     ]);
     const personIds = new Set(persons.map((p) => p.id));
 
-    // 1. Delete orphaned biometrics (person doesn't exist)
+    // 1. Delete orphaned biometrics
     const orphaned = biometrics.filter((b) => b.person_id && !personIds.has(b.person_id));
     for (const b of orphaned) {
       try { await base44.asServiceRole.entities.Biometric.delete(b.id); report.orphaned_deleted++; } catch {}
@@ -71,7 +89,7 @@ export default async function (req) {
       try { await base44.asServiceRole.entities.Biometric.delete(b.id); report.pending_deleted++; } catch {}
     }
 
-    // 5. Active biometrics with valid descriptors and valid persons
+    // 5. Active biometrics with valid descriptors
     const activeBios = biometrics.filter(
       (b) =>
         b.status === 'active' &&
@@ -80,7 +98,7 @@ export default async function (req) {
         (!b.person_id || personIds.has(b.person_id))
     );
 
-    // 5a. One active biometric per person (keep most recent)
+    // 5a. One active biometric per person
     const activeByPerson = {};
     for (const b of activeBios) {
       if (!b.person_id) continue;
@@ -88,7 +106,7 @@ export default async function (req) {
       activeByPerson[b.person_id].push(b);
     }
     const toDeleteMulti = [];
-    for (const [pid, bios] of Object.entries(activeByPerson)) {
+    for (const [, bios] of Object.entries(activeByPerson)) {
       bios.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
       for (let i = 1; i < bios.length; i++) toDeleteMulti.push(bios[i]);
     }
@@ -96,7 +114,7 @@ export default async function (req) {
       try { await base44.asServiceRole.entities.Biometric.delete(b.id); report.multi_active_per_person_deleted++; } catch {}
     }
 
-    // 5b. Cross-person face duplicates (same face on different persons)
+    // 5b. Cross-person face duplicates
     const remainingActive = activeBios.filter((b) => !toDeleteMulti.includes(b));
     const revokedIds = new Set();
     for (let i = 0; i < remainingActive.length; i++) {
@@ -126,9 +144,9 @@ export default async function (req) {
     }
 
     // 6. Sync Accreditation has_biometric flags
-    const finalActive = await base44.asServiceRole.entities.Biometric.filter({ status: 'active' }, '-created_date', 500);
+    const finalActive = await fetchAll(base44, 'Biometric', { status: 'active' }, '-created_date');
     const personsWithBio = new Set(finalActive.map((b) => b.person_id));
-    const accreditations = await base44.asServiceRole.entities.Accreditation.list('-created_date', 500);
+    const accreditations = await fetchAll(base44, 'Accreditation', {}, '-created_date');
     const accUpdates = [];
     for (const a of accreditations) {
       const should = personsWithBio.has(a.person_id);

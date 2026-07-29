@@ -15,6 +15,7 @@ import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
 import { btnPrimary, btnOutline, btnIcon } from '@/components/ui/button-styles';
 import Pagination from '@/components/ui/pagination';
 import { usePagination } from '@/lib/usePagination';
+import { generateBadgeCode } from '@/lib/badgeCode';
 
 const validateAutonomo = (data) => {
   const e = {};
@@ -176,12 +177,13 @@ export default function PersonasAutonomas() {
         alert('Esta persona ya tiene una acreditación activa para el evento.');
         return;
       }
-      // Generate badge code
+      // Generate badge code using shared utility (avoids duplicates from deleted accreditations)
       const evt = events.find((e) => e.id === person.event_id);
-      const prefix = (zones.find((z) => z.value === person.access_area)?.value || 'GE').substring(0, 2).toUpperCase();
-      const count = await base44.entities.Accreditation.filter({ event_id: person.event_id });
-      const num = String(count.length + 1).padStart(4, '0');
-      const badge_code = `${prefix}-${num}`;
+      const existingAccrs = await base44.entities.Accreditation.filter({ event_id: person.event_id }, '-created_date', 200);
+      const existingCodes = existingAccrs.map((a) => a.badge_code).filter(Boolean);
+      const typePrefixes = {};
+      zones.forEach((z) => { typePrefixes[z.value] = (z.value || 'GE').substring(0, 2).toUpperCase(); });
+      const badge_code = generateBadgeCode(person.access_area || 'general', existingCodes, typePrefixes);
       await base44.entities.Accreditation.create({
         event_id: person.event_id,
         event_name: evt?.name || '',
@@ -286,15 +288,15 @@ export default function PersonasAutonomas() {
       userCompany = me?.company || me?.data?.company || '';
       if (!personData.productora) personData.productora = userCompany;
     } catch {}
-    // SECURITY: Check DNI duplicate BEFORE creating/updating person
-    if (personData.document) {
-      const docCheck = await base44.functions.invoke('checkDocumentDuplicate', {
-        document: personData.document,
-        person_id: editing?.id || null,
-      });
-      if (docCheck.is_duplicate) {
-        throw new Error(`Ya existe una persona con ese DNI: ${docCheck.existing_person.full_name}. No pueden haber dos personas con el mismo documento.`);
-      }
+    // SECURITY: Check DNI + email duplicate BEFORE creating/updating person
+    const docCheck = await base44.functions.invoke('checkDocumentDuplicate', {
+      document: personData.document || null,
+      email: personData.email || null,
+      person_id: editing?.id || null,
+    });
+    if (docCheck.is_duplicate) {
+      const field = docCheck.duplicate_type === 'email' ? 'email' : 'DNI';
+      throw new Error(`Ya existe una persona con ese ${field}: ${docCheck.existing_person.full_name}. No pueden haber dos personas con el mismo ${field}.`);
     }
     // SECURITY: Check face duplicate BEFORE creating/updating person
     if (face_photo_url && face_descriptor?.length) {

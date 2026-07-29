@@ -46,6 +46,7 @@ export default async function (req) {
         productora,
         phone: body.phone,
         person_type: 'provider',
+        tipo_vinculo: 'empresa',
         status: 'active',
         event_id: body.event_id,
       });
@@ -58,6 +59,7 @@ export default async function (req) {
         phone: body.phone,
         email: body.email,
         person_type: 'provider',
+        tipo_vinculo: 'empresa',
         status: 'active',
         event_id: body.event_id,
       });

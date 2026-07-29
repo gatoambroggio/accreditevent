@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 
 const DUPLICATE_THRESHOLD = 0.5;
+const PAGE_SIZE = 500;
 
 function euclideanDistance(a, b) {
   if (!a || !b || a.length !== b.length) return Infinity;
@@ -19,22 +20,30 @@ export default async function (req) {
     if (!user) return Response.json({ error: 'No autorizado' }, { status: 401 });
 
     const body = await req.json();
-    const { face_descriptor, person_id, event_id } = body;
+    const { face_descriptor, person_id } = body;
 
     if (!face_descriptor || !Array.isArray(face_descriptor) || face_descriptor.length === 0) {
       return Response.json({ error: 'face_descriptor es obligatorio' }, { status: 400 });
     }
 
-    // Get ALL active biometrics globally — duplicates must be caught across ALL events
-    const bios = await base44.asServiceRole.entities.Biometric.filter(
-      { status: 'active' },
-      '-created_date',
-      500
-    );
+    // Paginated fetch of ALL active biometrics globally
+    let allBios = [];
+    let skip = 0;
+    while (true) {
+      const batch = await base44.asServiceRole.entities.Biometric.filter(
+        { status: 'active' },
+        '-created_date',
+        PAGE_SIZE,
+        skip
+      );
+      allBios = allBios.concat(batch);
+      if (batch.length < PAGE_SIZE) break;
+      skip += PAGE_SIZE;
+      if (skip > 10000) break; // safety limit
+    }
 
     const duplicates = [];
-    for (const b of bios) {
-      // Skip same person (they can re-register their own face)
+    for (const b of allBios) {
       if (person_id && b.person_id === person_id) continue;
       if (!b.face_descriptor || b.face_descriptor.length === 0) continue;
 

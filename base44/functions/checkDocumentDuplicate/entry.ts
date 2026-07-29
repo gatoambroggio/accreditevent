@@ -7,39 +7,64 @@ export default async function (req) {
     if (!user) return Response.json({ error: 'No autorizado' }, { status: 401 });
 
     const body = await req.json();
-    const { document, person_id } = body;
+    const { document, email, person_id } = body;
 
-    if (!document || typeof document !== 'string') {
-      return Response.json({ error: 'document es obligatorio' }, { status: 400 });
+    if (!document && !email) {
+      return Response.json({ error: 'document o email es obligatorio' }, { status: 400 });
     }
 
-    // Normalize: digits only
-    const normalized = document.replace(/\D/g, '');
-    if (!normalized) {
-      return Response.json({ error: 'document no puede estar vacío' }, { status: 400 });
+    let docDup = null;
+    let emailDup = null;
+
+    // Check document duplicate (global, service role)
+    if (document) {
+      const normalized = String(document).replace(/\D/g, '');
+      if (normalized) {
+        const docPersons = await base44.asServiceRole.entities.Person.filter(
+          { document: normalized },
+          '-created_date',
+          50
+        );
+        const docMatch = docPersons.find((p) => p.id !== person_id);
+        if (docMatch) {
+          docDup = {
+            id: docMatch.id,
+            full_name: docMatch.full_name,
+            document: docMatch.document,
+            company: docMatch.company || '',
+            tipo_vinculo: docMatch.tipo_vinculo || 'empresa',
+          };
+        }
+      }
     }
 
-    // Search globally across ALL persons (service role bypasses RLS)
-    const persons = await base44.asServiceRole.entities.Person.filter(
-      { document: normalized },
-      '-created_date',
-      50
-    );
+    // Check email duplicate (global, service role)
+    if (email) {
+      const emailPersons = await base44.asServiceRole.entities.Person.filter(
+        { email: email },
+        '-created_date',
+        50
+      );
+      const emailMatch = emailPersons.find((p) => p.id !== person_id);
+      if (emailMatch) {
+        emailDup = {
+          id: emailMatch.id,
+          full_name: emailMatch.full_name,
+          document: emailMatch.document,
+          company: emailMatch.company || '',
+          tipo_vinculo: emailMatch.tipo_vinculo || 'empresa',
+        };
+      }
+    }
 
-    // Exclude the current person (when editing)
-    const duplicates = persons.filter((p) => p.id !== person_id);
+    const isDuplicate = !!(docDup || emailDup);
+    const existing = docDup || emailDup;
+    const duplicateType = docDup ? 'document' : (emailDup ? 'email' : null);
 
     return Response.json({
-      is_duplicate: duplicates.length > 0,
-      existing_person: duplicates[0]
-        ? {
-            id: duplicates[0].id,
-            full_name: duplicates[0].full_name,
-            document: duplicates[0].document,
-            company: duplicates[0].company || '',
-            tipo_vinculo: duplicates[0].tipo_vinculo || 'empresa',
-          }
-        : null,
+      is_duplicate: isDuplicate,
+      duplicate_type: duplicateType,
+      existing_person: existing,
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

@@ -114,11 +114,16 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
       setError('El DNI es obligatorio y debe tener 7 u 8 dígitos numéricos.');
       return;
     }
+    if (form.phone && form.phone.replace(/\D/g, '').length < 10) {
+      setError('El teléfono está incompleto. Ingresá código de área + número (mínimo 10 dígitos).');
+      return;
+    }
     setSaving(true);
     try {
-      // SECURITY: Check DNI duplicate BEFORE creating person
+      // SECURITY: Check DNI + email duplicate BEFORE creating person
       const docCheck = await base44.functions.invoke('checkDocumentDuplicate', {
         document: form.document,
+        email: null, // EmployeeFormModal doesn't collect email
         person_id: editing?.id || null,
       });
       if (docCheck.is_duplicate) {

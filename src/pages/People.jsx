@@ -241,15 +241,15 @@ export default function People() {
       userCompany = me?.company || me?.data?.company || '';
       if (!personData.productora) personData.productora = userCompany;
     } catch {}
-    // SECURITY: Check DNI duplicate BEFORE creating/updating person
-    if (personData.document) {
-      const docCheck = await base44.functions.invoke('checkDocumentDuplicate', {
-        document: personData.document,
-        person_id: editing?.id || null,
-      });
-      if (docCheck.is_duplicate) {
-        throw new Error(`Ya existe una persona con ese DNI: ${docCheck.existing_person.full_name} (${docCheck.existing_person.company || 'sin empresa'}). No pueden haber dos personas con el mismo documento.`);
-      }
+    // SECURITY: Check DNI + email duplicate BEFORE creating/updating person
+    const docCheck = await base44.functions.invoke('checkDocumentDuplicate', {
+      document: personData.document || null,
+      email: personData.email || null,
+      person_id: editing?.id || null,
+    });
+    if (docCheck.is_duplicate) {
+      const field = docCheck.duplicate_type === 'email' ? 'email' : 'DNI';
+      throw new Error(`Ya existe una persona con ese ${field}: ${docCheck.existing_person.full_name} (${docCheck.existing_person.company || 'sin empresa'}). No pueden haber dos personas con el mismo ${field}.`);
     }
     // SECURITY: Check face duplicate BEFORE creating/updating person
     if (face_photo_url && face_descriptor?.length) {
