@@ -2,8 +2,10 @@ import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { X, Printer } from 'lucide-react';
 import { printBadge } from '@/lib/printBadge';
+import { usePrinterSettings } from '@/lib/usePrinterSettings';
 
 export default function BadgePrint({ accreditation, event, onClose }) {
+  const { printerPersonal } = usePrinterSettings();
   const handlePrint = () => {
     printBadge();
   };
@@ -13,7 +15,12 @@ export default function BadgePrint({ accreditation, event, onClose }) {
       <div className="badge-wrapper my-8 w-full max-w-sm">
         <div className="no-print mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold text-white">Credencial</h2>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            {printerPersonal && (
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white">
+                <Printer className="h-3.5 w-3.5" /> {printerPersonal}
+              </span>
+            )}
             <button
               onClick={handlePrint}
               className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700"

@@ -77,6 +77,8 @@ export default function Settings() {
             zones: [],
             doors: [],
             enabled_modules: { whatsapp: false },
+            printer_personal: '',
+            printer_vehicular: '',
           });
           setSettings(created);
         }
@@ -132,6 +134,8 @@ export default function Settings() {
         zones: settings.zones,
         doors: settings.doors,
         enabled_modules: settings.enabled_modules,
+        printer_personal: settings.printer_personal,
+        printer_vehicular: settings.printer_vehicular,
       });
       setSettings(updated);
       setSuccess(true);
@@ -182,6 +186,13 @@ export default function Settings() {
               <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" disabled={uploading} />
             </label>
           )}
+        </div>
+      </Section>
+
+      <Section title="Impresoras de credenciales" description="Definí qué impresora se usa para cada tipo de credencial. El sistema indicará la impresora asignada al momento de imprimir.">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Impresora para acreditaciones personales" value={settings.printer_personal} onChange={(v) => update('printer_personal', v)} placeholder="Ej: Impresora B" hint="Credenciales personales (8×10cm)" />
+          <Field label="Impresora para estacionamiento / vehicular" value={settings.printer_vehicular} onChange={(v) => update('printer_vehicular', v)} placeholder="Ej: Impresora A" hint="Credenciales de vehículo (A5)" />
         </div>
       </Section>
 

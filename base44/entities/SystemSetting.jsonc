@@ -81,6 +81,14 @@
       "type": "string",
       "description": "Phone Number ID de WhatsApp Cloud API"
     },
+    "printer_personal": {
+      "type": "string",
+      "description": "Nombre/etiqueta de la impresora asignada para acreditaciones personales"
+    },
+    "printer_vehicular": {
+      "type": "string",
+      "description": "Nombre/etiqueta de la impresora asignada para credenciales de estacionamiento / vehicular"
+    },
     "role_access": {
       "type": "object",
       "description": "Mapa de path de m\u00f3dulo a array de roles con acceso permitido"
