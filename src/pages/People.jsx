@@ -234,6 +234,13 @@ export default function People() {
     if (typeof personData.event_phases === 'string') {
       personData.event_phases = personData.event_phases.split(',').map((s) => s.trim()).filter(Boolean);
     }
+    // Set productora from current user's company for RLS
+    let userCompany = '';
+    try {
+      const me = await base44.auth.me();
+      userCompany = me?.company || me?.data?.company || '';
+      if (!personData.productora) personData.productora = userCompany;
+    } catch {}
     let personId;
     if (editing) {
       await update(editing.id, personData);
@@ -255,7 +262,7 @@ export default function People() {
         person_id: personId,
         person_name: personData.full_name,
         event_id: personData.event_id,
-        company: evt?.company || personData.productora || '',
+        company: evt?.company || userCompany || personData.productora || '',
         face_photo_url,
         face_descriptor,
         status: 'active',
