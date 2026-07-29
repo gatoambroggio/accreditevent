@@ -6,8 +6,8 @@ export default async function(req) {
     const body = await req.json().catch(() => ({}));
     const email = (body && body.email ? body.email : '').toString().trim().toLowerCase();
     const userId = (body && body.user_id ? body.user_id : '').toString().trim();
-    if (!email || !userId) {
-      return Response.json({ ok: false, skipped: true, reason: 'missing email or user_id' });
+    if (!email) {
+      return Response.json({ ok: false, skipped: true, reason: 'missing email' });
     }
 
     const pending = await base44.asServiceRole.entities.PendingOperator.filter({ email, status: 'pending' });

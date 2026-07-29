@@ -46,6 +46,11 @@ export default function Register() {
       if (result?.access_token) {
         base44.auth.setToken(result.access_token);
       }
+      try {
+        await base44.functions.invoke('processPendingOperators', { email });
+      } catch (e) {
+        console.warn('No se pudo procesar asignación pendiente:', e);
+      }
       window.location.href = "/";
     } catch (err) {
       setError(err.message || "Código de verificación inválido");
