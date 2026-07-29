@@ -48,11 +48,6 @@
       "format": "date-time",
       "description": "Desarme - fin"
     },
-    "grace_hours": {
-      "type": "number",
-      "default": 4,
-      "description": "Horas extra de acceso tras finalizar el evento"
-    },
     "status": {
       "type": "string",
       "enum": [
@@ -94,6 +89,15 @@
         "type": "string"
       },
       "description": "IDs de usuarios asignados a este evento"
+    },
+    "insurance_non_repetition": {
+      "type": "boolean",
+      "default": false,
+      "description": "Requiere que la p\u00f3liza contenga cl\u00e1usula de no repetici\u00f3n"
+    },
+    "insurance_insured_amount": {
+      "type": "number",
+      "description": "Monto asegurado m\u00ednimo requerido por el evento"
     },
     "custom_fields": {
       "type": "object",

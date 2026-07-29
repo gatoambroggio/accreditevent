@@ -142,10 +142,17 @@ export default function InsuranceValidationModal({ document: doc, onClose, onVal
                     detail={`Persona: ${result.validation.person_dni || '—'} · Póliza: ${result.validation.policy_dni || '—'}${result.extracted.policy_dni_was_cuit ? ' (extraído de CUIT/CUIL)' : ''}`} />
                   <CheckRow label="Vigencia de fechas" passed={result.validation.date_valid}
                     detail={result.validation.date_issues.length > 0 ? result.validation.date_issues.join(' · ') : 'Fechas válidas y vigentes'} />
-                  {result.validation.event_coverage && (
-                    <CheckRow label={`Cobertura del evento: ${result.validation.event_coverage.event_name}`}
-                      passed={result.validation.event_coverage.covers_event}
-                      detail={`${fmtDate(result.validation.event_coverage.event_start)} → ${fmtDate(result.validation.event_coverage.event_end)}`} />
+                  {result.validation.insurance_config && result.validation.insurance_config.non_repetition_required && (
+                    <CheckRow label="Cláusula de no repetición"
+                      passed={result.validation.insurance_config.non_repetition_ok}
+                      detail={result.validation.insurance_config.has_non_repetition_clause
+                        ? 'La póliza contiene la cláusula de no repetición requerida'
+                        : 'La póliza NO contiene la cláusula de no repetición requerida por el evento'} />
+                  )}
+                  {result.validation.insurance_config && result.validation.insurance_config.required_amount > 0 && (
+                    <CheckRow label="Monto asegurado"
+                      passed={result.validation.insurance_config.amount_ok}
+                      detail={`Requerido: ${fmtMoney(result.validation.insurance_config.required_amount)} · Póliza: ${fmtMoney(result.validation.insurance_config.document_amount)}`} />
                   )}
                   {result.validation.employee_validation && result.validation.employee_validation.total_employees > 0 && (
                     <CheckRow

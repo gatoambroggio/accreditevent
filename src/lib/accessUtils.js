@@ -2,19 +2,15 @@ export function getEventStatus(event) {
   const now = Date.now();
   const start = event.start_at ? new Date(event.start_at).getTime() : 0;
   const end = event.end_at ? new Date(event.end_at).getTime() : 0;
-  const grace = (event.grace_hours ?? 4) * 3600000;
-  const graceEnd = end + grace;
 
   if (start && now < start) return 'upcoming';
-  if (end && now > graceEnd) return 'ended';
-  if (end && now > end) return 'grace';
+  if (end && now > end) return 'ended';
   return 'active';
 }
 
 export const EVENT_STATUS_INFO = {
   upcoming: { label: 'Próximo a iniciar', cls: 'bg-amber-50 text-amber-700 ring-amber-200' },
   active: { label: 'En curso', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
-  grace: { label: 'Período de gracia', cls: 'bg-amber-50 text-amber-700 ring-amber-200' },
   ended: { label: 'Finalizado', cls: 'bg-red-50 text-red-700 ring-red-200' },
 };
 
@@ -23,7 +19,7 @@ export function isWithinEventPhases(event, eventPhases, date = new Date()) {
   const now = date.getTime();
   if (!eventPhases || eventPhases.length === 0) {
     const start = event.start_at ? new Date(event.start_at).getTime() : 0;
-    const end = event.end_at ? new Date(event.end_at).getTime() + (event.grace_hours || 0) * 3600000 : Infinity;
+    const end = event.end_at ? new Date(event.end_at).getTime() : Infinity;
     return now >= start && now <= end;
   }
   const PHASE_DATES = {

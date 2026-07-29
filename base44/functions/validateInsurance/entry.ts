@@ -47,6 +47,7 @@ export default async function(req) {
           valid_from: { type: 'string', description: 'Fecha de inicio de cobertura en formato YYYY-MM-DD' },
           valid_until: { type: 'string', description: 'Fecha de vencimiento de cobertura en formato YYYY-MM-DD' },
           coverage_type: { type: 'string', description: 'Tipo de cobertura: ART, responsabilidad civil, accidentes personales, etc.' },
+          has_non_repetition_clause: { type: 'boolean', description: 'Indica si la póliza contiene una cláusula de no repetición (cláusula de no repetición / non repetition / sin repetición). Buscar frases como "cláusula de no repetición", "no repetición", "non repetition", "sin repetición"' },
           insured_employees: {
             type: 'array',
             description: 'Lista de empleados asegurados que aparecen en la nómina de la póliza. Incluir todos los nombres y DNI/CUIT/CUIL que aparezcan',
@@ -153,6 +154,23 @@ export default async function(req) {
       };
     });
 
+    // Insurance config validation (event-level requirements)
+    const nonRepetitionRequired = event?.insurance_non_repetition === true;
+    const hasNonRepetition = extracted.has_non_repetition_clause === true;
+    const nonRepetitionOk = !nonRepetitionRequired || hasNonRepetition;
+
+    const requiredAmount = event?.insurance_insured_amount || 0;
+    const docAmount = extracted.coverage_amount || 0;
+    const amountOk = !requiredAmount || docAmount >= requiredAmount;
+
+    const insuranceIssues = [];
+    if (nonRepetitionRequired && !hasNonRepetition) {
+      insuranceIssues.push('La póliza no contiene la cláusula de no repetición requerida por el evento');
+    }
+    if (requiredAmount && docAmount < requiredAmount) {
+      insuranceIssues.push(`El monto asegurado ($${docAmount.toLocaleString('es-AR')}) es menor al mínimo requerido ($${requiredAmount.toLocaleString('es-AR')})`);
+    }
+
     const coveredCount = reconciliation.filter(e => e.is_covered).length;
     const uncoveredCount = reconciliation.length - coveredCount;
 
@@ -172,8 +190,8 @@ export default async function(req) {
     const isCompanyLevelDoc = !doc.person_id && !!doc.company;
     const employeeCoverageOk = !employeeValidation || !hasInsuredList || uncoveredCount === 0;
     const overallValid = isCompanyLevelDoc
-      ? dateValid && (!eventCoverage || eventCoverage.covers_event) && employeeCoverageOk
-      : dniMatch && dateValid && (!eventCoverage || eventCoverage.covers_event) && employeeCoverageOk;
+      ? dateValid && (!eventCoverage || eventCoverage.covers_event) && employeeCoverageOk && nonRepetitionOk && amountOk
+      : dniMatch && dateValid && (!eventCoverage || eventCoverage.covers_event) && employeeCoverageOk && nonRepetitionOk && amountOk;
 
     return Response.json({
       valid: overallValid,
@@ -200,6 +218,15 @@ export default async function(req) {
         date_issues: dateIssues,
         event_coverage: eventCoverage,
         coverage_amount: extracted.coverage_amount || 0,
+        insurance_config: {
+          non_repetition_required: nonRepetitionRequired,
+          has_non_repetition_clause: hasNonRepetition,
+          non_repetition_ok: nonRepetitionOk,
+          required_amount: requiredAmount,
+          document_amount: docAmount,
+          amount_ok: amountOk,
+          issues: insuranceIssues,
+        },
         employee_validation: employeeValidation
       },
       person: { full_name: person?.full_name || '', document: person?.document || '' },
