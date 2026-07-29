@@ -16,10 +16,17 @@ export default async function (req) {
       return Response.json({ error: 'Faltan parámetros: captured_photo_url es obligatorio.' }, { status: 400 });
     }
 
-    // Build the biometric query filter — scope by event_id if provided
+    // Scope by productora (tenant isolation): productora users only match within their own company
+    const userCompany = user?.data?.company || user?.company || '';
+    const role = user?.data?.role || user?.role || '';
+    const isProductora = role === 'productora' && userCompany;
+
+    // Build the biometric query filter — scope by event_id if provided, and by productora company
     const bioFilter = { status: 'active' };
     if (event_id) {
       bioFilter.event_id = event_id;
+    } else if (isProductora) {
+      bioFilter.company = userCompany;
     }
 
     const bios = await base44.asServiceRole.entities.Biometric.filter(
