@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useCrud } from '@/lib/crud';
-import { Eye, FileText, Download, Plus, Pencil, Settings2, ChevronDown, ChevronRight, ShieldCheck } from 'lucide-react';
+import { Eye, FileText, Download, Plus, Pencil, Settings2, ChevronDown, ChevronRight, ShieldCheck, Trash2 } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
 import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
@@ -60,6 +60,8 @@ export default function Documents() {
   const [productoraLoading, setProductoraLoading] = useState(false);
   const [productoraError, setProductoraError] = useState('');
   const [userRole, setUserRole] = useState('');
+  const [selected, setSelected] = useState(new Set());
+  const [deleting, setDeleting] = useState(false);
 
   React.useEffect(() => {
     (async () => {
@@ -119,6 +121,48 @@ export default function Documents() {
   }, [items, query, typeFilter, statusFilter]);
 
   const { page, setPage, totalPages, paginated } = usePagination(filtered, 15);
+
+  const allFilteredIds = useMemo(() => filtered.map((d) => d.id), [filtered]);
+  const isAllSelected = allFilteredIds.length > 0 && allFilteredIds.every((id) => selected.has(id));
+  const toggleSelect = (id) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAll = () => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (isAllSelected) {
+        allFilteredIds.forEach((id) => next.delete(id));
+      } else {
+        allFilteredIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+  const handleBulkDelete = async () => {
+    if (!confirm(`¿Eliminar ${selected.size} documento(s)? Esta acción no se puede deshacer.`)) return;
+    setDeleting(true);
+    try {
+      const ids = Array.from(selected);
+      if (isProductora) {
+        const res = await base44.functions.invoke('deleteDocuments', { document_ids: ids });
+        if (res?.data?.error) throw new Error(res.data.error);
+      } else {
+        for (const id of ids) {
+          try { await base44.entities.Document.delete(id); } catch {}
+        }
+      }
+      setSelected(new Set());
+      await reload();
+    } catch (e) {
+      alert('Error al eliminar: ' + (e.message || e));
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const docTypeLabel = (value) => docTypes.find((t) => t.value === value)?.label || value;
 
@@ -246,6 +290,17 @@ export default function Documents() {
         <FilterSelect value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} placeholder="Todos los estados" />
       </div>
 
+      {selected.size > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5">
+          <span className="text-sm font-semibold text-emerald-700">{selected.size} seleccionado(s)</span>
+          <button onClick={handleBulkDelete} disabled={deleting}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-50">
+            <Trash2 className="h-4 w-4" /> {deleting ? 'Eliminando…' : 'Eliminar selección'}
+          </button>
+          <button onClick={() => setSelected(new Set())} className="text-sm text-slate-500 hover:text-slate-700">Limpiar</button>
+        </div>
+      )}
+
       <DataTable
         loading={loading}
         error={error}
@@ -255,6 +310,14 @@ export default function Documents() {
       >
         <thead>
           <tr className="border-b border-slate-100 bg-slate-50">
+            <Th className="w-10">
+              <input
+                type="checkbox"
+                checked={isAllSelected}
+                onChange={toggleSelectAll}
+                className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              />
+            </Th>
             <Th>Persona</Th>
             <Th>Empresa</Th>
             <Th>Tipo</Th>
@@ -267,6 +330,14 @@ export default function Documents() {
         <tbody>
           {paginated.map((d) => (
             <Tr key={d.id}>
+              <Td>
+                <input
+                  type="checkbox"
+                  checked={selected.has(d.id)}
+                  onChange={() => toggleSelect(d.id)}
+                  className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                />
+              </Td>
               <Td className="text-sm font-semibold text-slate-900">{d.person_name || '—'}</Td>
               <Td className="text-sm text-slate-500">{d.company || '—'}</Td>
               <Td className="text-sm text-slate-500">{docTypeLabel(d.document_type)}</Td>

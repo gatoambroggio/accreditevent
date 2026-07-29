@@ -75,9 +75,7 @@ export default function Vehicles() {
       if (statusFilter && v.status !== statusFilter) return false;
       if (!q) {
         if (v.status === 'approved') return true;
-        const evtIds = v.event_ids || [];
-        if (evtIds.length === 0) return true;
-        return evtIds.some((id) => activeEventIds.has(id));
+        return false;
       }
       const person = people.find((p) => p.id === v.person_id);
       const personDoc = person?.document || '';
@@ -175,7 +173,7 @@ export default function Vehicles() {
     const selectedEventIds = data.event_ids ? String(data.event_ids).split(',').filter(Boolean) : [];
     const enriched = {
       ...data,
-      status: data.status || 'pending',
+      status: data.status || (editing ? 'pending' : 'approved'),
       person_name: person?.full_name || editing?.person_name || '',
       company: events.find((e) => e.id === selectedEventIds[0])?.company || editing?.company || '',
       plate: (data.plate || '').toUpperCase().trim(),
@@ -220,7 +218,7 @@ export default function Vehicles() {
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="Logística" title="Vehículos acreditados">
+      <PageHeader kicker="Logística" title="Acreditar vehículos">
         <button onClick={handleExport} className={btnOutline}>
           <Download className="h-4 w-4" /> Exportar
         </button>
@@ -229,7 +227,7 @@ export default function Vehicles() {
           <Printer className="h-4 w-4" /> Imprimir ({selected.size})
         </button>
         <button onClick={openNew} className={btnPrimary}>
-          <Plus className="h-4 w-4" /> Nuevo vehículo
+          <Plus className="h-4 w-4" /> Acreditar vehículo
         </button>
       </PageHeader>
 
@@ -248,7 +246,7 @@ export default function Vehicles() {
         error={error}
         isEmpty={filtered.length === 0}
         emptyIcon={Car}
-        emptyMessage={query ? 'Sin resultados para tu búsqueda.' : 'No hay vehículos registrados todavía.'}
+        emptyMessage={query ? 'Sin resultados para tu búsqueda.' : 'No hay vehículos acreditados.'}
         tableClassName="min-w-[820px]"
       >
         <thead>
