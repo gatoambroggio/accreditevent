@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, X, Loader2, AlertTriangle, CheckCircle2, XCircle, FileText, Calendar, User, Building2, Users } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { assignEventToCompanyEmployees } from '@/lib/assignEventToCompanyEmployees';
 
 export default function InsuranceValidationModal({ document: doc, onClose, onValidated }) {
   const [loading, setLoading] = useState(false);
@@ -101,22 +102,10 @@ export default function InsuranceValidationModal({ document: doc, onClose, onVal
       if (status === 'approved' && doc.company && selectedEventId) {
         try {
           const eventName = events.find((e) => e.id === selectedEventId)?.name || '';
-          const employees = await base44.entities.Person.filter(
-            { company: doc.company, tipo_vinculo: 'empresa' },
-            '-created_date', 500
-          );
-          const toUpdate = employees
-            .filter((emp) => !(emp.event_ids || []).includes(selectedEventId))
-            .map((emp) => ({
-              id: emp.id,
-              event_ids: [...(emp.event_ids || []), selectedEventId],
-              event_names: [...(emp.event_names || []), eventName].filter((v, i, a) => a.indexOf(v) === i),
-              event_id: emp.event_id || selectedEventId,
-            }));
-          if (toUpdate.length > 0) {
-            await base44.entities.Person.bulkUpdate(toUpdate);
-          }
-        } catch {}
+          await assignEventToCompanyEmployees(doc.company, selectedEventId, eventName);
+        } catch (assignErr) {
+          console.error('Error al asignar evento a empleados:', assignErr);
+        }
       }
 
       onValidated?.();

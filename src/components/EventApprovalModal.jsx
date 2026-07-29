@@ -3,6 +3,7 @@ import { X, Loader2, CheckCircle2, XCircle, Clock, CalendarDays, ShieldCheck } f
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { logAudit } from '@/lib/audit';
+import { assignEventToCompanyEmployees } from '@/lib/assignEventToCompanyEmployees';
 
 export default function EventApprovalModal({ providerCompany, onClose }) {
   const { user } = useAuth();
@@ -54,6 +55,15 @@ export default function EventApprovalModal({ providerCompany, onClose }) {
         setApprovals((prev) => [...prev, created]);
       }
       await logAudit('approve-company-event', 'EventCompanyApproval', event.id, `${providerCompany.name} → ${event.name}: ${status}`);
+
+      // Auto-assign the event to all employees of the provider company when approved
+      if (status === 'approved') {
+        try {
+          await assignEventToCompanyEmployees(providerCompany.name, event.id, event.name);
+        } catch (assignErr) {
+          console.error('Error al asignar evento a empleados:', assignErr);
+        }
+      }
     } catch {}
     setSaving(null);
   };
