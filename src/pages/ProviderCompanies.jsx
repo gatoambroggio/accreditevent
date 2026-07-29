@@ -7,6 +7,7 @@ import EntityModal from '@/components/EntityModal';
 import ProviderCompanyPeopleModal from '@/components/ProviderCompanyPeopleModal';
 import CompanyEmployeesList from '@/components/CompanyEmployeesList';
 import EventApprovalModal from '@/components/EventApprovalModal';
+import PersonDetailModal from '@/components/PersonDetailModal';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
 import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
@@ -23,6 +24,7 @@ export default function ProviderCompanies() {
   const [expandedCompany, setExpandedCompany] = useState(null);
   const [approvalModalCompany, setApprovalModalCompany] = useState(null);
   const [approvals, setApprovals] = useState([]);
+  const [detailPerson, setDetailPerson] = useState(null);
 
   useEffect(() => {
     base44.entities.EventCompanyApproval.list('-created_date', 500)
@@ -173,7 +175,7 @@ export default function ProviderCompanies() {
             {expandedCompany === c.name && (
               <tr className="border-b border-slate-50">
                 <td colSpan={4} className="bg-slate-50/50 px-4">
-                  <CompanyEmployeesList company={c} />
+                  <CompanyEmployeesList company={c} onSelectPerson={setDetailPerson} />
                 </td>
               </tr>
             )}
@@ -212,6 +214,10 @@ export default function ProviderCompanies() {
           providerCompany={approvalModalCompany}
           onClose={() => setApprovalModalCompany(null)}
         />
+      )}
+
+      {detailPerson && (
+        <PersonDetailModal person={detailPerson} onClose={() => setDetailPerson(null)} />
       )}
     </div>
   );

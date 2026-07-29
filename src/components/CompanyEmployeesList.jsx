@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import StatusBadge from '@/components/StatusBadge';
 import { useZones } from '@/lib/useZones';
 
-export default function CompanyEmployeesList({ company }) {
+export default function CompanyEmployeesList({ company, onSelectPerson }) {
   const [people, setPeople] = useState([]);
   const [loading, setLoading] = useState(true);
   const { zones } = useZones();
@@ -67,10 +67,16 @@ export default function CompanyEmployeesList({ company }) {
             {people.map((p) => {
               const eventNames = p.event_names?.length ? p.event_names : [];
               return (
-                <tr key={p.id} className="border-b border-slate-50">
+                <tr key={p.id} className="border-b border-slate-50 transition hover:bg-slate-50">
                   <td className="px-3 py-2">
-                    <p className="font-semibold text-slate-900">{p.full_name}</p>
-                    <p className="text-xs text-slate-400">{p.document || 'Sin documento'}</p>
+                    <button
+                      type="button"
+                      onClick={() => onSelectPerson?.(p)}
+                      className="text-left transition hover:text-emerald-600 hover:underline"
+                    >
+                      <p className="font-semibold text-slate-900">{p.full_name}</p>
+                      <p className="text-xs text-slate-400">{p.document || 'Sin documento'}</p>
+                    </button>
                   </td>
                   <td className="px-3 py-2">
                     {p.access_area ? (
