@@ -110,8 +110,21 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
       setError('El nombre es obligatorio.');
       return;
     }
+    if (!form.document || !/^\d{7,8}$/.test(form.document.trim())) {
+      setError('El DNI es obligatorio y debe tener 7 u 8 dígitos numéricos.');
+      return;
+    }
     setSaving(true);
     try {
+      // SECURITY: Check DNI duplicate BEFORE creating person
+      const docCheck = await base44.functions.invoke('checkDocumentDuplicate', {
+        document: form.document,
+        person_id: editing?.id || null,
+      });
+      if (docCheck.is_duplicate) {
+        throw new Error(`Ya existe una persona con ese DNI: ${docCheck.existing_person.full_name} (${docCheck.existing_person.company || 'sin empresa'}). No pueden haber dos personas con el mismo documento.`);
+      }
+
       // SECURITY: Check face duplicate BEFORE creating person
       const descriptorToCheck = faceDescriptor?.length ? faceDescriptor : (dniFaceDescriptor?.length ? dniFaceDescriptor : null);
       if (descriptorToCheck) {
@@ -262,8 +275,8 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label className="block">
-              <span className="mb-1.5 block text-xs font-semibold text-slate-600">Documento (DNI)</span>
-              <input value={form.document} onChange={(e) => setField('document', e.target.value.replace(/\D/g, ''))} inputMode="numeric" className={inputCls} placeholder="12345678" />
+              <span className="mb-1.5 block text-xs font-semibold text-slate-600">Documento (DNI) *</span>
+              <input value={form.document} onChange={(e) => setField('document', e.target.value.replace(/\D/g, ''))} inputMode="numeric" maxLength={8} required className={inputCls} placeholder="12345678" />
             </label>
             <label className="block">
               <span className="mb-1.5 block text-xs font-semibold text-slate-600">Teléfono (opcional)</span>

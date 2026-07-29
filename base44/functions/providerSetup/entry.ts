@@ -16,6 +16,24 @@ export default async function (req) {
     const event = await base44.asServiceRole.entities.Event.get(body.event_id);
     const productora = event?.company || '';
 
+    // SECURITY: Check DNI duplicate BEFORE creating person
+    if (body.document) {
+      const normalizedDoc = String(body.document).replace(/\D/g, '');
+      if (normalizedDoc) {
+        const docMatches = await base44.asServiceRole.entities.Person.filter(
+          { document: normalizedDoc },
+          '-created_date',
+          50
+        );
+        const docDup = docMatches.find((p) => p.email !== body.email);
+        if (docDup) {
+          return Response.json({
+            error: `Ya existe una persona con ese DNI: ${docDup.full_name}. No pueden haber dos personas con el mismo documento.`,
+          }, { status: 409 });
+        }
+      }
+    }
+
     // Check if person already exists for this email
     const existing = await base44.asServiceRole.entities.Person.filter({ email: body.email });
     let person;

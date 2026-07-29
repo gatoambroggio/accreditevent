@@ -286,6 +286,16 @@ export default function PersonasAutonomas() {
       userCompany = me?.company || me?.data?.company || '';
       if (!personData.productora) personData.productora = userCompany;
     } catch {}
+    // SECURITY: Check DNI duplicate BEFORE creating/updating person
+    if (personData.document) {
+      const docCheck = await base44.functions.invoke('checkDocumentDuplicate', {
+        document: personData.document,
+        person_id: editing?.id || null,
+      });
+      if (docCheck.is_duplicate) {
+        throw new Error(`Ya existe una persona con ese DNI: ${docCheck.existing_person.full_name}. No pueden haber dos personas con el mismo documento.`);
+      }
+    }
     // SECURITY: Check face duplicate BEFORE creating/updating person
     if (face_photo_url && face_descriptor?.length) {
       const dupCheck = await base44.functions.invoke('checkFaceDuplicate', {
