@@ -382,8 +382,22 @@ export default function Accreditations() {
     try {
       const vehs = await base44.entities.Vehicle.filter({ person_id: personId }, '-created_date', 50);
       const linked = vehs.filter((v) => Array.isArray(v.event_ids) && v.event_ids.includes(eventId));
+      const evt = events.find((e) => e.id === eventId);
       for (const v of linked) {
-        try { await base44.entities.Vehicle.delete(v.id); } catch {}
+        try {
+          const remainingEventIds = v.event_ids.filter((id) => id !== eventId);
+          const remainingEventNames = (v.event_names || []).filter((n) => n !== evt?.name);
+          // Si el vehículo ya no está vinculado a ningún evento, se elimina el registro.
+          // Si aún está asignado a otros eventos, solo se desvincula de este.
+          if (remainingEventIds.length === 0) {
+            await base44.entities.Vehicle.delete(v.id);
+          } else {
+            await base44.entities.Vehicle.update(v.id, {
+              event_ids: remainingEventIds,
+              event_names: remainingEventNames,
+            });
+          }
+        } catch {}
       }
     } catch {}
   };
