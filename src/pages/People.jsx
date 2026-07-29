@@ -23,8 +23,7 @@ const validatePerson = (data) => {
   if (!data.document?.trim()) e.document = 'El documento es obligatorio';
   else if (!/^\d{7,8}$/.test(data.document.trim())) e.document = 'Debe tener 7 u 8 dígitos numéricos';
   if (!data.company?.trim()) e.company = 'La empresa es obligatoria';
-  if (!data.phone?.trim()) e.phone = 'El teléfono es obligatorio';
-  else if (data.phone.replace(/\D/g, '').length < 12) e.phone = 'Teléfono incompleto (código de área + número)';
+  if (data.phone?.trim() && data.phone.replace(/\D/g, '').length < 12) e.phone = 'Teléfono incompleto (código de área + número)';
   if (data.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e.email = 'Email inválido';
   if (!data.status) e.status = 'Seleccioná un estado';
   return e;
@@ -186,7 +185,7 @@ export default function People() {
       options: companies.map((c) => ({ value: c.name, label: c.name })),
       placeholder: 'Buscar o crear empresa…',
     },
-    { name: 'phone', label: 'Teléfono', type: 'phone-ar', required: true, hint: 'Código de área sin 0 y número sin 15. Ej: 11 12345678' },
+    { name: 'phone', label: 'Teléfono (opcional)', type: 'phone-ar', hint: 'Código de área sin 0 y número sin 15. Ej: 11 12345678' },
     { name: 'email', label: 'Email', type: 'email', placeholder: 'Ej: juan@empresa.com' },
     { name: 'status', label: 'Estado', type: 'select', required: true, options: STATUS_OPTIONS },
       { name: 'notes', label: 'Notas', type: 'textarea', full: true, placeholder: 'Ej: Responsable de montaje audiovisual' },
@@ -268,6 +267,18 @@ export default function People() {
         status: 'active',
       });
     }
+    // Sync phases to active accreditations
+    try {
+      const accreditations = await base44.entities.Accreditation.filter({ person_id: personId, status: 'active' });
+      for (const acc of accreditations) {
+        await base44.entities.Accreditation.update(acc.id, {
+          event_phases: personData.event_phases,
+          area: personData.access_area || acc.area,
+          access_level: personData.access_area || acc.access_level,
+          person_type: personData.access_area || acc.person_type,
+        });
+      }
+    } catch {}
   };
   const handleDelete = async () => {
     await base44.functions.invoke('deletePerson', { person_id: editing.id });

@@ -293,6 +293,12 @@ export default function Accreditations() {
         }
       }
     }
+    // Sync phases back to Person (productora authority)
+    if (person && finalPhases.length > 0) {
+      try {
+        await base44.entities.Person.update(person.id, { event_phases: finalPhases });
+      } catch {}
+    }
   };
 
   const handleDelete = async () => { await remove(editing.id); };
