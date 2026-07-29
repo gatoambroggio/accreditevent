@@ -26,12 +26,19 @@ export default async function (req) {
       return Response.json({ error: 'face_descriptor es obligatorio' }, { status: 400 });
     }
 
-    // Paginated fetch of ALL active biometrics globally
+    // Scope duplicate check by productora (tenant isolation):
+    // productora users only check within their own company's biometrics; admins check globally.
+    const userCompany = user?.data?.company || user?.company || '';
+    const role = user?.data?.role || user?.role || '';
+    const isScoped = role === 'productora' && userCompany;
+    const bioFilter = isScoped ? { status: 'active', company: userCompany } : { status: 'active' };
+
+    // Paginated fetch of active biometrics (scoped by productora when applicable)
     let allBios = [];
     let skip = 0;
     while (true) {
       const batch = await base44.asServiceRole.entities.Biometric.filter(
-        { status: 'active' },
+        bioFilter,
         '-created_date',
         PAGE_SIZE,
         skip

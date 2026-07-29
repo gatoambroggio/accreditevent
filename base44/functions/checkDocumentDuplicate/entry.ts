@@ -16,12 +16,19 @@ export default async function (req) {
     let docDup = null;
     let emailDup = null;
 
-    // Check document duplicate (global, service role)
+    // Scope duplicate check by productora (tenant isolation):
+    // productora users only check within their own company; admins check globally.
+    const userCompany = user?.data?.company || user?.company || '';
+    const role = user?.data?.role || user?.role || '';
+    const isScoped = role === 'productora' && userCompany;
+    const baseFilter = isScoped ? { productora: userCompany } : {};
+
+    // Check document duplicate (service role, scoped by productora)
     if (document) {
       const normalized = String(document).replace(/\D/g, '');
       if (normalized) {
         const docPersons = await base44.asServiceRole.entities.Person.filter(
-          { document: normalized },
+          { ...baseFilter, document: normalized },
           '-created_date',
           50
         );
@@ -38,10 +45,10 @@ export default async function (req) {
       }
     }
 
-    // Check email duplicate (global, service role)
+    // Check email duplicate (service role, scoped by productora)
     if (email) {
       const emailPersons = await base44.asServiceRole.entities.Person.filter(
-        { email: email },
+        { ...baseFilter, email: email },
         '-created_date',
         50
       );
