@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { X, Loader2, FileText, ExternalLink, User, UploadCloud, Car, Plus, Pencil, Trash2, Printer, Check, XCircle, ScanFace, Heart } from 'lucide-react';
+import { X, Loader2, FileText, ExternalLink, User, UploadCloud, Car, Plus, Pencil, Trash2, Printer, Check, XCircle, ScanFace, Heart, ShieldCheck, ShieldAlert } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
 import { Image } from '@/components/ui/image';
 import { useDocumentTypes } from '@/lib/useDocumentTypes';
@@ -10,6 +10,7 @@ import VehicleBadgePrint from '@/components/VehicleBadgePrint';
 import { useParkingSectors } from '@/lib/useParkingSectors';
 import DniToBiometric from '@/components/DniToBiometric';
 import { useCustomFields } from '@/lib/useCustomFields';
+import { getInsuranceStatus } from '@/lib/insuranceUtils';
 
 export default function PersonDetailModal({ person, onClose }) {
   const [docs, setDocs] = useState([]);
@@ -31,6 +32,7 @@ export default function PersonDetailModal({ person, onClose }) {
   const [savingReview, setSavingReview] = useState(false);
   const { customFields } = useCustomFields('Person');
   const [dniBioOpen, setDniBioOpen] = useState(false);
+  const [insurance, setInsurance] = useState(null);
   const { docTypes } = useDocumentTypes();
   const { sectors } = useParkingSectors();
 
@@ -68,6 +70,8 @@ export default function PersonDetailModal({ person, onClose }) {
         setBio(bioData[0] || null);
         setVehicles(vehData);
         setEvents(evs);
+        const ins = await getInsuranceStatus(person);
+        setInsurance(ins);
       } catch {}
       setLoading(false);
     })();
@@ -247,6 +251,27 @@ export default function PersonDetailModal({ person, onClose }) {
               </button>
             )}
           </div>
+
+          {/* Insurance status */}
+          {!loading && insurance && (
+            <div className={`mb-5 flex items-center gap-3 rounded-xl border p-3.5 ${insurance.insured ? 'border-emerald-200 bg-emerald-50/50' : 'border-red-200 bg-red-50/50'}`}>
+              {insurance.insured ? (
+                <ShieldCheck className="h-5 w-5 shrink-0 text-emerald-600" />
+              ) : (
+                <ShieldAlert className="h-5 w-5 shrink-0 text-red-600" />
+              )}
+              <div className="flex-1">
+                <p className={`text-sm font-bold ${insurance.insured ? 'text-emerald-800' : 'text-red-800'}`}>
+                  {insurance.insured ? 'Seguro aprobado' : 'Sin seguro aprobado'}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {insurance.insured
+                    ? `La persona puede ser acreditada.${insurance.approvedDoc?.expires_at ? ` Vence: ${new Date(insurance.approvedDoc.expires_at + 'T00:00:00').toLocaleDateString('es-AR')}.` : ''}`
+                    : 'No se puede acreditar hasta que la empresa o la persona tenga un seguro aprobado.'}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Custom fields */}
           {!loading && customFields.length > 0 && person.custom_fields && Object.keys(person.custom_fields).length > 0 && (

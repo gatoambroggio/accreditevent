@@ -20,6 +20,7 @@ import { btnPrimary, btnOutline, btnIcon } from '@/components/ui/button-styles';
 import Pagination from '@/components/ui/pagination';
 import { usePagination } from '@/lib/usePagination';
 import { logAudit } from '@/lib/audit';
+import { getInsuranceStatus } from '@/lib/insuranceUtils';
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Activa' },
@@ -207,6 +208,12 @@ export default function Accreditations() {
     let person = people.find((p) => p.id === data.person_id);
     if (!person && data.person_id) {
       try { person = await base44.entities.Person.get(data.person_id); } catch {}
+    }
+    if (!editing && person) {
+      const ins = await getInsuranceStatus(person);
+      if (!ins.insured) {
+        throw new Error(`No se puede acreditar: ${person?.full_name || 'la persona'} no tiene seguro aprobado${person?.company ? ` (empresa: ${person.company})` : ''}.`);
+      }
     }
     const accessLevelValue = data.access_level || person?.access_area || 'general';
     const primaryZone = accessLevelValue.split(',')[0].trim() || 'general';

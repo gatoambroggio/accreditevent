@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useCrud } from '@/lib/crud';
-import { Plus, Pencil, Download, Trash2, ScanLine, FileSpreadsheet, FileText } from 'lucide-react';
+import { Plus, Pencil, Download, Trash2, ScanLine, FileSpreadsheet, FileText, ShieldCheck, ShieldAlert } from 'lucide-react';
 import DniScannerModal from '@/components/DniScannerModal';
 import { exportToExcel } from '@/lib/exportUtils';
 import { base44 } from '@/api/base44Client';
@@ -18,6 +18,7 @@ import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
 import { btnPrimary, btnOutline, btnIcon } from '@/components/ui/button-styles';
 import Pagination from '@/components/ui/pagination';
 import { usePagination } from '@/lib/usePagination';
+import { getInsuredCompanies } from '@/lib/insuranceUtils';
 
 const validatePerson = (data) => {
   const e = {};
@@ -39,6 +40,11 @@ const STATUS_OPTIONS = [
   { value: 'pending', label: 'Pendiente' },
 ];
 
+const INSURANCE_OPTIONS = [
+  { value: 'insured', label: 'Asegurados' },
+  { value: 'uninsured', label: 'Sin seguro' },
+];
+
 export default function People() {
   const { items, loading, error, create, update, remove, reload } = useCrud('Person');
   const { zones } = useZones();
@@ -57,16 +63,20 @@ export default function People() {
   const [companies, setCompanies] = useState([]);
   const [importOpen, setImportOpen] = useState(false);
   const [docUploadPerson, setDocUploadPerson] = useState(null);
+  const [insuredCompanies, setInsuredCompanies] = useState(new Set());
+  const [insuranceFilter, setInsuranceFilter] = useState('');
 
   React.useEffect(() => {
     (async () => {
       try {
-        const [evs, comps] = await Promise.all([
+        const [evs, comps, insured] = await Promise.all([
           base44.entities.Event.list('-start_at', 200),
           base44.entities.ProviderCompany.list('name', 500),
+          getInsuredCompanies(),
         ]);
         setEvents(evs);
         setCompanies(comps);
+        setInsuredCompanies(insured);
       } catch {}
     })();
   }, []);
@@ -82,8 +92,10 @@ export default function People() {
     if (areaFilter) result = result.filter((p) => p.access_area === areaFilter);
     if (statusFilter) result = result.filter((p) => p.status === statusFilter);
     if (companyFilter) result = result.filter((p) => p.company === companyFilter);
+    if (insuranceFilter === 'insured') result = result.filter((p) => insuredCompanies.has(p.company));
+    if (insuranceFilter === 'uninsured') result = result.filter((p) => !insuredCompanies.has(p.company));
     return result;
-  }, [items, query, areaFilter, statusFilter, companyFilter]);
+  }, [items, query, areaFilter, statusFilter, companyFilter, insuranceFilter, insuredCompanies]);
 
   const { page, setPage, totalPages, paginated } = usePagination(filtered, 15);
 
@@ -389,6 +401,7 @@ export default function People() {
         <FilterSelect value={areaFilter} onChange={setAreaFilter} options={zones.map((z) => ({ value: z.value, label: z.label }))} placeholder="Todas las áreas" />
         <FilterSelect value={companyFilter} onChange={setCompanyFilter} options={companies.map((c) => ({ value: c.name, label: c.name }))} placeholder="Todas las empresas" />
         <FilterSelect value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} placeholder="Todos los estados" />
+        <FilterSelect value={insuranceFilter} onChange={setInsuranceFilter} options={INSURANCE_OPTIONS} placeholder="Estado de seguro" />
       </div>
 
       {selected.size > 0 && (
@@ -409,7 +422,7 @@ export default function People() {
         error={error}
         isEmpty={filtered.length === 0}
         emptyMessage={query ? 'Sin resultados para tu búsqueda.' : 'No hay empleados registrados todavía.'}
-        tableClassName="min-w-[800px]"
+        tableClassName="min-w-[900px]"
       >
         <thead>
           <tr className="border-b border-slate-100 bg-slate-50">
@@ -419,6 +432,7 @@ export default function People() {
             <Th>Persona</Th>
             <Th>Tipo / Área</Th>
             <Th>Empresa</Th>
+            <Th>Seguro</Th>
             <Th>Contacto</Th>
             <Th>Estado</Th>
             <Th />
@@ -440,6 +454,17 @@ export default function People() {
                 ) : <span className="text-sm text-slate-400">—</span>}
               </Td>
               <Td className="text-sm text-slate-500">{p.company || '—'}</Td>
+              <Td>
+                {insuredCompanies.has(p.company) ? (
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700" title="Empresa con seguro aprobado">
+                    <ShieldCheck className="h-3.5 w-3.5" /> Asegurado
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600" title="Sin seguro aprobado">
+                    <ShieldAlert className="h-3.5 w-3.5" /> Sin seguro
+                  </span>
+                )}
+              </Td>
               <Td className="text-sm text-slate-500">{p.phone || p.email || '—'}</Td>
               <Td><StatusBadge status={p.status} /></Td>
               <Td className="text-right">
