@@ -121,11 +121,10 @@ export default function EmpresaPortal() {
       if (!currentEventIds.includes(bulkEventId)) {
         const newEventIds = [...currentEventIds, bulkEventId];
         const newEventNames = [...(emp.event_names || []), ev.event_name];
-        const updated = await base44.entities.Person.update(emp.id, {
+        await base44.entities.Person.update(emp.id, {
           event_ids: newEventIds,
           event_names: newEventNames,
         });
-        await syncAccreditations(updated, newEventIds, emp.access_area, approvedEventList, emp.event_phases);
       }
     }
     setSelected(new Set());
