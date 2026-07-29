@@ -92,13 +92,12 @@ export default function FacialAccreditationForm({ open, event, identifiedPerson,
     { name: 'has_biometric', label: 'Biometría registrada', type: 'checkbox' },
     { name: 'print_badge', label: 'Imprimir credencial al acreditar', type: 'checkbox' },
     {
-      name: 'print_type', label: 'Tipo de credencial a imprimir', type: 'select',
+      name: 'print_type', label: 'Credenciales a imprimir', type: 'toggle-group',
       options: [
         { value: 'personal', label: 'Personal' },
         { value: 'vehicular', label: 'Vehicular' },
       ],
-      defaultValue: 'personal',
-      hint: 'Elegí qué credencial imprimir tras acreditar.',
+      hint: 'Seleccioná personal, vehicular o ambas.',
     },
   ];
 
@@ -198,17 +197,17 @@ export default function FacialAccreditationForm({ open, event, identifiedPerson,
     }
     let printInfo = null;
     if (data.print_badge) {
-      const printType = data.print_type || 'personal';
-      if (printType === 'vehicular' && approvedVehicles.length > 0) {
+      const printTypes = String(data.print_type || '').split(',').map((s) => s.trim()).filter(Boolean);
+      printInfo = {};
+      if (printTypes.includes('personal')) printInfo.personal = true;
+      if (printTypes.includes('vehicular') && approvedVehicles.length > 0) {
         const vehsForPrint = approvedVehicles.map((v) => ({
           ...v,
           parking_sector: vehicleApprovals[v.id]?.sector ?? v.parking_sector,
           event_ids: Array.from(new Set([...(Array.isArray(v.event_ids) ? v.event_ids : []), data.event_id])),
           event_names: Array.from(new Set([...(Array.isArray(v.event_names) ? v.event_names : []), evt?.name].filter(Boolean))),
         }));
-        printInfo = { type: 'vehicular', vehicles: vehsForPrint };
-      } else {
-        printInfo = { type: 'personal' };
+        printInfo.vehicles = vehsForPrint;
       }
     }
     if (onCreated) onCreated(created, printInfo);

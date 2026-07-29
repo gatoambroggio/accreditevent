@@ -340,10 +340,9 @@ export default function AccreditationFacial() {
             badge_code: accred.badge_code,
             accred,
           });
-          if (printInfo?.type === 'vehicular') {
+          if (printInfo?.personal) setPrintAccred(accred);
+          if (printInfo?.vehicles?.length) {
             setVehicleBatchPrint({ vehicles: printInfo.vehicles, event: selectedEvent });
-          } else if (printInfo?.type === 'personal') {
-            setPrintAccred(accred);
           }
         }}
         onClose={() => {
