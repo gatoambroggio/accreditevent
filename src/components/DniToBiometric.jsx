@@ -71,29 +71,17 @@ export default function DniToBiometric({ person, onSaved, onClose }) {
       setStatus('Subiendo foto del rostro…');
       const { file_url } = await base44.integrations.Core.UploadFile({ file: faceFile });
 
-      // SECURITY: Check face duplicate on a different person before saving
+      // Tenant-isolated save (service role, scoped to the productora's own data)
       const descriptor = Array.from(detection.descriptor);
-      const dupCheck = await base44.functions.invoke('checkFaceDuplicate', {
-        face_descriptor: descriptor,
-        person_id: person.id,
-      });
-      if (dupCheck.data?.is_duplicate) {
-        throw new Error(`Este rostro ya está registrado para "${dupCheck.data.duplicates[0].person_name}". No se puede registrar la misma cara en dos personas distintas.`);
-      }
-
       setStatus('Guardando biometría…');
-      const existing = await base44.entities.Biometric.filter({ person_id: person.id, status: 'active' });
-      for (const b of existing) {
-        await base44.entities.Biometric.update(b.id, { status: 'revoked' });
-      }
-      await base44.entities.Biometric.create({
+      const res = await base44.functions.invoke('saveProviderBiometric', {
         person_id: person.id,
         person_name: person.full_name,
-        company: person.productora || person.company || '',
+        event_id: person.event_id || '',
         face_photo_url: file_url,
         face_descriptor: descriptor,
-        status: 'active',
       });
+      if (res?.data?.error) throw new Error(res.data.error);
 
       // Mark accreditations as having biometric
       try {

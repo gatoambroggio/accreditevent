@@ -35,29 +35,18 @@ export default function PersonBiometricCard({ person }) {
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
 
-      // SECURITY: Check face duplicate on a different person before saving
-      if (descriptor && descriptor.length > 0) {
-        const dupCheck = await base44.functions.invoke('checkFaceDuplicate', {
-          face_descriptor: descriptor,
-          person_id: person.id,
-        });
-        if (dupCheck.is_duplicate) {
-          setError(`Este rostro ya está registrado para "${dupCheck.duplicates[0].person_name}". No se puede registrar la misma cara en dos personas distintas.`);
-          return;
-        }
-      }
-
-      if (biometric) {
-        await base44.entities.Biometric.update(biometric.id, { status: 'revoked' });
-      }
-
-      await base44.entities.Biometric.create({
+      // Tenant-isolated save (service role, scoped to the productora's own data)
+      const res = await base44.functions.invoke('saveProviderBiometric', {
         person_id: person.id,
         person_name: person.full_name,
+        event_id: person.event_id || '',
         face_photo_url: file_url,
         face_descriptor: descriptor || [],
-        status: 'active',
       });
+      if (res?.data?.error) {
+        setError(res.data.error);
+        return;
+      }
 
       const accreds = await base44.entities.Accreditation.filter({
         person_id: person.id,
