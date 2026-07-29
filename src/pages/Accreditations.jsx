@@ -23,6 +23,7 @@ import Pagination from '@/components/ui/pagination';
 import { usePagination } from '@/lib/usePagination';
 import { logAudit } from '@/lib/audit';
 import { getInsuranceStatus } from '@/lib/insuranceUtils';
+import { pickPersonDefaultEvent } from '@/lib/personDefaultEvent';
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Activa' },
@@ -185,6 +186,11 @@ export default function Accreditations() {
       const p = people.find((p) => p.id === value);
       if (p?.access_area) setField('access_level', p.access_area);
       if (p?.event_phases) setField('event_phases', Array.isArray(p.event_phases) ? p.event_phases.join(',') : p.event_phases);
+      const defaultEventId = pickPersonDefaultEvent(p, events);
+      if (defaultEventId) {
+        setField('event_id', defaultEventId);
+        setSelectedEventId(defaultEventId);
+      }
       try {
         const [bios, vehs] = await Promise.all([
           base44.entities.Biometric.filter({ person_id: value, status: 'active' }, '-created_date', 1),
