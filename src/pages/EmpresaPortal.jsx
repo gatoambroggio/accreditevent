@@ -95,6 +95,11 @@ export default function EmpresaPortal() {
   const syncAccreditations = async (person, eventIds, accessArea, events, eventPhases) => {
     const phases = Array.isArray(eventPhases) ? eventPhases : [];
     const existing = await base44.entities.Accreditation.filter({ person_id: person.id });
+    let hasBiometric = false;
+    try {
+      const bios = await base44.entities.Biometric.filter({ person_id: person.id, status: 'active' }, '-created_date', 1);
+      hasBiometric = bios.length > 0;
+    } catch {}
     for (const eventId of eventIds) {
       const ev = events.find((e) => e.event_id === eventId);
       if (!ev) continue;
@@ -106,6 +111,7 @@ export default function EmpresaPortal() {
           person_name: person.full_name,
           person_type: person.person_type || 'provider',
           event_phases: phases,
+          has_biometric: hasBiometric,
         });
       } else {
         const allAccrs = await base44.entities.Accreditation.filter({ event_id: eventId }, '-created_date', 200);
@@ -124,7 +130,7 @@ export default function EmpresaPortal() {
           access_level: accessArea || 'general',
           event_phases: phases,
           status: 'active',
-          has_biometric: false,
+          has_biometric: hasBiometric,
         });
       }
     }
