@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useCrud } from '@/lib/crud';
-import { Plus, Pencil, Briefcase, Download, ShieldCheck } from 'lucide-react';
+import { Plus, Pencil, Briefcase, Download, ShieldCheck, ChevronDown } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { exportToExcel } from '@/lib/exportUtils';
 import EntityModal from '@/components/EntityModal';
 import ProviderCompanyPeopleModal from '@/components/ProviderCompanyPeopleModal';
+import CompanyEmployeesList from '@/components/CompanyEmployeesList';
 import EventApprovalModal from '@/components/EventApprovalModal';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
@@ -19,6 +20,7 @@ export default function ProviderCompanies() {
   const [editing, setEditing] = useState(null);
   const [query, setQuery] = useState('');
   const [peopleModalCompany, setPeopleModalCompany] = useState(null);
+  const [expandedCompany, setExpandedCompany] = useState(null);
   const [approvalModalCompany, setApprovalModalCompany] = useState(null);
   const [approvals, setApprovals] = useState([]);
 
@@ -27,6 +29,14 @@ export default function ProviderCompanies() {
       .then(setApprovals)
       .catch(() => {});
   }, [items]);
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const companyParam = urlParams.get('company');
+    if (companyParam) {
+      setExpandedCompany(decodeURIComponent(companyParam));
+    }
+  }, []);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -98,9 +108,16 @@ export default function ProviderCompanies() {
         </thead>
         <tbody>
           {paginated.map((c) => (
-            <Tr key={c.id}>
+            <React.Fragment key={c.id}>
+            <Tr>
               <Td>
                 <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setExpandedCompany(expandedCompany === c.name ? null : c.name)}
+                    className="shrink-0 rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                  >
+                    <ChevronDown className={`h-4 w-4 transition-transform ${expandedCompany === c.name ? 'rotate-180' : ''}`} />
+                  </button>
                   {c.logo_url ? (
                     <img src={c.logo_url} alt="" className="h-9 w-9 rounded-lg object-cover" />
                   ) : (
@@ -153,6 +170,14 @@ export default function ProviderCompanies() {
                 </div>
               </Td>
             </Tr>
+            {expandedCompany === c.name && (
+              <tr className="border-b border-slate-50">
+                <td colSpan={4} className="bg-slate-50/50 px-4">
+                  <CompanyEmployeesList company={c} />
+                </td>
+              </tr>
+            )}
+            </React.Fragment>
           ))}
         </tbody>
       </DataTable>

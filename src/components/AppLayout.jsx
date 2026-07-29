@@ -28,6 +28,7 @@ import {
   Briefcase,
   UserSearch,
   ClipboardList,
+  ChevronDown,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 
@@ -41,7 +42,7 @@ const NAV_ITEMS = [
   { path: '/people', label: 'Empleados', icon: Users, minLevel: 1 },
   { path: '/personas-autonomas', label: 'Personas Autónomas', icon: UserSearch, minLevel: 1 },
   { path: '/registered-people', label: 'Personas registradas', icon: UserSearch, minLevel: 1 },
-  { path: '/provider-companies', label: 'Empresas de servicios', icon: Briefcase, minLevel: 1 },
+  { path: '/provider-companies', label: 'Empresas de servicios', icon: Briefcase, minLevel: 1, expandable: true },
   // Acreditaciones
   { path: '/accreditations', label: 'Acreditaciones', icon: IdCard, minLevel: 0 },
   { path: '/access-levels', label: 'Niveles de acceso', icon: Layers, minLevel: 1 },
@@ -75,6 +76,8 @@ export default function AppLayout() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [settings, setSettings] = useState(null);
+  const [expandedNav, setExpandedNav] = useState(null);
+  const [navSubItems, setNavSubItems] = useState({});
 
   useEffect(() => {
     (async () => {
@@ -117,6 +120,29 @@ export default function AppLayout() {
   });
 
   const isActive = (path) => (path === '/' ? location.pathname === '/' : location.pathname.startsWith(path));
+
+  const urlParams = new URLSearchParams(location.search);
+  const activeCompany = urlParams.get('company');
+
+  const toggleNavExpand = async (item) => {
+    const key = item.path;
+    if (expandedNav === key) {
+      setExpandedNav(null);
+      return;
+    }
+    setExpandedNav(key);
+    if (!navSubItems[key]) {
+      try {
+        let companies = [];
+        if (key === '/provider-companies') {
+          companies = await base44.entities.ProviderCompany.list('name', 500);
+        }
+        setNavSubItems((prev) => ({ ...prev, [key]: companies }));
+      } catch {
+        setNavSubItems((prev) => ({ ...prev, [key]: [] }));
+      }
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[hsl(120_14%_97%)]">
@@ -163,17 +189,52 @@ export default function AppLayout() {
           {visibleItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.path);
+            const isExpanded = expandedNav === item.path;
+            const subItems = navSubItems[item.path] || [];
             return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
-                  active ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                }`}
-              >
-                <Icon className="h-5 w-5 shrink-0" strokeWidth={active ? 2.5 : 2} />
-                <span>{item.label}</span>
-              </Link>
+              <div key={item.path}>
+                {item.expandable ? (
+                  <button
+                    onClick={() => toggleNavExpand(item)}
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
+                      active || isExpanded ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    <Icon className="h-5 w-5 shrink-0" strokeWidth={active ? 2.5 : 2} />
+                    <span className="flex-1 text-left">{item.label}</span>
+                    <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                  </button>
+                ) : (
+                  <Link
+                    to={item.path}
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
+                      active ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    <Icon className="h-5 w-5 shrink-0" strokeWidth={active ? 2.5 : 2} />
+                    <span>{item.label}</span>
+                  </Link>
+                )}
+                {item.expandable && isExpanded && (
+                  <div className="mt-0.5 ml-4 space-y-0.5 border-l border-white/10 pl-2">
+                    {subItems.length === 0 ? (
+                      <div className="px-3 py-2 text-xs text-slate-500">Sin empresas</div>
+                    ) : (
+                      subItems.map((company) => (
+                        <Link
+                          key={company.id}
+                          to={`${item.path}?company=${encodeURIComponent(company.name)}`}
+                          className={`flex items-center rounded-lg px-3 py-2 text-xs font-medium transition ${
+                            activeCompany === company.name ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                          }`}
+                        >
+                          {company.name}
+                        </Link>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
             );
           })}
         </nav>
