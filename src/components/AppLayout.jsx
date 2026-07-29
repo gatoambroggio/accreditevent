@@ -17,6 +17,7 @@ import {
   Radio,
   MessageSquare,
   ScanFace,
+  ScanLine,
   BarChart3,
   Settings as SettingsIcon,
   Layers,
@@ -44,6 +45,7 @@ const NAV_ITEMS = [
   { path: '/accreditations', label: 'Acreditaciones', icon: IdCard, minLevel: 0 },
   { path: '/access-levels', label: 'Niveles de acceso', icon: Layers, minLevel: 1 },
   { path: '/accreditation-facial', label: 'Acreditación facial', icon: ScanFace, minLevel: 1 },
+  { path: '/dni-scan', label: 'Escaneo de DNI', icon: ScanLine, minLevel: 0 },
   // Control de acceso
   { path: '/access-control', label: 'Control de acceso', icon: DoorOpen, minLevel: 0 },
   { path: '/access-monitor', label: 'Monitor en vivo', icon: Radio, minLevel: 0 },
