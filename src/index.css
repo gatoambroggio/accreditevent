@@ -89,6 +89,10 @@
   body {
     @apply bg-background text-foreground font-body;
   }
+
+  input[type="text"], input:not([type]), textarea {
+    text-transform: uppercase;
+  }
 }
 
 @media print {

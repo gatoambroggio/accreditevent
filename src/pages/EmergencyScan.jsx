@@ -6,6 +6,7 @@ import PageHeader from '@/components/ui/page-header';
 import FilterSelect from '@/components/ui/filter-select';
 import StatusBadge from '@/components/StatusBadge';
 import { findBestMatch } from '@/lib/faceRecognition';
+import DocumentViewer from '@/components/DocumentViewer';
 
 export default function EmergencyScan() {
   const [scanning, setScanning] = useState(false);
@@ -148,6 +149,7 @@ export default function EmergencyScan() {
 }
 
 function EmergencyCard({ person, accred, docs, vehicles, onReset }) {
+  const [viewingDoc, setViewingDoc] = useState(null);
   const insuranceDocs = docs.filter((d) => ['work_insurance', 'art', 'seguro'].includes(d.document_type));
   const otherDocs = docs.filter((d) => !['work_insurance', 'art', 'seguro'].includes(d.document_type));
 
@@ -175,7 +177,13 @@ function EmergencyCard({ person, accred, docs, vehicles, onReset }) {
             insuranceDocs.length > 0
               ? insuranceDocs.map((d) => (
                   <div key={d.id} className="flex items-center gap-2">
-                    <span>{d.original_name}</span>
+                    <button
+                      type="button"
+                      onClick={() => setViewingDoc(d)}
+                      className="text-left text-sm font-semibold text-emerald-700 transition hover:text-emerald-800 hover:underline"
+                    >
+                      {d.original_name}
+                    </button>
                     <StatusBadge status={d.status} />
                   </div>
                 ))
@@ -210,6 +218,10 @@ function EmergencyCard({ person, accred, docs, vehicles, onReset }) {
           </div>
         )}
       </div>
+
+      {viewingDoc && (
+        <DocumentViewer document={viewingDoc} onClose={() => setViewingDoc(null)} />
+      )}
     </div>
   );
 }

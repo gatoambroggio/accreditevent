@@ -108,7 +108,13 @@ export default function EntityModal({
       id: f.name,
       value: f.type === 'checkbox' ? undefined : value,
       checked: f.type === 'checkbox' ? !!value : undefined,
-      onChange: (e) => setField(f.name, f.type === 'checkbox' ? e.target.checked : e.target.value),
+      onChange: (e) => {
+        let val = f.type === 'checkbox' ? e.target.checked : e.target.value;
+        if (typeof val === 'string' && (f.type === 'text' || f.type === 'textarea' || !f.type)) {
+          val = val.toUpperCase();
+        }
+        setField(f.name, val);
+      },
       required: f.required,
       className: `w-full rounded-lg border px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:ring-2 ${
         fieldError
@@ -178,7 +184,7 @@ export default function EntityModal({
             value={selectedOption ? selectedOption.label : searchQuery}
             onChange={(e) => {
               setField(f.name, '');
-              setField(`_search_${f.name}`, e.target.value);
+              setField(`_search_${f.name}`, e.target.value.toUpperCase());
             }}
             placeholder={f.placeholder || 'Buscar…'}
             className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
@@ -205,7 +211,7 @@ export default function EntityModal({
                 <button
                   type="button"
                   onClick={() => {
-                    setField(f.name, searchQuery);
+                    setField(f.name, searchQuery.toUpperCase());
                     setField(`_search_${f.name}`, '');
                   }}
                   className="block w-full border-t border-slate-100 px-3 py-2 text-left text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
@@ -308,7 +314,7 @@ export default function EntityModal({
           <span className="mb-1.5 block text-xs font-semibold text-slate-600">{f.label}{f.required && ' *'}</span>
           <AddressInput
             value={value}
-            onChange={(val) => setField(f.name, val)}
+            onChange={(val) => setField(f.name, typeof val === 'string' ? val.toUpperCase() : val)}
             lat={data[latField]}
             lng={data[lngField]}
             onCoordinatesChange={(latVal, lngVal) => {
