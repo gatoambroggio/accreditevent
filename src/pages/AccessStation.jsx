@@ -87,26 +87,25 @@ export default function AccessStation() {
         return;
       }
 
-      // Fetch ALL active biometrics (not event-scoped — biometrics are tied to persons, not events)
-      const bios = await base44.entities.Biometric.filter({ status: 'active' }, '-created_date', 500);
-      const persons = await base44.entities.Person.list('-created_date', 500);
-      const validPersonIds = new Set(persons.map((p) => p.id));
-      const withDescriptors = bios.filter(
-        (b) => b.face_descriptor && b.face_descriptor.length > 0 && validPersonIds.has(b.person_id)
-      );
-
-      if (withDescriptors.length === 0) {
-        await logAccess('denied');
-        setResult({ ok: false, message: 'No hay rostros registrados en el sistema.' });
-        return;
-      }
-
       // Fetch active accreditations for the SELECTED EVENT only
       const accreditations = await base44.entities.Accreditation.filter(
         { status: 'active', event_id: selectedEvent.id },
         '-created_date',
         500
       );
+      const eventPersonIds = new Set(accreditations.map((a) => a.person_id));
+
+      // Fetch biometrics only for persons with active accreditations in this event
+      const bios = await base44.entities.Biometric.filter({ status: 'active' }, '-created_date', 500);
+      const withDescriptors = bios.filter(
+        (b) => b.face_descriptor && b.face_descriptor.length > 0 && eventPersonIds.has(b.person_id)
+      );
+
+      if (withDescriptors.length === 0) {
+        await logAccess('denied');
+        setResult({ ok: false, message: 'No hay rostros registrados para este evento.' });
+        return;
+      }
 
       // Find best match using face-api.js descriptors
       const { match, distance, topEntries } = findBestMatch(descriptor, withDescriptors);
@@ -126,7 +125,7 @@ export default function AccessStation() {
         if (candidates.length < 8) {
           const existingIds = new Set(candidates.map((c) => c.id));
           const additional = bios
-            .filter((b) => b.face_photo_url && !existingIds.has(b.id))
+            .filter((b) => b.face_photo_url && !existingIds.has(b.id) && eventPersonIds.has(b.person_id))
             .slice(0, 8 - candidates.length);
           candidates = [...candidates, ...additional];
         }
