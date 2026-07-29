@@ -13,7 +13,6 @@ import VehicleAccreditSection from '@/components/VehicleAccreditSection';
 import { useZones } from '@/lib/useZones';
 import { usePersonTypes } from '@/lib/usePersonTypes';
 import { useParkingSectors } from '@/lib/useParkingSectors';
-import { computeSectorOccupancy, sectorStatus } from '@/lib/parkingCapacity';
 import { generateBadgeCode } from '@/lib/badgeCode';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
@@ -165,11 +164,12 @@ export default function Accreditations() {
     { name: 'has_biometric', label: 'Biometría registrada', type: 'checkbox' },
   ];
 
-  const openNew = () => { setEditing(null); setPersonVehicles([]); setVehicleApprovals({}); setModalOpen(true); };
+  const openNew = () => { setEditing(null); setPersonVehicles([]); setVehicleApprovals({}); setSelectedEventId(''); setModalOpen(true); };
   const openEdit = (item) => {
     const normalized = { ...item, access_level: item.access_level || item.area || '' };
     setPersonVehicles([]);
     setVehicleApprovals({});
+    setSelectedEventId(item.event_id || '');
     if (Array.isArray(normalized.event_phases)) {
       normalized.event_phases = normalized.event_phases.join(',');
     }
@@ -178,6 +178,7 @@ export default function Accreditations() {
   };
 
   const handleFieldChange = async (name, value, setField, formData) => {
+    if (name === 'event_id') setSelectedEventId(value);
     if (name === 'person_id' && value) {
       const p = people.find((p) => p.id === value);
       if (p?.access_area) setField('access_level', p.access_area);
@@ -469,7 +470,7 @@ export default function Accreditations() {
 
       <EntityModal
         open={modalOpen}
-        onClose={() => { setModalOpen(false); setPersonVehicles([]); setVehicleApprovals({}); }}
+        onClose={() => { setModalOpen(false); setPersonVehicles([]); setVehicleApprovals({}); setSelectedEventId(''); }}
         title={editing ? 'Editar acreditación' : 'Nueva acreditación'}
         kicker={editing ? 'EDITAR ACREDITACIÓN' : 'CREAR ACREDITACIÓN'}
         fields={fields}
@@ -486,7 +487,7 @@ export default function Accreditations() {
             approvals={vehicleApprovals}
             setApprovals={setVehicleApprovals}
             sectors={sectors}
-            event={events.find((e) => e.id === (editing?.event_id || ''))}
+            event={events.find((e) => e.id === (selectedEventId || editing?.event_id || ''))}
           />
         ) : undefined}
       />
