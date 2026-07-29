@@ -77,8 +77,8 @@ export default function DniToBiometric({ person, onSaved, onClose }) {
         face_descriptor: descriptor,
         person_id: person.id,
       });
-      if (dupCheck.is_duplicate) {
-        throw new Error(`Este rostro ya está registrado para "${dupCheck.duplicates[0].person_name}". No se puede registrar la misma cara en dos personas distintas.`);
+      if (dupCheck.data?.is_duplicate) {
+        throw new Error(`Este rostro ya está registrado para "${dupCheck.data.duplicates[0].person_name}". No se puede registrar la misma cara en dos personas distintas.`);
       }
 
       setStatus('Guardando biometría…');

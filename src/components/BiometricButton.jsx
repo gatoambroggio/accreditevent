@@ -24,8 +24,8 @@ export default function BiometricButton({ accreditation, onRegistered }) {
         face_descriptor: descriptor,
         person_id: accreditation.person_id,
       });
-      if (dupCheck.is_duplicate) {
-        setError(`Este rostro ya está registrado para "${dupCheck.duplicates[0].person_name}". No se puede registrar la misma cara en dos personas distintas.`);
+      if (dupCheck.data?.is_duplicate) {
+        setError(`Este rostro ya está registrado para "${dupCheck.data.duplicates[0].person_name}". No se puede registrar la misma cara en dos personas distintas.`);
         return;
       }
 

@@ -123,11 +123,11 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
       // SECURITY: Check DNI + email duplicate BEFORE creating person
       const docCheck = await base44.functions.invoke('checkDocumentDuplicate', {
         document: form.document,
-        email: null, // EmployeeFormModal doesn't collect email
+        email: null,
         person_id: editing?.id || null,
       });
-      if (docCheck.is_duplicate) {
-        throw new Error(`Ya existe una persona con ese DNI: ${docCheck.existing_person.full_name} (${docCheck.existing_person.company || 'sin empresa'}). No pueden haber dos personas con el mismo documento.`);
+      if (docCheck.data?.is_duplicate) {
+        throw new Error(`Ya existe una persona con ese DNI: ${docCheck.data.existing_person.full_name} (${docCheck.data.existing_person.company || 'sin empresa'}). No pueden haber dos personas con el mismo documento.`);
       }
 
       // SECURITY: Check face duplicate BEFORE creating person
@@ -137,8 +137,8 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
           face_descriptor: descriptorToCheck,
           person_id: editing?.id || null,
         });
-        if (dupCheck.is_duplicate) {
-          throw new Error(`Este rostro ya está registrado para "${dupCheck.duplicates[0].person_name}". No se puede registrar la misma cara en dos personas distintas.`);
+        if (dupCheck.data?.is_duplicate) {
+          throw new Error(`Este rostro ya está registrado para "${dupCheck.data.duplicates[0].person_name}". No se puede registrar la misma cara en dos personas distintas.`);
         }
       }
       setStatus('Guardando empleado…');

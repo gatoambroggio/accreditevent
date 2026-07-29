@@ -247,9 +247,9 @@ export default function People() {
       email: personData.email || null,
       person_id: editing?.id || null,
     });
-    if (docCheck.is_duplicate) {
-      const field = docCheck.duplicate_type === 'email' ? 'email' : 'DNI';
-      throw new Error(`Ya existe una persona con ese ${field}: ${docCheck.existing_person.full_name} (${docCheck.existing_person.company || 'sin empresa'}). No pueden haber dos personas con el mismo ${field}.`);
+    if (docCheck.data?.is_duplicate) {
+      const field = docCheck.data.duplicate_type === 'email' ? 'email' : 'DNI';
+      throw new Error(`Ya existe una persona con ese ${field}: ${docCheck.data.existing_person.full_name} (${docCheck.data.existing_person.company || 'sin empresa'}). No pueden haber dos personas con el mismo ${field}.`);
     }
     // SECURITY: Check face duplicate BEFORE creating/updating person
     if (face_photo_url && face_descriptor?.length) {
@@ -257,8 +257,8 @@ export default function People() {
         face_descriptor,
         person_id: editing?.id || null,
       });
-      if (dupCheck.is_duplicate) {
-        throw new Error(`Este rostro ya está registrado para "${dupCheck.duplicates[0].person_name}". No se puede registrar la misma cara en dos personas distintas.`);
+      if (dupCheck.data?.is_duplicate) {
+        throw new Error(`Este rostro ya está registrado para "${dupCheck.data.duplicates[0].person_name}". No se puede registrar la misma cara en dos personas distintas.`);
       }
     }
     let personId;
