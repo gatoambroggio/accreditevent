@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Loader2, CheckCircle2, XCircle, Calendar, AlertCircle, RefreshCw, Printer } from 'lucide-react';
 import FaceCapture from '@/components/FaceCapture';
 import BadgePrint from '@/components/BadgePrint';
+import FacialAccreditationForm from '@/components/FacialAccreditationForm';
 import { findBestMatch } from '@/lib/faceRecognition';
-import { usePersonTypes } from '@/lib/usePersonTypes';
-import { generateBadgeCode } from '@/lib/badgeCode';
 
 export default function AccreditationFacial() {
   const [phase, setPhase] = useState('select');
@@ -17,18 +16,17 @@ export default function AccreditationFacial() {
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState(null);
   const [printAccred, setPrintAccred] = useState(null);
-  const { personTypes } = usePersonTypes();
-  const typePrefixes = useMemo(() => {
-    const map = {};
-    personTypes.forEach((t) => { map[t.value] = t.badge_prefix || 'GE'; });
-    return map;
-  }, [personTypes]);
+  const [people, setPeople] = useState([]);
+  const [pendingPerson, setPendingPerson] = useState(null);
+  const [formOpen, setFormOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
         const data = await base44.entities.Event.filter({ status: 'active' }, '-created_date', 100);
         setEvents(data);
+        const ps = await base44.entities.Person.list('-created_date', 200);
+        setPeople(ps);
       } catch {}
       setLoadingEvents(false);
     })();
@@ -47,59 +45,6 @@ export default function AccreditationFacial() {
     setResult(null);
     setProcessing(false);
     setCycle((c) => c + 1);
-  };
-
-  const confirmAccreditation = async () => {
-    if (!result || result.ok !== 'pending_confirm') return;
-    setProcessing(true);
-    try {
-      const existing = await base44.entities.Accreditation.filter(
-        { event_id: selectedEvent.id, person_id: result.person_id },
-        '-created_date',
-        5
-      );
-      if (existing.length > 0) {
-        const accred = existing[0];
-        setResult({
-          ok: false,
-          alreadyAccredited: true,
-          person_name: accred.person_name,
-          badge_code: accred.badge_code,
-          message: 'Esta persona ya tiene una acreditación para este evento.',
-        });
-        return;
-      }
-
-      const allAccreditations = await base44.entities.Accreditation.list('-created_date', 500);
-      const badgeCode = generateBadgeCode(result.person_type, allAccreditations.map((a) => a.badge_code), typePrefixes);
-
-      const newAccred = await base44.entities.Accreditation.create({
-        event_id: selectedEvent.id,
-        event_name: selectedEvent.name,
-        company: selectedEvent.company || '',
-        person_id: result.person_id,
-        person_name: result.person_name,
-        person_type: result.person_type,
-        person_email: result.person_email,
-        badge_code: badgeCode,
-        area: result.access_area,
-        access_level: result.access_area,
-        event_phases: result.event_phases,
-        status: 'active',
-        has_biometric: true,
-      });
-
-      setResult({
-        ok: true,
-        person_name: result.person_name,
-        badge_code: badgeCode,
-        accred: newAccred,
-      });
-    } catch (err) {
-      setResult({ ok: false, message: err.message || 'Error al generar la acreditación.' });
-    } finally {
-      setProcessing(false);
-    }
   };
 
   const backToSelect = () => {
@@ -183,17 +128,22 @@ export default function AccreditationFacial() {
         return;
       }
 
-      // Pre-acreditación: no crear automáticamente, esperar confirmación del operador
+      // Abrir formulario completo (como nueva acreditación manual) con la persona identificada
       setResult({
-        ok: 'pending_confirm',
-        person_id: personId,
+        ok: 'identified',
         person_name: personName,
+        face_photo_url: match.face_photo_url,
+      });
+      setPendingPerson({
+        id: personId,
+        full_name: personName,
         person_type: personType,
-        person_email: personEmail,
+        email: personEmail,
         access_area: personAccessArea,
         event_phases: personPhases,
         face_photo_url: match.face_photo_url,
       });
+      setFormOpen(true);
     } catch (err) {
       setResult({ ok: false, message: err.message || 'Error en el proceso.' });
     } finally {
@@ -278,48 +228,19 @@ export default function AccreditationFacial() {
               </div>
             ) : result ? (
               <div className="flex flex-col items-center py-8">
-                {result.ok === 'pending_confirm' ? (
+                {result.ok === 'identified' ? (
                   <>
                     <div className="grid h-16 w-16 place-items-center rounded-full bg-blue-100">
                       <CheckCircle2 className="h-10 w-10 text-blue-600" />
                     </div>
                     <p className="mt-4 text-xl font-bold text-slate-900">Rostro identificado</p>
                     <p className="mt-1 text-lg text-slate-600">{result.person_name}</p>
-
-                    <div className="mt-4 w-full max-w-sm space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                      <div className="flex items-start gap-3">
-                        {result.face_photo_url && (
-                          <img src={result.face_photo_url} alt="Rostro" className="h-16 w-16 rounded-lg object-cover" />
-                        )}
-                        <dl className="flex-1 space-y-1 text-sm">
-                          <div className="flex justify-between"><dt className="text-slate-500">Tipo:</dt><dd className="font-medium text-slate-800">{result.person_type || '—'}</dd></div>
-                          <div className="flex justify-between"><dt className="text-slate-500">Área:</dt><dd className="font-medium text-slate-800">{result.access_area || '—'}</dd></div>
-                          <div className="flex justify-between"><dt className="text-slate-500">Fases:</dt><dd className="font-medium text-slate-800">{(result.event_phases || []).join(', ') || '—'}</dd></div>
-                        </dl>
-                      </div>
-                    </div>
-
+                    {result.face_photo_url && (
+                      <img src={result.face_photo_url} alt="Rostro" className="mt-3 h-20 w-20 rounded-lg object-cover" />
+                    )}
                     <p className="mt-3 max-w-sm text-center text-xs text-slate-500">
-                      Revisá los datos y confirmá para generar la acreditación.
+                      Revisá los datos en el formulario y confirmá para generar la acreditación.
                     </p>
-
-                    <div className="mt-5 flex items-center gap-2">
-                      <button
-                        onClick={reset}
-                        disabled={processing}
-                        className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        onClick={confirmAccreditation}
-                        disabled={processing}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50"
-                      >
-                        {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                        Confirmar acreditación
-                      </button>
-                    </div>
                   </>
                 ) : result.ok ? (
                   <>
@@ -386,6 +307,30 @@ export default function AccreditationFacial() {
           onClose={() => setPrintAccred(null)}
         />
       )}
+
+      <FacialAccreditationForm
+        open={formOpen}
+        event={selectedEvent}
+        identifiedPerson={pendingPerson}
+        events={events}
+        people={people}
+        onCreated={(accred) => {
+          setFormOpen(false);
+          setPendingPerson(null);
+          setResult({
+            ok: true,
+            person_name: accred.person_name,
+            badge_code: accred.badge_code,
+            accred,
+          });
+          setPrintAccred(accred);
+        }}
+        onClose={() => {
+          setFormOpen(false);
+          setPendingPerson(null);
+          reset();
+        }}
+      />
     </div>
   );
 }
