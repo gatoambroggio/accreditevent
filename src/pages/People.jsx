@@ -5,6 +5,7 @@ import DniScannerModal from '@/components/DniScannerModal';
 import { exportToExcel } from '@/lib/exportUtils';
 import { base44 } from '@/api/base44Client';
 import { useZones } from '@/lib/useZones';
+import { useParkingSectors } from '@/lib/useParkingSectors';
 import EntityModal from '@/components/EntityModal';
 import StatusBadge from '@/components/StatusBadge';
 import PersonDetailModal from '@/components/PersonDetailModal';
@@ -26,6 +27,7 @@ const validatePerson = (data) => {
   if (data.phone?.trim() && data.phone.replace(/\D/g, '').length < 12) e.phone = 'Teléfono incompleto (código de área + número)';
   if (data.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) e.email = 'Email inválido';
   if (!data.status) e.status = 'Seleccioná un estado';
+  if (data._veh_plate?.trim() && (!data._veh_brand?.trim() || !data._veh_model?.trim())) e._veh_plate = 'Si cargás una patente, debés completar marca y modelo';
   return e;
 };
 
@@ -38,6 +40,7 @@ const STATUS_OPTIONS = [
 export default function People() {
   const { items, loading, error, create, update, remove, reload } = useCrud('Person');
   const { zones } = useZones();
+  const { sectors } = useParkingSectors();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [query, setQuery] = useState('');
@@ -190,8 +193,13 @@ export default function People() {
     { name: 'status', label: 'Estado', type: 'select', required: true, options: STATUS_OPTIONS },
       { name: 'notes', label: 'Notas', type: 'textarea', full: true, placeholder: 'Ej: Responsable de montaje audiovisual' },
       { name: '_face', label: 'Registro facial', type: 'face-capture', full: true },
+      { name: '_veh_plate', label: 'Vehículo — Patente', type: 'text', full: true, placeholder: 'Ej: AB123CD', hint: 'Completá estos datos si la persona necesita acceso vehicular al evento.' },
+      { name: '_veh_brand', label: 'Vehículo — Marca', type: 'text', placeholder: 'Ej: Toyota' },
+      { name: '_veh_model', label: 'Vehículo — Modelo', type: 'text', placeholder: 'Ej: Corolla' },
+      { name: '_veh_color', label: 'Vehículo — Color', type: 'text', placeholder: 'Ej: Blanco' },
+      { name: '_veh_parking_sector', label: 'Vehículo — Sector', type: 'select', options: sectors.map((s) => ({ value: s.value, label: s.label })) },
     ];
-  }, [zones, events, editing, companies]);
+  }, [zones, events, editing, companies, sectors]);
 
   const openNew = () => { setEditing(null); setDniPrefill(null); setModalOpen(true); };
   const openEdit = async (item) => {
@@ -206,10 +214,21 @@ export default function People() {
     setEditing(normalized);
     setModalOpen(true);
     try {
-      const bios = await base44.entities.Biometric.filter({ person_id: item.id, status: 'active' }, '-created_date', 1);
-      if (bios[0]?.face_photo_url) {
-        setEditing({ ...normalized, face_photo_url: bios[0].face_photo_url });
+      const [bios, vehs] = await Promise.all([
+        base44.entities.Biometric.filter({ person_id: item.id, status: 'active' }, '-created_date', 1),
+        base44.entities.Vehicle.filter({ person_id: item.id }, '-created_date', 1),
+      ]);
+      const extra = {};
+      if (bios[0]?.face_photo_url) extra.face_photo_url = bios[0].face_photo_url;
+      if (vehs[0]) {
+        extra._veh_id = vehs[0].id;
+        extra._veh_brand = vehs[0].brand || '';
+        extra._veh_model = vehs[0].model || '';
+        extra._veh_plate = vehs[0].plate || '';
+        extra._veh_color = vehs[0].color || '';
+        extra._veh_parking_sector = vehs[0].parking_sector || '';
       }
+      if (Object.keys(extra).length) setEditing({ ...normalized, ...extra });
     } catch {}
   };
   const handleDniScanned = (data) => {
@@ -300,6 +319,31 @@ export default function People() {
         });
       }
     } catch {}
+    // Handle vehicle
+    const vehPlate = data._veh_plate?.trim().toUpperCase();
+    const existingVehId = data._veh_id;
+    if (vehPlate) {
+      const vehData = {
+        person_id: personId,
+        person_name: personData.full_name,
+        company: userCompany || personData.productora || personData.company || '',
+        brand: data._veh_brand?.trim() || '',
+        model: data._veh_model?.trim() || '',
+        plate: vehPlate,
+        color: data._veh_color?.trim() || '',
+        parking_sector: data._veh_parking_sector || '',
+        event_ids: personData.event_id ? [personData.event_id] : [],
+        event_names: events.filter((e) => e.id === personData.event_id).map((e) => e.name),
+        status: 'pending',
+      };
+      if (existingVehId) {
+        await base44.entities.Vehicle.update(existingVehId, vehData);
+      } else {
+        await base44.entities.Vehicle.create(vehData);
+      }
+    } else if (existingVehId) {
+      try { await base44.entities.Vehicle.delete(existingVehId); } catch {}
+    }
   };
   const handleDelete = async () => {
     await base44.functions.invoke('deletePerson', { person_id: editing.id });
