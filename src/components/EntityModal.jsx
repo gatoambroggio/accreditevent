@@ -34,7 +34,8 @@ export default function EntityModal({
       setError('');
       setErrors({});
     }
-  }, [open, initialData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   if (!open) return null;
 
