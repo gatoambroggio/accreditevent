@@ -107,7 +107,8 @@ export default function AppLayout() {
       if (user?.role === 'operador') {
         try {
           const res = await base44.functions.invoke('getOperatorModules');
-          if (res.data?.ok) setOperatorModules(res.data.modules || []);
+          const body = res?.data ?? res;
+          if (body?.ok && Array.isArray(body.modules)) setOperatorModules(body.modules);
         } catch {}
       }
     })();
