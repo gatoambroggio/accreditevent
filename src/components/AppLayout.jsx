@@ -151,10 +151,12 @@ export default function AppLayout() {
       if (item.path === '/') return true;
       if (item.expandable && item.children?.some((c) => operatorModules.includes(c.path))) return true;
       if (!operatorModules.includes(item.path)) return false;
+      return true;
     } else if (hasPathRestriction) {
       if (item.path === '/') return true;
       if (item.expandable && item.children?.some((c) => userAllowedPaths.includes(c.path))) return true;
       if (!userAllowedPaths.includes(item.path)) return false;
+      return true;
     }
     if (item.roles) {
       return item.roles.includes(role);
