@@ -307,6 +307,8 @@ export default function Accreditations() {
     } else {
       createdAccred = await create(payload);
       await logAudit('create-accreditation', 'Accreditation', createdAccred.id, `${person?.full_name} → ${evt?.name}`);
+      const sendEmailEnabled = settings?.enabled_modules?.accreditation_email ?? true;
+      const sendWhatsAppEnabled = settings?.enabled_modules?.accreditation_whatsapp ?? true;
       if (evt?.pickup_address) {
         const mapsUrl = evt.pickup_lat && evt.pickup_lng
           ? `https://www.google.com/maps?q=${evt.pickup_lat},${evt.pickup_lng}`
@@ -318,7 +320,7 @@ export default function Accreditations() {
           ? `${evt.pickup_start_time} a ${evt.pickup_end_time} hs`
           : (evt.pickup_start_time || 'a confirmar');
 
-        if (person?.email) {
+        if (sendEmailEnabled && person?.email) {
           try {
             const htmlBody = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background-color:#f0fdf4;font-family:Arial,Helvetica,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0fdf4;padding:32px 16px;">
@@ -358,7 +360,7 @@ export default function Accreditations() {
           } catch {}
         }
 
-        if (person?.phone) {
+        if (sendWhatsAppEnabled && person?.phone) {
           let cleanPhone = person.phone.replace(/\D/g, '');
           if (!cleanPhone.startsWith('54')) {
             cleanPhone = '54' + cleanPhone.replace(/^0/, '');
@@ -380,7 +382,7 @@ export default function Accreditations() {
         }
       }
       // Send confirmation email to company contact (#8)
-      if (person?.company) {
+      if (sendEmailEnabled && person?.company) {
         try {
           const comps = await base44.entities.ProviderCompany.filter({ name: person.company });
           if (comps[0]?.contact_email) {

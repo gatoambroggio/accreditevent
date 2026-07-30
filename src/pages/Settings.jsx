@@ -76,7 +76,7 @@ export default function Settings() {
             default_grace_hours: 4,
             zones: [],
             doors: [],
-            enabled_modules: { whatsapp: false },
+            enabled_modules: { whatsapp: false, accreditation_email: true, accreditation_whatsapp: true },
             printer_personal: '',
             printer_vehicular: '',
           });
@@ -275,6 +275,35 @@ export default function Settings() {
               type="checkbox"
               checked={settings.enabled_modules?.whatsapp ?? false}
               onChange={(e) => update('enabled_modules', { ...(settings.enabled_modules || {}), whatsapp: e.target.checked })}
+              className="h-5 w-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+            />
+          </label>
+        </div>
+      </Section>
+
+      <Section title="Envío automático al acreditar" description="Controlá si se envían mails y WhatsApp automáticamente al generar una acreditación. Desactivá lo que no quieras que se envíe solo.">
+        <div className="space-y-3">
+          <label className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">Envío de mail al acreditar</p>
+              <p className="text-xs text-slate-500">Envía automáticamente el mail de retiro de credencial a la persona acreditada y a la empresa proveedora</p>
+            </div>
+            <input
+              type="checkbox"
+              checked={settings.enabled_modules?.accreditation_email ?? true}
+              onChange={(e) => update('enabled_modules', { ...(settings.enabled_modules || {}), accreditation_email: e.target.checked })}
+              className="h-5 w-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+            />
+          </label>
+          <label className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">Envío de WhatsApp al acreditar</p>
+              <p className="text-xs text-slate-500">Abre automáticamente WhatsApp con el mensaje de retiro de credencial al acreditar</p>
+            </div>
+            <input
+              type="checkbox"
+              checked={settings.enabled_modules?.accreditation_whatsapp ?? true}
+              onChange={(e) => update('enabled_modules', { ...(settings.enabled_modules || {}), accreditation_whatsapp: e.target.checked })}
               className="h-5 w-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
             />
           </label>

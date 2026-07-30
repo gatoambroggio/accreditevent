@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { logAudit } from '@/lib/audit';
 import {
   Loader2, Upload, FileText, Building2, Users, UserPlus, Pencil, Trash2,
-  FileSpreadsheet, CheckCircle2, LogOut, ShieldCheck, ShieldAlert,
+  FileSpreadsheet, CheckCircle2, LogOut, ShieldCheck, ShieldAlert, IdCard, Car,
 } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
 import DocumentViewer from '@/components/DocumentViewer';
@@ -43,6 +43,8 @@ export default function EmpresaPortal() {
   const [approvals, setApprovals] = useState([]);
   const [selected, setSelected] = useState(new Set());
   const [bulkEventId, setBulkEventId] = useState('');
+  const [accredByPerson, setAccredByPerson] = useState({});
+  const [vehiclesByPerson, setVehiclesByPerson] = useState({});
 
   const companyName = user?.company || user?.data?.company || '';
   const approvedEvents = approvals.filter((a) => a.status === 'approved').map((a) => a.event_name);
@@ -75,6 +77,25 @@ export default function EmpresaPortal() {
       setEmployees(emps);
       setDocuments(docs);
       setApprovals(apprs);
+      // Fetch accreditation status + vehicles for each employee (service role bypasses RLS)
+      try {
+        const statusRes = await base44.functions.invoke('getEmpresaEmployeeStatus', {});
+        const statusBody = statusRes?.data ?? statusRes;
+        if (statusBody?.employees) {
+          const accMap = {};
+          const vehMap = {};
+          for (const a of (statusBody.accreditations || [])) {
+            if (!accMap[a.person_id]) accMap[a.person_id] = [];
+            accMap[a.person_id].push(a);
+          }
+          for (const v of (statusBody.vehicles || [])) {
+            if (!vehMap[v.person_id]) vehMap[v.person_id] = [];
+            vehMap[v.person_id].push(v);
+          }
+          setAccredByPerson(accMap);
+          setVehiclesByPerson(vehMap);
+        }
+      } catch {}
     } catch {
       // silent
     } finally {
@@ -413,7 +434,7 @@ export default function EmpresaPortal() {
             isEmpty={filtered.length === 0}
             emptyIcon={Users}
             emptyMessage={search || filterType !== 'all' ? 'Sin resultados.' : 'No hay empleados cargados. Agregá el primero o importá desde Excel.'}
-            tableClassName="min-w-[840px]"
+            tableClassName="min-w-[1040px]"
           >
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
@@ -427,6 +448,8 @@ export default function EmpresaPortal() {
                 <Th>Fases</Th>
                 <Th>Área</Th>
                 <Th>Eventos</Th>
+                <Th>Acreditado</Th>
+                <Th>Vehículos</Th>
                 <Th />
               </tr>
             </thead>
@@ -475,6 +498,45 @@ export default function EmpresaPortal() {
                         ))}
                       </div>
                     ) : '—'}
+                  </Td>
+                  <Td>
+                    {(() => {
+                      const accs = accredByPerson[emp.id] || [];
+                      const active = accs.filter((a) => a.status === 'active');
+                      if (accs.length === 0) {
+                        return <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 ring-1 ring-slate-200"><IdCard className="h-3 w-3" /> Pendiente</span>;
+                      }
+                      if (active.length > 0) {
+                        return (
+                          <div className="space-y-0.5">
+                            {active.map((a) => (
+                              <div key={a.id} className="flex items-center gap-1">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200"><IdCard className="h-3 w-3" /> {a.event_name}</span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      }
+                      return <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200"><IdCard className="h-3 w-3" /> {accs[0].status === 'blocked' ? 'Bloqueada' : 'Revocada'}</span>;
+                    })()}
+                  </Td>
+                  <Td>
+                    {(() => {
+                      const vehs = vehiclesByPerson[emp.id] || [];
+                      if (vehs.length === 0) return <span className="text-xs text-slate-400">—</span>;
+                      return (
+                        <div className="space-y-0.5">
+                          {vehs.map((v) => (
+                            <div key={v.id} className="flex items-center gap-1.5">
+                              <Car className="h-3 w-3 text-slate-400" />
+                              <span className="font-mono text-xs font-bold uppercase text-slate-700">{v.plate}</span>
+                              <span className="text-xs text-slate-400">{v.brand} {v.model}</span>
+                              {v.status === 'approved' && <span className="rounded bg-emerald-50 px-1 py-0.5 text-[10px] text-emerald-700">Aprob.</span>}
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </Td>
                   <Td className="text-right">
                     <div className="inline-flex items-center gap-1">
@@ -573,7 +635,7 @@ export default function EmpresaPortal() {
       <EmployeeFormModal
         key={editingEmployee?.id || 'new'}
         open={formOpen}
-        onClose={(success) => { setFormOpen(false); setEditingEmployee(null); if (success) { setMsg(success); setTimeout(() => setMsg(''), 4000); } }}
+        onClose={(success) => { setFormOpen(false); setEditingEmployee(null); if (success) { setMsg(success); setTimeout(() => setMsg(''), 4000); load(); } }}
         onSubmit={handleSaveEmployee}
         editing={editingEmployee}
         companyName={companyName}
