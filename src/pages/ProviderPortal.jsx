@@ -289,7 +289,9 @@ export default function ProviderPortal() {
         {(() => {
           const ins = computeInsuranceStatus(person, documents);
           const activeAccrs = accreditations.filter((a) => a.status === 'active');
-          const accredited = activeAccrs.length > 0;
+          const hasBio = activeAccrs.some((a) => a.has_biometric === true);
+          const insResult = computeInsuranceStatus(person, documents);
+          const accredited = activeAccrs.length > 0 && hasBio && insResult.tone === 'approved';
           const insIcon = ins.tone === 'approved' ? <ShieldCheck className="h-5 w-5 text-emerald-600" />
             : ins.tone === 'pending' ? <ShieldAlert className="h-5 w-5 text-amber-600" />
             : ins.tone === 'none' ? <ShieldAlert className="h-5 w-5 text-slate-400" />
@@ -302,7 +304,7 @@ export default function ProviderPortal() {
           const accIcon = accredited ? <IdCard className="h-5 w-5 text-emerald-600" /> : <CircleDot className="h-5 w-5 text-amber-600" />;
           const vehApproved = vehicles.filter((v) => v.status === 'approved');
           const vehIcon = vehicles.length === 0 ? <Car className="h-5 w-5 text-slate-400" />
-            : vehApproved.length > 0 ? <Car className="h-5 w-5 text-emerald-600" />
+            : (vehApproved.length > 0 && accredited) ? <Car className="h-5 w-5 text-emerald-600" />
             : <Car className="h-5 w-5 text-amber-600" />;
           return (
             <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -325,13 +327,17 @@ export default function ProviderPortal() {
                   <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
                     <IdCard className="h-3 w-3" /> Acreditado
                   </span>
+                ) : activeAccrs.length > 0 ? (
+                  <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 ring-1 ring-red-200">
+                    <IdCard className="h-3 w-3" /> No habilitado
+                  </span>
                 ) : (
                   <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
                     <CircleDot className="h-3 w-3" /> Pendiente de acreditar
                   </span>
                 )}
                 <p className="mt-1.5 text-xs text-slate-500">
-                  {accredited ? `${activeAccrs.length} acreditación(es) activa(s).` : 'Aún no generaste tu acreditación.'}
+                  {accredited ? `${activeAccrs.length} acreditación(es) activa(s).` : activeAccrs.length > 0 ? 'Falta biometría o seguro aprobado para habilitar.' : 'Aún no generaste tu acreditación.'}
                 </p>
               </div>
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -343,9 +349,13 @@ export default function ProviderPortal() {
                   <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 ring-1 ring-slate-200">
                     Sin vehículos
                   </span>
-                ) : (
+                ) : (vehApproved.length > 0 && accredited) ? (
                   <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
                     {vehApproved.length} aprobado(s)
+                  </span>
+                ) : (
+                  <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
+                    {accredited ? `${vehApproved.length} aprobado(s)` : 'Pendiente de habilitación'}
                   </span>
                 )}
                 <p className="mt-1.5 text-xs text-slate-500">

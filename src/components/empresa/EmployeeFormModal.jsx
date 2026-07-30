@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, UserPlus, FileImage, ScanFace, CheckCircle2, FileText, CalendarDays, MapPin, ScanLine, Heart } from 'lucide-react';
+import { X, Loader2, UserPlus, FileImage, ScanFace, CheckCircle2, FileText, CalendarDays, MapPin, ScanLine, Heart, Car } from 'lucide-react';
 import DniScannerModal from '@/components/DniScannerModal';
 import { base44 } from '@/api/base44Client';
 import { Image } from '@/components/ui/image';
 import FaceCapture from '@/components/FaceCapture';
 import { useZones } from '@/lib/useZones';
+import { useParkingSectors } from '@/lib/useParkingSectors';
 import { extractFaceFromDni } from '@/lib/dniFaceExtract';
 
-const EMPTY = { first_name: '', last_name: '', document: '', phone: '', employment_type: 'fijo', access_area: '', event_phases: [], event_ids: [], notes: '', obra_social: '', carnet_obra_social: '', emergency_contact_name: '', emergency_contact_phone: '', allergies: '', blood_type: '', coordinator_name: '' };
+const EMPTY = { first_name: '', last_name: '', document: '', phone: '', employment_type: 'fijo', access_area: '', event_phases: [], event_ids: [], notes: '', obra_social: '', carnet_obra_social: '', emergency_contact_name: '', emergency_contact_phone: '', allergies: '', blood_type: '', coordinator_name: '', veh_id: null, veh_plate: '', veh_brand: '', veh_model: '', veh_color: '', veh_type: 'auto', veh_parking_sector: '' };
 const normalizeType = (v) => (v === 'eventual' || v === 'esporadico' ? 'eventual' : 'fijo');
 
 const PHASES = [
@@ -36,11 +37,19 @@ function buildForm(editing) {
     allergies: editing.allergies || '',
     blood_type: editing.blood_type || '',
     coordinator_name: editing.coordinator_name || '',
+    veh_id: null,
+    veh_plate: '',
+    veh_brand: '',
+    veh_model: '',
+    veh_color: '',
+    veh_type: 'auto',
+    veh_parking_sector: '',
   };
 }
 
 export default function EmployeeFormModal({ open, onClose, onSubmit, editing, companyName, approvedEvents = [] }) {
   const { zones } = useZones();
+  const { sectors } = useParkingSectors();
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
@@ -69,6 +78,22 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
       base44.entities.Biometric.filter({ person_id: editing.id, status: 'active' })
         .then((existing) => setExistingFaceUrl(existing[0]?.face_photo_url || null))
         .catch(() => setExistingFaceUrl(null));
+      base44.entities.Vehicle.filter({ person_id: editing.id }, '-created_date', 1)
+        .then((vehs) => {
+          if (vehs[0]) {
+            setForm((f) => ({
+              ...f,
+              veh_id: vehs[0].id,
+              veh_plate: vehs[0].plate || '',
+              veh_brand: vehs[0].brand || '',
+              veh_model: vehs[0].model || '',
+              veh_color: vehs[0].color || '',
+              veh_type: vehs[0].vehicle_type || 'auto',
+              veh_parking_sector: vehs[0].parking_sector || '',
+            }));
+          }
+        })
+        .catch(() => {});
     } else {
       setExistingDni(null);
       setExistingFaceUrl(null);
@@ -236,6 +261,37 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
         }
       } catch (uploadErr) {
         uploadWarning = uploadErr.message || 'No se pudo completar la carga de DNI/biometría.';
+      }
+
+      // Handle vehicle
+      try {
+        const vehPlate = form.veh_plate?.trim().toUpperCase();
+        if (vehPlate && form.veh_brand?.trim() && form.veh_model?.trim()) {
+          setStatus('Guardando vehículo…');
+          const vehData = {
+            person_id: person.id,
+            person_name: full_name,
+            company: companyName,
+            vehicle_type: form.veh_type || 'auto',
+            brand: form.veh_brand.trim(),
+            model: form.veh_model.trim(),
+            plate: vehPlate,
+            color: form.veh_color?.trim() || '',
+            parking_sector: form.veh_parking_sector || '',
+            event_ids: form.event_ids || [],
+            event_names,
+            status: 'pending',
+          };
+          if (form.veh_id) {
+            await base44.entities.Vehicle.update(form.veh_id, vehData);
+          } else {
+            await base44.entities.Vehicle.create(vehData);
+          }
+        } else if (form.veh_id && !vehPlate) {
+          try { await base44.entities.Vehicle.delete(form.veh_id); } catch {}
+        }
+      } catch (vehErr) {
+        uploadWarning = uploadWarning || 'No se pudo guardar el vehículo.';
       }
 
       onClose(uploadWarning ? `Empleado guardado. ${uploadWarning}` : 'Empleado guardado correctamente.');
@@ -406,6 +462,47 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
               <label className="block sm:col-span-2">
                 <span className="mb-1.5 block text-xs font-semibold text-slate-600">Coordinador / responsable asignado</span>
                 <input value={form.coordinator_name} onChange={(e) => setField('coordinator_name', e.target.value)} className={inputCls} placeholder="Ej: Carlos Gómez" />
+              </label>
+            </div>
+          </div>
+
+          {/* Vehicle */}
+          <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+            <p className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+              <Car className="h-4 w-4" /> Vehículo (opcional)
+            </p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Patente</span>
+                <input value={form.veh_plate} onChange={(e) => setField('veh_plate', e.target.value)} className={inputCls} placeholder="Ej: AB123CD" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Tipo</span>
+                <select value={form.veh_type} onChange={(e) => setField('veh_type', e.target.value)} className={inputCls}>
+                  <option value="auto">Auto</option>
+                  <option value="moto">Moto</option>
+                  <option value="camioneta">Camioneta</option>
+                  <option value="camion">Camión</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Marca</span>
+                <input value={form.veh_brand} onChange={(e) => setField('veh_brand', e.target.value)} className={inputCls} placeholder="Ej: Toyota" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Modelo</span>
+                <input value={form.veh_model} onChange={(e) => setField('veh_model', e.target.value)} className={inputCls} placeholder="Ej: Corolla" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Color</span>
+                <input value={form.veh_color} onChange={(e) => setField('veh_color', e.target.value)} className={inputCls} placeholder="Ej: Blanco" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Sector de estacionamiento</span>
+                <select value={form.veh_parking_sector} onChange={(e) => setField('veh_parking_sector', e.target.value)} className={inputCls}>
+                  <option value="">Sin asignar</option>
+                  {sectors.map((s) => (<option key={s.value} value={s.value}>{s.label}</option>))}
+                </select>
               </label>
             </div>
           </div>

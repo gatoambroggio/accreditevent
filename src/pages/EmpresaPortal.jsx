@@ -174,6 +174,16 @@ export default function EmpresaPortal() {
     eventuals: employees.filter((e) => e.employment_type === 'eventual').length,
   }), [employees]);
 
+  // Una persona está "habilitada" solo si tiene acreditación activa CON biometría y seguro aprobado
+  const isHabilitado = (emp) => {
+    const accs = accredByPerson[emp.id] || [];
+    const active = accs.filter((a) => a.status === 'active');
+    if (active.length === 0) return false;
+    const hasBio = active.some((a) => a.has_biometric === true);
+    const ins = computeInsuranceStatus(emp, docsForInsurance);
+    return hasBio && ins.tone === 'approved';
+  };
+
   const syncAccreditations = async (person, eventIds, accessArea, events, eventPhases) => {
     const phases = Array.isArray(eventPhases) ? eventPhases : [];
     const existing = await base44.entities.Accreditation.filter({ person_id: person.id });
@@ -526,11 +536,14 @@ export default function EmpresaPortal() {
                         return <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 ring-1 ring-slate-200"><IdCard className="h-3 w-3" /> Pendiente</span>;
                       }
                       if (active.length > 0) {
+                        const habilitado = isHabilitado(emp);
                         return (
                           <div className="space-y-0.5">
                             {active.map((a) => (
                               <div key={a.id} className="flex items-center gap-1">
-                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200"><IdCard className="h-3 w-3" /> {a.event_name}</span>
+                                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${habilitado ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-red-50 text-red-700 ring-red-200'}`}>
+                                  <IdCard className="h-3 w-3" /> {habilitado ? 'Acreditado' : 'No habilitado'} · {a.event_name}
+                                </span>
                               </div>
                             ))}
                           </div>
@@ -543,6 +556,7 @@ export default function EmpresaPortal() {
                     {(() => {
                       const vehs = vehiclesByPerson[emp.id] || [];
                       if (vehs.length === 0) return <span className="text-xs text-slate-400">—</span>;
+                      const habilitado = isHabilitado(emp);
                       return (
                         <div className="space-y-0.5">
                           {vehs.map((v) => (
@@ -550,7 +564,11 @@ export default function EmpresaPortal() {
                               <Car className="h-3 w-3 text-slate-400" />
                               <span className="font-mono text-xs font-bold uppercase text-slate-700">{v.plate}</span>
                               <span className="text-xs text-slate-400">{v.brand} {v.model}</span>
-                              {v.status === 'approved' && <span className="rounded bg-emerald-50 px-1 py-0.5 text-[10px] text-emerald-700">Aprob.</span>}
+                              {habilitado && v.status === 'approved' ? (
+                                <span className="rounded bg-emerald-50 px-1 py-0.5 text-[10px] text-emerald-700">Aprob.</span>
+                              ) : (
+                                <span className="rounded bg-amber-50 px-1 py-0.5 text-[10px] text-amber-700">Pendiente</span>
+                              )}
                             </div>
                           ))}
                         </div>
