@@ -177,15 +177,32 @@ export default function Users() {
     const allowedPaths = typeof data.allowed_paths === 'string'
       ? data.allowed_paths.split(',').map((s) => s.trim()).filter(Boolean)
       : (Array.isArray(data.allowed_paths) ? data.allowed_paths : []);
-    await base44.entities.User.update(editing.id, { role: data.role, company: newCompany, assigned_event_ids: assignedEventIds, allowed_paths: allowedPaths, blocked: !!data.blocked });
-    await syncUserCompany(editing.id, oldCompany, newCompany);
-    await logAudit('update', 'User', editing.id, `Rol: ${data.role}, Empresa: ${newCompany || '—'}`);
-    setUsers((prev) => prev.map((u) => (u.id === editing.id ? { ...u, role: data.role, company: newCompany, assigned_event_ids: assignedEventIds, allowed_paths: allowedPaths, blocked: !!data.blocked } : u)));
+    if (isProductora) {
+      const res = await base44.functions.invoke('updateOperator', {
+        user_id: editing.id,
+        assigned_event_ids: assignedEventIds,
+        allowed_paths: allowedPaths,
+        blocked: !!data.blocked,
+      });
+      if (res.data?.error) throw new Error(res.data.error);
+      await logAudit('update', 'User', editing.id, `Operador actualizado (eventos: ${assignedEventIds.length}, módulos: ${allowedPaths.length})`);
+      setUsers((prev) => prev.map((u) => (u.id === editing.id ? { ...u, assigned_event_ids: assignedEventIds, allowed_paths: allowedPaths, blocked: !!data.blocked } : u)));
+    } else {
+      await base44.entities.User.update(editing.id, { role: data.role, company: newCompany, assigned_event_ids: assignedEventIds, allowed_paths: allowedPaths, blocked: !!data.blocked });
+      await syncUserCompany(editing.id, oldCompany, newCompany);
+      await logAudit('update', 'User', editing.id, `Rol: ${data.role}, Empresa: ${newCompany || '—'}`);
+      setUsers((prev) => prev.map((u) => (u.id === editing.id ? { ...u, role: data.role, company: newCompany, assigned_event_ids: assignedEventIds, allowed_paths: allowedPaths, blocked: !!data.blocked } : u)));
+    }
   };
 
   const handleToggleBlock = async (u) => {
     try {
-      await base44.entities.User.update(u.id, { blocked: !u.blocked });
+      if (isProductora) {
+        const res = await base44.functions.invoke('updateOperator', { user_id: u.id, blocked: !u.blocked });
+        if (res.data?.error) throw new Error(res.data.error);
+      } else {
+        await base44.entities.User.update(u.id, { blocked: !u.blocked });
+      }
       await logAudit(!u.blocked ? 'block-user' : 'unblock-user', 'User', u.id, !u.blocked ? 'Bloqueado' : 'Desbloqueado');
       setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, blocked: !u.blocked } : x)));
     } catch (err) {

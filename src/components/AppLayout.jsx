@@ -105,7 +105,7 @@ export default function AppLayout() {
   const isProvider = user?.role === 'provider';
   const isEmpresa = user?.role === 'empresa';
   const sysName = settings?.system_name || 'acceso';
-  const orgName = user?.role === 'productora' && user?.company ? user.company : (settings?.organization_name || 'Acceso Eventos');
+  const orgName = user?.company || (settings?.organization_name || 'Acceso Eventos');
   const logoUrl = settings?.logo_url;
 
   useEffect(() => {
