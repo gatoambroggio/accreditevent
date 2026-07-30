@@ -33,7 +33,7 @@ export async function getInsuranceStatus(person) {
     const me = await base44.auth.me().catch(() => null);
     const role = me?.data?.role || me?.role || '';
 
-    if (role === 'productora') {
+    if (role === 'productora' || role === 'operador') {
       // Service-role backend aggregates docs across the productora's provider companies
       const res = await base44.functions.invoke('getProductoraDocuments', {});
       const backendDocs = res?.data?.documents || [];
@@ -73,7 +73,7 @@ export async function getInsuranceCoverageMap() {
     let docs;
     const me = await base44.auth.me().catch(() => null);
     const role = me?.data?.role || me?.role || '';
-    if (role === 'productora') {
+    if (role === 'productora' || role === 'operador') {
       // Productora RLS blocks provider-company docs; fetch via backend service role
       const res = await base44.functions.invoke('getProductoraDocuments', {});
       docs = res?.data?.documents || [];

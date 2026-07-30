@@ -94,8 +94,19 @@ export default function PersonasAutonomas() {
 
   const refreshDocs = async () => {
     try {
-      const docs = await base44.entities.Document.list('-created_date', 500);
-      setDocuments(docs);
+      let role = '';
+      try {
+        const me = await base44.auth.me();
+        role = me?.data?.role || me?.role || '';
+      } catch {}
+      if (role === 'productora' || role === 'operador') {
+        // RLS blocks provider-company docs for productoras/operators; fetch via backend service role
+        const res = await base44.functions.invoke('getProductoraDocuments', {});
+        setDocuments(res?.data?.documents || []);
+      } else {
+        const docs = await base44.entities.Document.list('-created_date', 500);
+        setDocuments(docs);
+      }
     } catch {}
   };
 
