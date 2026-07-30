@@ -241,7 +241,7 @@ export default function Accreditations() {
         setField('has_biometric', bios.length > 0);
         setPersonVehicles(vehs);
         const init = {};
-        vehs.forEach((v) => { init[v.id] = { approved: false, sector: v.parking_sector || '' }; });
+        vehs.forEach((v) => { init[v.id] = { approved: true, sector: v.parking_sector || '' }; });
         setVehicleApprovals(init);
       } catch { setPersonVehicles([]); setVehicleApprovals({}); }
     }
