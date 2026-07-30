@@ -247,9 +247,8 @@ export default function EmpresaPortal() {
       setEmployees((prev) => [person, ...prev]);
       await logAudit('empresa-create-employee', 'Person', person.id, data.full_name);
     }
-    if (data.event_ids?.length) {
-      await syncAccreditations(person, data.event_ids, data.access_area, approvedEventList, data.event_phases);
-    }
+    // La acreditación NO se crea automáticamente desde el portal de empresas.
+    // La productora la genera manualmente desde el módulo de Acreditaciones.
     return person;
   };
 
