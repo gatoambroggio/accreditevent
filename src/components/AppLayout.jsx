@@ -19,6 +19,7 @@ import {
   ScanFace,
   ScanLine,
   BarChart3,
+  Bell,
   Settings as SettingsIcon,
   Layers,
   Cpu,
@@ -68,6 +69,7 @@ const NAV_ITEMS = [
   // Logística
   // Reportes y comunicación
   { path: '/reports', label: 'Reportes', icon: BarChart3, minLevel: 1 },
+  { path: '/notifications', label: 'Notificaciones', icon: Bell, minLevel: 1 },
   { path: '/messages', label: 'Mensajes', icon: MessageSquare, minLevel: 1, module: 'whatsapp' },
   // Administración
   { path: '/companies', label: 'Empresas', icon: Building2, minLevel: 2 },

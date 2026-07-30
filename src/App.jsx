@@ -49,6 +49,7 @@ import DniScan from '@/pages/DniScan';
 import CustomFields from '@/pages/CustomFields';
 import Appearance from '@/pages/Appearance';
 import EmergencyScan from '@/pages/EmergencyScan';
+import Notifications from '@/pages/Notifications';
 
 const AUTH_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password', '/provider-register', '/registro-empresa'];
 
@@ -118,6 +119,7 @@ const AuthenticatedApp = () => {
         <Route path="/custom-fields" element={<CustomFields />} />
         <Route path="/apariencia" element={<Appearance />} />
         <Route path="/emergency-scan" element={<EmergencyScan />} />
+        <Route path="/notifications" element={<Notifications />} />
       </Route>
       <Route path="/portal" element={<ProviderPortal />} />
       <Route path="/registro-empresa" element={<EmpresaRegister />} />
