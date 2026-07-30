@@ -27,6 +27,7 @@ export default async function(req) {
         role: u.role || (u.data && u.data.role),
         blocked: u.blocked,
         assigned_event_ids: u.assigned_event_ids || (u.data && u.data.assigned_event_ids) || [],
+        allowed_paths: u.allowed_paths || (u.data && u.data.allowed_paths) || [],
       }));
 
     // Invitaciones pendientes (no registradas todavía)
