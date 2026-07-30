@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { logAudit } from '@/lib/audit';
-import { UserPlus, Loader2, Pencil, KeyRound, Building2, ShieldCheck, Ban } from 'lucide-react';
+import { UserPlus, Loader2, Pencil, KeyRound, Building2, ShieldCheck, Ban, Link2 } from 'lucide-react';
 import EntityModal from '@/components/EntityModal';
 import { useAuth } from '@/lib/AuthContext';
 import PageHeader from '@/components/ui/page-header';
@@ -66,6 +66,7 @@ export default function Users() {
   const isProductora = currentUser?.role === 'productora';
   const myCompany = currentUser?.company || currentUser?.data?.company || '';
   const [users, setUsers] = useState([]);
+  const [pendingInvites, setPendingInvites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [events, setEvents] = useState([]);
@@ -90,13 +91,16 @@ export default function Users() {
   const load = async () => {
     setLoading(true);
     try {
-      let data;
       if (isProductora && myCompany) {
-        data = await base44.entities.User.filter({ company: myCompany }, '-created_date', 200);
+        const res = await base44.functions.invoke('getCompanyOperators');
+        if (res.data?.error) throw new Error(res.data.error);
+        setUsers(res.data.operators || []);
+        setPendingInvites(res.data.pending || []);
       } else {
-        data = await base44.entities.User.list('-created_date', 200);
+        const data = await base44.entities.User.list('-created_date', 200);
+        setUsers(data || []);
+        setPendingInvites([]);
       }
-      setUsers(data || []);
     } catch (err) {
       setError(err.message || 'Error al cargar usuarios.');
     } finally {
@@ -223,6 +227,15 @@ export default function Users() {
     }
   };
 
+  const copyInviteLink = async (url) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      alert('Link copiado al portapapeles.');
+    } catch {
+      window.prompt('Copiá este link:', url);
+    }
+  };
+
   const handleInvite = async (e) => {
     e.preventDefault();
     setInviting(true);
@@ -231,8 +244,10 @@ export default function Users() {
       if (isProductora) {
         const res = await base44.functions.invoke('assignOperator', { email: inviteEmail });
         if (res.data?.error) throw new Error(res.data.error);
+        const link = res.data?.invite_url || '';
         if (res.data?.pending) {
-          alert(res.data.message || 'La invitación fue enviada. El operador quedará vinculado a tu empresa al completar su registro.');
+          const msg = res.data.message || 'La invitación fue enviada. El operador quedará vinculado a tu empresa al completar su registro.';
+          alert(link ? `${msg}\n\nLink para compartir:\n${link}` : msg);
         }
         await logAudit('invite-operator', 'User', '', `Operador invitado: ${inviteEmail}`);
       } else {
@@ -261,6 +276,33 @@ export default function Users() {
       <div className="max-w-sm">
         <SearchInput value={search} onChange={setSearch} placeholder="Buscar por nombre, email o empresa…" />
       </div>
+
+      {isProductora && pendingInvites.length > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
+          <h3 className="text-sm font-semibold text-amber-900">Invitaciones pendientes ({pendingInvites.length})</h3>
+          <p className="mt-0.5 text-xs text-amber-700">Personas que aún no completaron su registro. Copiá el link y compartilo por el medio que prefieras.</p>
+          <div className="mt-3 space-y-2">
+            {pendingInvites.map((p) => (
+              <div key={p.id} className="flex flex-col gap-2 rounded-xl border border-amber-200 bg-white px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-slate-800">{p.email}</p>
+                  {p.invite_url ? (
+                    <p className="mt-0.5 truncate text-xs text-slate-400">{p.invite_url}</p>
+                  ) : (
+                    <p className="mt-0.5 text-xs text-slate-400">Sin link generado</p>
+                  )}
+                </div>
+                {p.invite_url && (
+                  <button type="button" onClick={() => copyInviteLink(p.invite_url)}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100">
+                    <Link2 className="h-3.5 w-3.5" /> Copiar link
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <DataTable
         loading={loading}

@@ -10,6 +10,10 @@
       "type": "string",
       "description": "Empresa productora a la que se vincular\u00e1 el operador"
     },
+    "invite_url": {
+      "type": "string",
+      "description": "Link de registro prellenado para compartir manualmente"
+    },
     "status": {
       "type": "string",
       "enum": [

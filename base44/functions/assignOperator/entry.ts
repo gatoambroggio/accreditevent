@@ -21,7 +21,21 @@ export default async function(req) {
 
     const found = await base44.asServiceRole.entities.User.filter({ email });
     if (!found.length) {
-      await base44.asServiceRole.entities.PendingOperator.create({ email, company, status: 'pending' });
+      // Link de registro prellenado para compartir manualmente si el email no llega
+      let origin = req.headers.get('origin');
+      if (!origin) {
+        const referer = req.headers.get('referer');
+        try { origin = referer ? new URL(referer).origin : null; } catch {}
+      }
+      const inviteUrl = origin ? `${origin}/register?email=${encodeURIComponent(email)}` : '';
+
+      // Reutilizar registro pendiente existente si ya fue invitado
+      const existingPending = await base44.asServiceRole.entities.PendingOperator.filter({ email, company, status: 'pending' });
+      if (existingPending.length) {
+        await base44.asServiceRole.entities.PendingOperator.update(existingPending[0].id, { invite_url: inviteUrl });
+      } else {
+        await base44.asServiceRole.entities.PendingOperator.create({ email, company, status: 'pending', invite_url: inviteUrl });
+      }
       try {
         await base44.asServiceRole.users.inviteUser(email, 'user');
       } catch (inviteErr) {
@@ -33,7 +47,8 @@ export default async function(req) {
       return Response.json({
         ok: true,
         pending: true,
-        message: 'La invitación fue enviada. Cuando la persona complete su registro, quedará automáticamente vinculada como operador de tu empresa.'
+        invite_url: inviteUrl,
+        message: 'La invitación fue enviada. Cuando la persona complete su registro, quedará automáticamente vinculada como operador de tu empresa. Compartí este link si el email no llega: ' + inviteUrl
       });
     }
     const target = found[0];
