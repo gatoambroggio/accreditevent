@@ -100,6 +100,13 @@ export default function EntityModal({
   const allFields = [...fields, ...customFieldConfigs];
 
   const renderField = (f) => {
+    if (f.type === 'section') {
+      return (
+        <div className="mt-3 border-t border-slate-100 pt-3">
+          <h3 className="text-sm font-semibold text-slate-700">{f.label}</h3>
+        </div>
+      );
+    }
     const value = f.name.startsWith('cf__')
       ? (data.custom_fields?.[f.name.slice(4)] ?? f.defaultValue ?? '')
       : (data[f.name] ?? f.defaultValue ?? '');

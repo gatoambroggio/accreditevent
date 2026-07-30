@@ -103,8 +103,9 @@ export default function AppLayout() {
   }, []);
 
   useEffect(() => {
+    const userRole = user?.role || user?.data?.role;
     (async () => {
-      if (user?.role === 'operador') {
+      if (userRole === 'operador') {
         try {
           const res = await base44.functions.invoke('getOperatorModules');
           const body = res?.data ?? res;
@@ -112,11 +113,12 @@ export default function AppLayout() {
         } catch {}
       }
     })();
-  }, [user?.role]);
+  }, [user?.role, user?.data?.role]);
 
-  const userLevel = ROLE_LEVEL[user?.role] ?? -1;
-  const isProvider = user?.role === 'provider';
-  const isEmpresa = user?.role === 'empresa';
+  const role = user?.role || user?.data?.role;
+  const userLevel = ROLE_LEVEL[role] ?? -1;
+  const isProvider = role === 'provider';
+  const isEmpresa = role === 'empresa';
   const sysName = settings?.system_name || 'acceso';
   const orgName = user?.company || (settings?.organization_name || 'Acceso Eventos');
   const logoUrl = settings?.logo_url;
@@ -139,7 +141,7 @@ export default function AppLayout() {
 
   const userAllowedPaths = user?.allowed_paths || user?.data?.allowed_paths || [];
   const hasPathRestriction = Array.isArray(userAllowedPaths) && userAllowedPaths.length > 0;
-  const hasOperatorCompanyModules = user?.role === 'operador' && Array.isArray(operatorModules) && operatorModules.length > 0;
+  const hasOperatorCompanyModules = role === 'operador' && Array.isArray(operatorModules) && operatorModules.length > 0;
   const visibleItems = NAV_ITEMS.filter((item) => {
     if (item.module && !settings?.enabled_modules?.[item.module]) return false;
     if (item.providerOnly) return isProvider;
@@ -155,10 +157,10 @@ export default function AppLayout() {
       if (!userAllowedPaths.includes(item.path)) return false;
     }
     if (item.roles) {
-      return item.roles.includes(user?.role);
+      return item.roles.includes(role);
     }
     if (settings?.role_access?.[item.path]) {
-      return settings.role_access[item.path].includes(user?.role);
+      return settings.role_access[item.path].includes(role);
     }
     return userLevel >= item.minLevel;
   });
