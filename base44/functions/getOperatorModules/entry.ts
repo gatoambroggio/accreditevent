@@ -16,7 +16,7 @@ export default async function(req) {
     const companies = await base44.asServiceRole.entities.Company.filter({ name: company });
     if (!companies.length) return Response.json({ ok: true, modules: [] });
 
-    const modules = companies[0].operator_allowed_paths || [];
+    const modules = (companies[0].data && companies[0].data.operator_allowed_paths) || [];
     return Response.json({ ok: true, modules });
   } catch (error) {
     return Response.json({ error: error.message || 'Error al obtener módulos' }, { status: 500 });
