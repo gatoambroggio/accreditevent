@@ -16,6 +16,17 @@ export default async function(req) {
     // Use explicit tipo_vinculo if set; fall back to company presence for backward compatibility
     const tipoVinculo = person?.tipo_vinculo || (hasCompany ? 'empresa' : 'autonomo');
 
+    // Biometric check via service role (bypasses RLS so productoras can see empresa-created biometrics)
+    let hasBiometric = false;
+    try {
+      const bios = await base44.asServiceRole.entities.Biometric.filter(
+        { person_id: personId, status: 'active' },
+        '-created_date',
+        1
+      );
+      hasBiometric = bios.length > 0;
+    } catch {}
+
     // ════════════════════════════════════════════════════════════
     // EMPRESA: company-level approval covers all employees
     // ════════════════════════════════════════════════════════════
@@ -42,6 +53,7 @@ export default async function(req) {
             has_pending: false,
             pending_count: 0,
             pending_statuses: [],
+            has_biometric: hasBiometric,
           });
         }
 
@@ -49,6 +61,7 @@ export default async function(req) {
           has_pending: true,
           pending_count: 1,
           pending_statuses: ['company_not_approved'],
+          has_biometric: hasBiometric,
         });
       }
 
@@ -65,12 +78,14 @@ export default async function(req) {
           has_pending: true,
           pending_count: 1,
           pending_statuses: ['rejected'],
+          has_biometric: hasBiometric,
         });
       }
       return Response.json({
         has_pending: false,
         pending_count: 0,
         pending_statuses: [],
+        has_biometric: hasBiometric,
       });
     }
 
@@ -90,6 +105,7 @@ export default async function(req) {
         has_pending: true,
         pending_count: 0,
         pending_statuses: ['no_documents'],
+        has_biometric: hasBiometric,
       });
     }
 
@@ -117,6 +133,7 @@ export default async function(req) {
       has_pending: pendingTypes.length > 0,
       pending_count: pendingTypes.length,
       pending_statuses: pendingTypes.flatMap((t) => t.statuses),
+      has_biometric: hasBiometric,
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

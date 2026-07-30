@@ -86,7 +86,13 @@ export default function Vehicles() {
     return items.filter((v) => {
       if (isProductora) {
         const userCompany = currentUser?.company || currentUser?.data?.company;
-        if (!userCompany || v.company !== userCompany) return false;
+        if (!userCompany) return false;
+        // El vehicle.company es la empresa proveedora, no la productora.
+        // La productora ve vehículos vinculados a sus eventos o creados por ella.
+        const myEventIds = new Set(events.filter((e) => e.company === userCompany).map((e) => e.id));
+        const vehEventIds = Array.isArray(v.event_ids) ? v.event_ids : [];
+        const linkedToMyEvents = vehEventIds.some((id) => myEventIds.has(id));
+        if (v.company !== userCompany && !linkedToMyEvents) return false;
       }
       if (statusFilter && v.status !== statusFilter) return false;
       if (eventFilter) {
@@ -101,7 +107,7 @@ export default function Vehicles() {
       const personDoc = person?.document || '';
       return `${v.person_name || ''} ${v.brand || ''} ${v.model || ''} ${v.plate || ''} ${personDoc}`.toLowerCase().includes(q);
     });
-  }, [items, activeEventIds, isProductora, currentUser, query, statusFilter, eventFilter, people]);
+  }, [items, events, activeEventIds, isProductora, currentUser, query, statusFilter, eventFilter, people]);
 
   const capacityEvent = useMemo(() => events.find((e) => e.id === eventFilter) || null, [events, eventFilter]);
   const occupancy = useMemo(() => computeSectorOccupancy(items, eventFilter || null), [items, eventFilter]);

@@ -234,11 +234,12 @@ export default function Accreditations() {
         setSelectedEventId(defaultEventId);
       }
       try {
-        const [bios, vehs] = await Promise.all([
-          base44.entities.Biometric.filter({ person_id: value, status: 'active' }, '-created_date', 1),
+        // Biometric check via backend (service role) so productoras can see empresa-created biometrics
+        const [docCheck, vehs] = await Promise.all([
+          base44.functions.invoke('checkPersonDocuments', { person_id: value, event_id: formData?.event_id }),
           base44.entities.Vehicle.filter({ person_id: value }, '-created_date', 10),
         ]);
-        setField('has_biometric', bios.length > 0);
+        setField('has_biometric', !!docCheck?.data?.has_biometric);
         setPersonVehicles(vehs);
         const init = {};
         vehs.forEach((v) => { init[v.id] = { approved: true, sector: v.parking_sector || '' }; });

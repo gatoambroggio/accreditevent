@@ -37,10 +37,15 @@ export default function RegisteredVehicles() {
 
   const filtered = useMemo(() => {
     let list = [...vehicles];
-    // Filtrado estricto por empresa para productoras
+    // Filtrado por eventos de la productora (vehicle.company es la empresa proveedora)
     if (isProductora) {
       if (!userCompany) return [];
-      list = list.filter((v) => v.company === userCompany);
+      const myEventIds = new Set(events.filter((e) => e.company === userCompany).map((e) => e.id));
+      list = list.filter((v) => {
+        if (v.company === userCompany) return true;
+        const vehEventIds = Array.isArray(v.event_ids) ? v.event_ids : [];
+        return vehEventIds.some((id) => myEventIds.has(id));
+      });
     }
     if (eventFilter) list = list.filter((v) => v.event_ids?.includes(eventFilter));
     const q = query.toLowerCase().trim();
@@ -50,7 +55,7 @@ export default function RegisteredVehicles() {
       );
     }
     return list;
-  }, [vehicles, eventFilter, query, isProductora, userCompany]);
+  }, [vehicles, events, eventFilter, query, isProductora, userCompany]);
 
   const stats = useMemo(() => ({
     total: filtered.length,
