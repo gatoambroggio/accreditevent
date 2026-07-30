@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { logAudit } from '@/lib/audit';
-import { Loader2, Upload, FileText, IdCard, UserCircle, CheckCircle2, Car, Trash2, Plus, Package } from 'lucide-react';
+import { Loader2, Upload, FileText, IdCard, UserCircle, CheckCircle2, Car, Trash2, Plus, Package, ShieldCheck, ShieldAlert, CircleDot } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
 import PersonBiometricCard from '@/components/PersonBiometricCard';
 import DocumentViewer from '@/components/DocumentViewer';
 import ProviderRequirementsSection from '@/components/ProviderRequirementsSection';
 import { DEFAULT_ROLE_ACCESS } from '@/lib/modules';
+import { computeInsuranceStatus, INSURANCE_BADGE_CLASSES } from '@/lib/portalInsurance';
 
 const DOC_TYPES = {
   dni: 'Documento de identidad',
@@ -283,6 +284,77 @@ export default function ProviderPortal() {
             <CheckCircle2 className="h-4 w-4" /> {msg}
           </div>
         )}
+
+        {/* Estado general */}
+        {(() => {
+          const ins = computeInsuranceStatus(person, documents);
+          const activeAccrs = accreditations.filter((a) => a.status === 'active');
+          const accredited = activeAccrs.length > 0;
+          const insIcon = ins.tone === 'approved' ? <ShieldCheck className="h-5 w-5 text-emerald-600" />
+            : ins.tone === 'pending' ? <ShieldAlert className="h-5 w-5 text-amber-600" />
+            : ins.tone === 'none' ? <ShieldAlert className="h-5 w-5 text-slate-400" />
+            : <ShieldAlert className="h-5 w-5 text-red-600" />;
+          const insHint = ins.tone === 'approved' ? 'Tu seguro está habilitado.'
+            : ins.tone === 'pending' ? 'Tu seguro está en revisión.'
+            : ins.tone === 'rejected' ? 'Tu seguro fue rechazado. Subí uno nuevo.'
+            : ins.tone === 'expired' ? 'Tu seguro está vencido. Subí uno nuevo.'
+            : 'No cargaste seguro todavía.';
+          const accIcon = accredited ? <IdCard className="h-5 w-5 text-emerald-600" /> : <CircleDot className="h-5 w-5 text-amber-600" />;
+          const vehApproved = vehicles.filter((v) => v.status === 'approved');
+          const vehIcon = vehicles.length === 0 ? <Car className="h-5 w-5 text-slate-400" />
+            : vehApproved.length > 0 ? <Car className="h-5 w-5 text-emerald-600" />
+            : <Car className="h-5 w-5 text-amber-600" />;
+          return (
+            <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-center gap-2">
+                  {insIcon}
+                  <h4 className="text-sm font-bold text-slate-900">Seguro</h4>
+                </div>
+                <span className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${INSURANCE_BADGE_CLASSES[ins.tone]}`}>
+                  {ins.label}
+                </span>
+                <p className="mt-1.5 text-xs text-slate-500">{insHint}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-center gap-2">
+                  {accIcon}
+                  <h4 className="text-sm font-bold text-slate-900">Acreditación</h4>
+                </div>
+                {accredited ? (
+                  <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
+                    <IdCard className="h-3 w-3" /> Acreditado
+                  </span>
+                ) : (
+                  <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
+                    <CircleDot className="h-3 w-3" /> Pendiente de acreditar
+                  </span>
+                )}
+                <p className="mt-1.5 text-xs text-slate-500">
+                  {accredited ? `${activeAccrs.length} acreditación(es) activa(s).` : 'Aún no generaste tu acreditación.'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-center gap-2">
+                  {vehIcon}
+                  <h4 className="text-sm font-bold text-slate-900">Vehículos</h4>
+                </div>
+                {vehicles.length === 0 ? (
+                  <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 ring-1 ring-slate-200">
+                    Sin vehículos
+                  </span>
+                ) : (
+                  <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
+                    {vehApproved.length} aprobado(s)
+                  </span>
+                )}
+                <p className="mt-1.5 text-xs text-slate-500">
+                  {vehicles.length === 0 ? 'No registraste vehículos.' : `${vehicles.length} vehículo(s) registrado(s).`}
+                </p>
+              </div>
+            </div>
+          );
+        })()}
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {/* Profile */}

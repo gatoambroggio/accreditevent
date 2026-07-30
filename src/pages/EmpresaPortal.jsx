@@ -15,6 +15,7 @@ import { btnPrimary, btnOutline, btnIcon } from '@/components/ui/button-styles';
 import Pagination from '@/components/ui/pagination';
 import { usePagination } from '@/lib/usePagination';
 import { generateBadgeCode } from '@/lib/badgeCode';
+import { computeInsuranceStatus, INSURANCE_BADGE_CLASSES } from '@/lib/portalInsurance';
 
 const DOC_TYPES = {
   dni: 'DNI',
@@ -45,6 +46,7 @@ export default function EmpresaPortal() {
   const [bulkEventId, setBulkEventId] = useState('');
   const [accredByPerson, setAccredByPerson] = useState({});
   const [vehiclesByPerson, setVehiclesByPerson] = useState({});
+  const [docsForInsurance, setDocsForInsurance] = useState([]);
 
   const companyName = user?.company || user?.data?.company || '';
   const approvedEvents = approvals.filter((a) => a.status === 'approved').map((a) => a.event_name);
@@ -94,6 +96,7 @@ export default function EmpresaPortal() {
           }
           setAccredByPerson(accMap);
           setVehiclesByPerson(vehMap);
+          setDocsForInsurance(statusBody.documents || []);
         }
       } catch {}
     } catch {
@@ -434,7 +437,7 @@ export default function EmpresaPortal() {
             isEmpty={filtered.length === 0}
             emptyIcon={Users}
             emptyMessage={search || filterType !== 'all' ? 'Sin resultados.' : 'No hay empleados cargados. Agregá el primero o importá desde Excel.'}
-            tableClassName="min-w-[1040px]"
+            tableClassName="min-w-[1140px]"
           >
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
@@ -448,6 +451,7 @@ export default function EmpresaPortal() {
                 <Th>Fases</Th>
                 <Th>Área</Th>
                 <Th>Eventos</Th>
+                <Th>Seguro</Th>
                 <Th>Acreditado</Th>
                 <Th>Vehículos</Th>
                 <Th />
@@ -498,6 +502,21 @@ export default function EmpresaPortal() {
                         ))}
                       </div>
                     ) : '—'}
+                  </Td>
+                  <Td>
+                    {(() => {
+                      const ins = computeInsuranceStatus(emp, docsForInsurance);
+                      const iconCls = ins.tone === 'approved' ? 'text-emerald-600'
+                        : ins.tone === 'pending' ? 'text-amber-600'
+                        : ins.tone === 'none' ? 'text-slate-400'
+                        : 'text-red-600';
+                      return (
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${INSURANCE_BADGE_CLASSES[ins.tone]}`}>
+                          <ShieldCheck className={`h-3 w-3 ${iconCls}`} />
+                          {ins.label}
+                        </span>
+                      );
+                    })()}
                   </Td>
                   <Td>
                     {(() => {

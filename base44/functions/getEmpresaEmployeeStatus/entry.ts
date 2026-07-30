@@ -26,6 +26,7 @@ export default async function(req) {
 
     let accreditations = [];
     let vehicles = [];
+    let documents = [];
     if (employeeIds.length > 0) {
       accreditations = await base44.asServiceRole.entities.Accreditation.filter(
         { person_id: { $in: employeeIds } },
@@ -37,12 +38,25 @@ export default async function(req) {
         '-created_date',
         500
       );
+      // Person-level docs for employees + company-level docs (no person_id)
+      const personDocs = await base44.asServiceRole.entities.Document.filter(
+        { person_id: { $in: employeeIds } },
+        '-created_date',
+        1000
+      );
+      const companyDocs = await base44.asServiceRole.entities.Document.filter(
+        { company: companyName },
+        '-created_date',
+        500
+      );
+      documents = personDocs.concat(companyDocs);
     }
 
     return Response.json({
       employees,
       accreditations,
       vehicles,
+      documents,
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
