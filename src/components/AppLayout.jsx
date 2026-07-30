@@ -159,12 +159,13 @@ export default function AppLayout() {
       return true;
     }
     if (item.roles) {
-      return item.roles.includes(role);
+    return item.roles.includes(role);
     }
-    if (settings?.role_access?.[item.path]) {
-      return settings.role_access[item.path].includes(role);
+    const hasSpecificPermissions = hasOperatorCompanyModules || hasPathRestriction;
+    if (!hasSpecificPermissions && settings?.role_access?.[item.path]) {
+    return settings.role_access[item.path].includes(role);
     }
-    return userLevel >= item.minLevel;
+    return hasSpecificPermissions || userLevel >= item.minLevel;
   });
 
   const isActive = (path) => (path === '/' ? location.pathname === '/' : location.pathname.startsWith(path));
