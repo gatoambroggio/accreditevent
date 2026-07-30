@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { logAudit } from '@/lib/audit';
-import { UserPlus, Loader2, Pencil, KeyRound, Building2, ShieldCheck, Ban, Link2 } from 'lucide-react';
+import { UserPlus, Loader2, Pencil, KeyRound, Building2, ShieldCheck, Ban, Link2, Layers } from 'lucide-react';
 import EntityModal from '@/components/EntityModal';
 import { useAuth } from '@/lib/AuthContext';
 import PageHeader from '@/components/ui/page-header';
@@ -9,6 +9,7 @@ import SearchInput from '@/components/ui/search-input';
 import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
 import { btnPrimary, btnIcon } from '@/components/ui/button-styles';
 import { slugify } from '@/lib/slugify';
+import OperatorModulesModal from '@/components/OperatorModulesModal';
 
 const ROLES = [
   { value: 'provider', label: 'Proveedor' },
@@ -79,6 +80,8 @@ export default function Users() {
   const [search, setSearch] = useState('');
   const [resetting, setResetting] = useState(false);
   const [resetMsg, setResetMsg] = useState('');
+  const [modulesModalOpen, setModulesModalOpen] = useState(false);
+  const [companyModules, setCompanyModules] = useState([]);
 
   const availableRoles = isProductora ? ROLES.filter((r) => r.value === 'operador') : ROLES;
   const canManageUser = (u) => {
@@ -96,6 +99,7 @@ export default function Users() {
         if (res.data?.error) throw new Error(res.data.error);
         setUsers(res.data.operators || []);
         setPendingInvites(res.data.pending || []);
+        setCompanyModules(res.data.operator_allowed_paths || []);
       } else {
         const data = await base44.entities.User.list('-created_date', 200);
         setUsers(data || []);
@@ -129,10 +133,10 @@ export default function Users() {
       options: events.map((e) => ({ value: e.id, label: e.name })),
       full: true, hint: 'Eventos a los que este usuario tiene acceso (operadores).',
     },
-    {
+    ...(isProductora ? [] : [{
       name: 'allowed_paths', label: 'Módulos permitidos', type: 'toggle-group',
       options: MODULE_OPTIONS, full: true, hint: 'Si seleccionás módulos, el usuario solo verá esos. Vacío = sin restricción.',
-    },
+    }]),
     { name: 'blocked', label: 'Bloqueado (sin acceso al sistema)', type: 'checkbox' },
     { name: 'password', label: 'Nueva contraseña', type: 'password', placeholder: 'Dejar en blanco para no cambiar', full: true, hint: 'Mínimo 6 caracteres' },
   ], [events, availableRoles]);
@@ -181,12 +185,11 @@ export default function Users() {
       const res = await base44.functions.invoke('updateOperator', {
         user_id: editing.id,
         assigned_event_ids: assignedEventIds,
-        allowed_paths: allowedPaths,
         blocked: !!data.blocked,
       });
       if (res.data?.error) throw new Error(res.data.error);
-      await logAudit('update', 'User', editing.id, `Operador actualizado (eventos: ${assignedEventIds.length}, módulos: ${allowedPaths.length})`);
-      setUsers((prev) => prev.map((u) => (u.id === editing.id ? { ...u, assigned_event_ids: assignedEventIds, allowed_paths: allowedPaths, blocked: !!data.blocked } : u)));
+      await logAudit('update', 'User', editing.id, `Operador actualizado (eventos: ${assignedEventIds.length})`);
+      setUsers((prev) => prev.map((u) => (u.id === editing.id ? { ...u, assigned_event_ids: assignedEventIds, blocked: !!data.blocked } : u)));
     } else {
       await base44.entities.User.update(editing.id, { role: data.role, company: newCompany, assigned_event_ids: assignedEventIds, allowed_paths: allowedPaths, blocked: !!data.blocked });
       await syncUserCompany(editing.id, oldCompany, newCompany);
@@ -253,6 +256,13 @@ export default function Users() {
     }
   };
 
+  const handleSaveModules = async (modules) => {
+    const res = await base44.functions.invoke('updateCompanyOperatorModules', { operator_allowed_paths: modules });
+    if (res.data?.error) throw new Error(res.data.error);
+    setCompanyModules(modules);
+    await logAudit('update', 'Company', '', `Módulos de operadores actualizados (${modules.length})`);
+  };
+
   const handleInvite = async (e) => {
     e.preventDefault();
     setInviting(true);
@@ -285,6 +295,11 @@ export default function Users() {
   return (
     <div className="space-y-6">
       <PageHeader kicker="Administración" title="Usuarios y roles">
+        {isProductora && (
+          <button onClick={() => setModulesModalOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+            <Layers className="h-4 w-4" /> Módulos de operadores
+          </button>
+        )}
         <button onClick={() => { setInviteOpen(true); if (isProductora) setInviteRole('operador'); }} className={btnPrimary}>
           <UserPlus className="h-4 w-4" /> {isProductora ? 'Asignar operador' : 'Invitar usuario'}
         </button>
@@ -460,6 +475,14 @@ export default function Users() {
           ) : null
         }
       />
+      {isProductora && (
+        <OperatorModulesModal
+          open={modulesModalOpen}
+          onClose={() => setModulesModalOpen(false)}
+          initialModules={companyModules}
+          onSave={handleSaveModules}
+        />
+      )}
     </div>
   );
 }

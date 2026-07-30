@@ -88,6 +88,7 @@ export default function AppLayout() {
   const [settings, setSettings] = useState(null);
   const [expandedNav, setExpandedNav] = useState(null);
   const [navSubItems, setNavSubItems] = useState({});
+  const [operatorModules, setOperatorModules] = useState([]);
 
   useEffect(() => {
     (async () => {
@@ -100,6 +101,17 @@ export default function AppLayout() {
       } catch {}
     })();
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      if (user?.role === 'operador') {
+        try {
+          const res = await base44.functions.invoke('getOperatorModules');
+          if (res.data?.ok) setOperatorModules(res.data.modules || []);
+        } catch {}
+      }
+    })();
+  }, [user?.role]);
 
   const userLevel = ROLE_LEVEL[user?.role] ?? -1;
   const isProvider = user?.role === 'provider';
@@ -126,12 +138,17 @@ export default function AppLayout() {
 
   const userAllowedPaths = user?.allowed_paths || user?.data?.allowed_paths || [];
   const hasPathRestriction = Array.isArray(userAllowedPaths) && userAllowedPaths.length > 0;
+  const hasOperatorCompanyModules = user?.role === 'operador' && Array.isArray(operatorModules) && operatorModules.length > 0;
   const visibleItems = NAV_ITEMS.filter((item) => {
     if (item.module && !settings?.enabled_modules?.[item.module]) return false;
     if (item.providerOnly) return isProvider;
     if (isProvider) return false;
     if (isEmpresa) return false;
-    if (hasPathRestriction) {
+    if (hasOperatorCompanyModules) {
+      if (item.path === '/') return true;
+      if (item.expandable && item.children?.some((c) => operatorModules.includes(c.path))) return true;
+      if (!operatorModules.includes(item.path)) return false;
+    } else if (hasPathRestriction) {
       if (item.path === '/') return true;
       if (item.expandable && item.children?.some((c) => userAllowedPaths.includes(c.path))) return true;
       if (!userAllowedPaths.includes(item.path)) return false;

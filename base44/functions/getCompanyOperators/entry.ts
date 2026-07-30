@@ -34,7 +34,14 @@ export default async function(req) {
     const pendingFilter = role === 'productora' ? { company, status: 'pending' } : { status: 'pending' };
     const pending = await base44.asServiceRole.entities.PendingOperator.filter(pendingFilter, '-created_date', 200);
 
-    return Response.json({ ok: true, operators, pending: pending || [] });
+    // Módulos configurados para operadores a nivel de empresa
+    let operator_allowed_paths = [];
+    if (role === 'productora' && company) {
+      const companies = await base44.asServiceRole.entities.Company.filter({ name: company });
+      if (companies.length) operator_allowed_paths = companies[0].operator_allowed_paths || [];
+    }
+
+    return Response.json({ ok: true, operators, pending: pending || [], operator_allowed_paths });
   } catch (error) {
     return Response.json({ error: error.message || 'Error al obtener operadores' }, { status: 500 });
   }
