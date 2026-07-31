@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { Loader2, Save, Upload, ArrowRight } from 'lucide-react';
+import { Loader2, Save, Upload, ArrowRight, DatabaseZap, ShieldCheck } from 'lucide-react';
 import { MODULES, ROLES, DEFAULT_ROLE_ACCESS } from '@/lib/modules';
 import ListEditor from '@/components/ui/list-editor';
 
@@ -58,6 +58,9 @@ export default function Settings() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
+  const [cleanReport, setCleanReport] = useState(null);
+  const [cleanError, setCleanError] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -108,6 +111,21 @@ export default function Settings() {
       update('logo_url', file_url);
     } catch {}
     setUploading(false);
+  };
+
+  const handleCleanup = async () => {
+    setCleaning(true);
+    setCleanError('');
+    setCleanReport(null);
+    try {
+      const res = await base44.functions.invoke('cleanupDatabase', {});
+      if (res?.error) throw new Error(res.error);
+      setCleanReport(res?.report || res);
+    } catch (err) {
+      setCleanError(err.message);
+    } finally {
+      setCleaning(false);
+    }
   };
 
   const handleSave = async () => {
@@ -343,6 +361,41 @@ export default function Settings() {
             </tbody>
           </table>
         </div>
+      </Section>
+
+      <Section title="Mantenimiento de base de datos" description="Reenlaza y normaliza todos los campos del sistema sin eliminar datos. Normaliza mayúsculas en empresas/usuarios, reenlaza productora, nombres de eventos, y datos denormalizados en acreditaciones, vehículos, documentos, biometría y registros de acceso.">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={handleCleanup}
+            disabled={cleaning}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
+          >
+            {cleaning ? <Loader2 className="h-4 w-4 animate-spin" /> : <DatabaseZap className="h-4 w-4" />}
+            {cleaning ? 'Ejecutando…' : 'Ejecutar limpieza y reenlace'}
+          </button>
+          <p className="text-xs text-slate-500">Solo disponible para administradores. No elimina registros.</p>
+        </div>
+        {cleanError && (
+          <div className="mt-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">{cleanError}</div>
+        )}
+        {cleanReport && (
+          <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/50 p-4">
+            <div className="flex items-center gap-2 text-sm font-bold text-emerald-800">
+              <ShieldCheck className="h-4 w-4" /> Limpieza completada
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-slate-700 sm:grid-cols-3">
+              {Object.entries(cleanReport).filter(([k]) => k !== 'errors').map(([k, v]) => (
+                <div key={k} className="flex justify-between border-b border-emerald-100/70 pb-1">
+                  <span className="font-mono text-[10px] uppercase tracking-wide text-slate-500">{k.replace(/_/g, ' ')}</span>
+                  <span className="font-bold text-slate-900">{v}</span>
+                </div>
+              ))}
+            </div>
+            {Array.isArray(cleanReport.errors) && cleanReport.errors.length > 0 && (
+              <div className="mt-2 text-xs text-amber-700">Avisos: {cleanReport.errors.join('; ')}</div>
+            )}
+          </div>
+        )}
       </Section>
 
       <Section title="Catálogos" description="Acceso rápido a la gestión de catálogos del sistema">
