@@ -31,7 +31,9 @@ export const SETUP_PHASE_OPTIONS = [
   { value: 'desarme', label: 'Desarme' },
 ];
 
-// Construye las opciones de días de show (Día del show + Día 1..N).
+// Construye las opciones de días de show ("Todo el show" + Día 1..N).
+// "Todo el show" (dia_evento) = acceso a toda la ventana del show; los días
+// específicos (Día 1..N) son puntuales. Son mutuamente excluyentes entre sí.
 export function buildShowDayOptions(showDays) {
   const n = Math.max(1, Math.min(6, Number(showDays) || 1));
   const days = [];
@@ -39,7 +41,7 @@ export function buildShowDayOptions(showDays) {
     days.push({ value: `dia_${i}`, label: `Día ${i}` });
   }
   return [
-    { value: 'dia_evento', label: 'Día del show' },
+    { value: 'dia_evento', label: 'Todo el show' },
     ...days,
   ];
 }
@@ -47,7 +49,7 @@ export function buildShowDayOptions(showDays) {
 // Etiquetas legibles para cada fase/día (incluye valores legacy y día_1..día_6).
 export const PHASE_LABELS = {
   armado: 'Armado',
-  dia_evento: 'Día del show',
+  dia_evento: 'Todo el show',
   desarme: 'Desarme',
   dia_1: 'Día 1',
   dia_2: 'Día 2',

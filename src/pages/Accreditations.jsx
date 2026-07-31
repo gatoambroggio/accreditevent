@@ -173,7 +173,7 @@ export default function Accreditations() {
         { label: 'Fases de montaje', options: SETUP_PHASE_OPTIONS },
         { label: 'Días de show', options: showDayOptions, exclusiveGroups: PHASE_EXCLUSIVE_GROUPS },
       ],
-      hint: '“Día del show” = acceso a todo el show (excluye días específicos). “Día 1..N” = días puntuales. Armado y desarme son independientes de los días de show.',
+      hint: 'Días de show: elegí “Todo el show” o días específicos (Día 1..N), son mutuamente excluyentes. Armado y desarme son independientes.',
       full: true,
     },
     { name: 'status', label: 'Estado', type: 'select', options: STATUS_OPTIONS },

@@ -25,7 +25,7 @@ const DOC_TYPES = {
   other: 'Otro',
 };
 
-const PHASE_LABELS = { armado: 'Armado', dia_evento: 'Día del show', desarme: 'Desarme', dia_1: 'Día 1', dia_2: 'Día 2', dia_3: 'Día 3', dia_4: 'Día 4', dia_5: 'Día 5', dia_6: 'Día 6' };
+const PHASE_LABELS = { armado: 'Armado', dia_evento: 'Todo el show', desarme: 'Desarme', dia_1: 'Día 1', dia_2: 'Día 2', dia_3: 'Día 3', dia_4: 'Día 4', dia_5: 'Día 5', dia_6: 'Día 6' };
 
 export default function EmpresaPortal() {
   const [user, setUser] = useState(null);
