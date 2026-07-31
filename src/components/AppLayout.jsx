@@ -151,15 +151,17 @@ export default function AppLayout() {
     if (item.providerOnly) return isProvider;
     if (isProvider) return false;
     if (isEmpresa) return false;
-    if (hasOperatorCompanyModules) {
-      if (item.path === '/') return true;
-      if (item.expandable && item.children?.some((c) => operatorModules.includes(c.path))) return true;
-      if (!operatorModules.includes(item.path)) return false;
-      return true;
-    } else if (hasPathRestriction) {
+    // Los módulos asignados por usuario (allowed_paths) tienen prioridad sobre
+    // los módulos generales de operador de la empresa (operator_allowed_paths).
+    if (hasPathRestriction) {
       if (item.path === '/') return true;
       if (item.expandable && item.children?.some((c) => userAllowedPaths.includes(c.path))) return true;
       if (!userAllowedPaths.includes(item.path)) return false;
+      return true;
+    } else if (hasOperatorCompanyModules) {
+      if (item.path === '/') return true;
+      if (item.expandable && item.children?.some((c) => operatorModules.includes(c.path))) return true;
+      if (!operatorModules.includes(item.path)) return false;
       return true;
     }
     if (item.roles) {

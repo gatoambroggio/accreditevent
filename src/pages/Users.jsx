@@ -10,6 +10,7 @@ import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
 import { btnPrimary, btnIcon } from '@/components/ui/button-styles';
 import { slugify } from '@/lib/slugify';
 import OperatorModulesModal from '@/components/OperatorModulesModal';
+import { MODULES } from '@/lib/modules';
 
 const ROLES = [
   { value: 'provider', label: 'Proveedor' },
@@ -22,23 +23,12 @@ const ROLES = [
   { value: 'productora', label: 'Productora' },
 ];
 
-const MODULE_OPTIONS = [
-  { value: '/', label: 'Resumen' },
-  { value: '/accreditations', label: 'Acreditaciones' },
-  { value: '/accreditation-facial', label: 'Acreditación facial' },
-  { value: '/dni-scan', label: 'Escaneo de DNI' },
-  { value: '/access-control', label: 'Control de acceso' },
-  { value: '/emergency-scan', label: 'Escaneo de emergencia' },
-  { value: '/access-monitor', label: 'Monitor en vivo' },
-  { value: '/vehicles', label: 'Vehículos acreditados' },
-  { value: '/parking-sectors', label: 'Sectores de estacionamiento' },
-  { value: '/parking-capacities', label: 'Capacidades por evento' },
-  { value: '/documents', label: 'Documentos' },
-  { value: '/people', label: 'Personal de Empresas' },
-  { value: '/personas-autonomas', label: 'Personas Autónomas' },
-  { value: '/registered-people', label: 'Personas registradas' },
-  { value: '/reports', label: 'Reportes' },
-];
+// Módulos asignables a operadores: todos los operativos (se excluyen los
+// reservados a administración). Se deriva de la lista central para mantener sincronizado.
+const ADMIN_ONLY_MODULES = ['/users', '/audit', '/settings', '/companies', '/apariencia', '/custom-fields'];
+const MODULE_OPTIONS = MODULES
+  .filter((m) => !ADMIN_ONLY_MODULES.includes(m.path))
+  .map((m) => ({ value: m.path, label: m.label }));
 
 const ROLE_LABELS = {
   productora: 'Productora',
