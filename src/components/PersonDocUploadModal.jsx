@@ -3,7 +3,7 @@ import { X, Upload, Loader2, CheckCircle2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useDocumentTypes } from '@/lib/useDocumentTypes';
 import { logAudit } from '@/lib/audit';
-import { prepareUploadFile } from '@/lib/safeUpload';
+import { uploadDocument, formatUploadError } from '@/lib/safeUpload';
 
 export default function PersonDocUploadModal({ person, onClose, onUploaded }) {
   const { docTypes } = useDocumentTypes();
@@ -29,15 +29,14 @@ export default function PersonDocUploadModal({ person, onClose, onUploaded }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!file || !docType) return;
-    if (file.size > 10 * 1024 * 1024) {
-      setError('El archivo supera el máximo de 10 MB.');
+    if (file.size > 50 * 1024 * 1024) {
+      setError('El archivo supera el máximo de 50 MB.');
       return;
     }
     setUploading(true);
     setError('');
     try {
-      const { uploadFile, originalName } = prepareUploadFile(file);
-      const { file_url } = await base44.integrations.Core.UploadFile({ file: uploadFile });
+      const { file_url, originalName } = await uploadDocument(file);
       const payload = {
         person_id: person.id,
         person_name: person.full_name,
@@ -59,7 +58,7 @@ export default function PersonDocUploadModal({ person, onClose, onUploaded }) {
       setSuccess(true);
       setTimeout(() => { onUploaded?.(); }, 1200);
     } catch (err) {
-      setError(err.message || 'Error al subir el documento.');
+      setError(formatUploadError(err, file));
     } finally {
       setUploading(false);
     }
@@ -99,7 +98,7 @@ export default function PersonDocUploadModal({ person, onClose, onUploaded }) {
               <input type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className={inputCls} />
             </label>
             <label className="block">
-              <span className="mb-1.5 block text-xs font-semibold text-slate-600">Archivo — PDF, JPG o PNG (máx. 10 MB)</span>
+              <span className="mb-1.5 block text-xs font-semibold text-slate-600">Archivo — PDF, JPG o PNG (máx. 50 MB)</span>
               <input
                 type="file"
                 accept="application/pdf,image/jpeg,image/png"
