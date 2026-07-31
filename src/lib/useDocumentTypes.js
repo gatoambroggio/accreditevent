@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 const DEFAULT_DOC_TYPES = [
   { value: 'dni', label: 'DNI' },
   { value: 'work_insurance', label: 'Seguro de trabajo' },
+  { value: 'art_insurance', label: 'Seguro ART' },
   { value: 'tax_certificate', label: 'Certificado fiscal' },
   { value: 'contract', label: 'Contrato' },
   { value: 'other', label: 'Otro' },

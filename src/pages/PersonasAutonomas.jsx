@@ -19,6 +19,7 @@ import Pagination from '@/components/ui/pagination';
 import { usePagination } from '@/lib/usePagination';
 import { generateBadgeCode } from '@/lib/badgeCode';
 import { buildShowDayOptions, SETUP_PHASE_OPTIONS, getShowDays, PHASE_EXCLUSIVE_GROUPS } from '@/lib/eventPhases';
+import { INSURANCE_KIND_LABELS, formatInsuranceAmount } from '@/lib/insuranceKind';
 
 const validateAutonomo = (data) => {
   const e = {};
@@ -67,10 +68,20 @@ function InsuranceBadge({ doc }) {
   const labels = { approved: 'Aprobado', pending: 'Pendiente', rejected: 'Rechazado', expired: 'Vencido' };
   const status = doc.expires_at && new Date(doc.expires_at + 'T23:59:59') < new Date() && doc.status === 'approved' ? 'expired' : doc.status;
   const cls = styles[status] || styles.pending;
+  const kind = doc.custom_fields?.insurance_kind || (doc.document_type === 'art_insurance' ? 'ART' : 'TRABAJO');
+  const amount = Number(doc.custom_fields?.coverage_amount || 0);
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${cls}`}>
-      {status === 'approved' ? <ShieldCheck className="h-3 w-3" /> : <FileWarning className="h-3 w-3" />}
-      {labels[status] || status}
+    <span className="inline-flex flex-col items-start gap-0.5">
+      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${cls}`}>
+        {status === 'approved' ? <ShieldCheck className="h-3 w-3" /> : <FileWarning className="h-3 w-3" />}
+        {labels[status] || status}
+      </span>
+      {status === 'approved' && (
+        <span className="inline-flex items-center gap-1">
+          <span className="rounded bg-slate-100 px-1 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600">{INSURANCE_KIND_LABELS[kind] || kind}</span>
+          {kind === 'TRABAJO' && amount > 0 && <span className="text-[10px] font-bold text-emerald-700">{formatInsuranceAmount(amount)}</span>}
+        </span>
+      )}
     </span>
   );
 }
@@ -127,11 +138,11 @@ export default function PersonasAutonomas() {
   // Only autonomous persons
   const autonomos = useMemo(() => items.filter((p) => p.tipo_vinculo === 'autonomo'), [items]);
 
-  // Latest insurance doc per person
+  // Latest insurance doc per person (ART o Seguro de trabajo)
   const insuranceByPerson = useMemo(() => {
     const map = {};
     for (const d of documents) {
-      if (d.document_type !== 'work_insurance') continue;
+      if (!['work_insurance', 'art_insurance'].includes(d.document_type)) continue;
       if (!map[d.person_id] || new Date(d.created_date) > new Date(map[d.person_id].created_date)) {
         map[d.person_id] = d;
       }

@@ -1,4 +1,5 @@
 import { base44 } from '@/api/base44Client';
+import { readInsuranceMeta } from '@/lib/insuranceKind';
 
 const INSURANCE_REGEX = /seguro|insurance/i;
 
@@ -57,11 +58,14 @@ export async function getInsuranceStatus(person) {
   const approvedDocs = activeInsuranceDocs.filter((d) => d.status === 'approved');
   const approvedDoc = approvedDocs.find((d) => isCoveredByDoc(d, person.id));
 
+  const meta = readInsuranceMeta(approvedDoc);
   return {
     insured: !!approvedDoc,
     status: approvedDoc ? 'approved' : (activeInsuranceDocs.length > 0 ? activeInsuranceDocs[0].status : 'none'),
     docs: insuranceDocs,
     approvedDoc,
+    kind: meta.kind,
+    amount: meta.amount,
   };
 }
 

@@ -2,6 +2,8 @@
 // Works for both the empresa portal (company-level + person-level docs) and the
 // persona autónoma portal (person-level docs only).
 
+import { readInsuranceMeta } from '@/lib/insuranceKind';
+
 const INSURANCE_REGEX = /seguro|insurance/i;
 
 const isInsuranceDocType = (docTypeValue) => INSURANCE_REGEX.test(docTypeValue || '');
@@ -35,7 +37,10 @@ export function computeInsuranceStatus(person, allDocs) {
   const active = relevant.filter((d) => !isDocExpired(d));
   const approvedDocs = active.filter((d) => d.status === 'approved');
   const approvedDoc = approvedDocs.find((d) => isCoveredByDoc(d, person.id));
-  if (approvedDoc) return { insured: true, status: 'approved', label: 'Seguro habilitado', tone: 'approved' };
+  if (approvedDoc) {
+    const meta = readInsuranceMeta(approvedDoc);
+    return { insured: true, status: 'approved', label: 'Seguro habilitado', tone: 'approved', kind: meta.kind, amount: meta.amount };
+  }
   if (active.length > 0) {
     const s = active[0].status;
     if (s === 'pending') return { insured: false, status: 'pending', label: 'Seguro en revisión', tone: 'pending' };
@@ -45,7 +50,7 @@ export function computeInsuranceStatus(person, allDocs) {
   if (expired.length > 0 && active.length === 0) {
     return { insured: false, status: 'expired', label: 'Seguro vencido', tone: 'expired' };
   }
-  return { insured: false, status: 'none', label: 'Sin seguro', tone: 'none' };
+  return { insured: false, status: 'none', label: 'Sin seguro', tone: 'none', kind: '', amount: 0 };
 }
 
 // Tailwind class sets for each insurance tone, used by portals.

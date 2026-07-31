@@ -11,6 +11,7 @@ import { useParkingSectors } from '@/lib/useParkingSectors';
 import DniToBiometric from '@/components/DniToBiometric';
 import { useCustomFields } from '@/lib/useCustomFields';
 import { getInsuranceStatus } from '@/lib/insuranceUtils';
+import { INSURANCE_KIND_LABELS, formatInsuranceAmount } from '@/lib/insuranceKind';
 import { phaseLabel } from '@/lib/eventPhases';
 
 export default function PersonDetailModal({ person, onClose, readOnly = false }) {
@@ -265,9 +266,26 @@ export default function PersonDetailModal({ person, onClose, readOnly = false })
                 <p className={`text-sm font-bold ${insurance.insured ? 'text-emerald-800' : 'text-red-800'}`}>
                   {insurance.insured ? 'Seguro aprobado' : 'Sin seguro aprobado'}
                 </p>
-                <p className="text-xs text-slate-500">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {insurance.kind && (
+                    <span className="inline-flex items-center rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-700 ring-1 ring-inset ring-slate-200">
+                      {INSURANCE_KIND_LABELS[insurance.kind] || insurance.kind}
+                    </span>
+                  )}
+                  {insurance.kind === 'TRABAJO' && insurance.amount > 0 && (
+                    <span className="inline-flex items-center rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                      {formatInsuranceAmount(insurance.amount)}
+                    </span>
+                  )}
+                  {insurance.insured && insurance.approvedDoc?.expires_at && (
+                    <span className="text-[10px] text-slate-500">
+                      Vence: {new Date(insurance.approvedDoc.expires_at + 'T00:00:00').toLocaleDateString('es-AR')}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-0.5 text-xs text-slate-500">
                   {insurance.insured
-                    ? `La persona puede ser acreditada.${insurance.approvedDoc?.expires_at ? ` Vence: ${new Date(insurance.approvedDoc.expires_at + 'T00:00:00').toLocaleDateString('es-AR')}.` : ''}`
+                    ? 'La persona puede ser acreditada.'
                     : 'No se puede acreditar hasta que la empresa o la persona tenga un seguro aprobado.'}
                 </p>
               </div>

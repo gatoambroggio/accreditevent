@@ -16,10 +16,12 @@ import Pagination from '@/components/ui/pagination';
 import { usePagination } from '@/lib/usePagination';
 import { generateBadgeCode } from '@/lib/badgeCode';
 import { computeInsuranceStatus, INSURANCE_BADGE_CLASSES } from '@/lib/portalInsurance';
+import { INSURANCE_KIND_LABELS, formatInsuranceAmount } from '@/lib/insuranceKind';
 
 const DOC_TYPES = {
   dni: 'DNI',
   work_insurance: 'Seguro de trabajo',
+  art_insurance: 'Seguro ART',
   tax_certificate: 'Constancia fiscal',
   contract: 'Contrato',
   other: 'Otro',
@@ -536,10 +538,20 @@ export default function EmpresaPortal() {
                         : ins.tone === 'none' ? 'text-slate-400'
                         : 'text-red-600';
                       return (
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${INSURANCE_BADGE_CLASSES[ins.tone]}`}>
-                          <ShieldCheck className={`h-3 w-3 ${iconCls}`} />
-                          {ins.label}
-                        </span>
+                        <div className="flex flex-col gap-0.5">
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${INSURANCE_BADGE_CLASSES[ins.tone]}`}>
+                            <ShieldCheck className={`h-3 w-3 ${iconCls}`} />
+                            {ins.label}
+                          </span>
+                          {ins.kind && (
+                            <span className="flex items-center gap-1 text-[10px] font-medium text-slate-500">
+                              <span className="rounded bg-slate-100 px-1 py-0.5 uppercase tracking-wide">{INSURANCE_KIND_LABELS[ins.kind] || ins.kind}</span>
+                              {ins.kind === 'TRABAJO' && ins.amount > 0 && (
+                                <span className="font-bold text-emerald-700">{formatInsuranceAmount(ins.amount)}</span>
+                              )}
+                            </span>
+                          )}
+                        </div>
                       );
                     })()}
                   </Td>

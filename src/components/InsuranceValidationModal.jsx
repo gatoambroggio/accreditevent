@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ShieldCheck, X, Loader2, AlertTriangle, CheckCircle2, XCircle, FileText, Calendar, User, Building2, Users } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { assignEventToCompanyEmployees } from '@/lib/assignEventToCompanyEmployees';
+import { deriveInsuranceKind, INSURANCE_KIND_LABELS, formatInsuranceAmount } from '@/lib/insuranceKind';
 
 export default function InsuranceValidationModal({ document: doc, onClose, onValidated }) {
   const [loading, setLoading] = useState(false);
@@ -92,6 +93,11 @@ export default function InsuranceValidationModal({ document: doc, onClose, onVal
         ? 'Seguro validado automáticamente (fechas, DNI y nómina de empleados verificados)'
         : 'Seguro rechazado: validación automática falló (DNI, fechas o nómina de empleados)';
       const expiresAt = result?.extracted?.valid_until || '';
+      // Persistir tipo de seguro (ART / Trabajo) y monto de cobertura extraído por OCR
+      if (status === 'approved') {
+        customFields.insurance_kind = deriveInsuranceKind(doc.document_type, result?.extracted?.coverage_type);
+        customFields.coverage_amount = Number(result?.extracted?.coverage_amount || 0);
+      }
       if (role === 'productora') {
         // Productora RLS blocks Document.update on provider-company docs — go via service role
         await base44.functions.invoke('reviewDocument', {
@@ -211,6 +217,7 @@ export default function InsuranceValidationModal({ document: doc, onClose, onVal
                   <InfoRow icon={<Calendar className="h-3.5 w-3.5" />} label="Vigencia hasta" value={fmtDate(result.extracted.valid_until)} />
                   <InfoRow icon={<ShieldCheck className="h-3.5 w-3.5" />} label="Tipo de cobertura" value={result.extracted.coverage_type} />
                   <InfoRow icon={<ShieldCheck className="h-3.5 w-3.5" />} label="Monto de cobertura" value={fmtMoney(result.validation.coverage_amount)} />
+                  <InfoRow icon={<ShieldCheck className="h-3.5 w-3.5" />} label="Tipo de seguro" value={INSURANCE_KIND_LABELS[deriveInsuranceKind(doc.document_type, result.extracted.coverage_type)] || '—'} />
                 </div>
               </div>
 
