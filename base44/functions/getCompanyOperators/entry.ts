@@ -14,11 +14,12 @@ export default async function(req) {
       return Response.json({ error: 'Tu usuario no tiene una empresa asignada' }, { status: 400 });
     }
 
-    // Operadores ya registrados
+    // Usuarios de la productora (roles operacionales asignables) ya registrados
+    const ASSIGNABLE = ['operador', 'control', 'coordinator', 'provider', 'empresa'];
     const userFilter = role === 'productora' ? { company } : {};
     const allUsers = await base44.asServiceRole.entities.User.filter(userFilter, '-created_date', 500);
     const operators = (allUsers || [])
-      .filter((u) => (u.role || (u.data && u.data.role)) === 'operador')
+      .filter((u) => role !== 'productora' || ASSIGNABLE.includes(u.role || (u.data && u.data.role)))
       .map((u) => ({
         id: u.id,
         full_name: u.full_name,

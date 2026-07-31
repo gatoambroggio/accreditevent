@@ -83,11 +83,12 @@ export default function Users() {
   const [modulesModalOpen, setModulesModalOpen] = useState(false);
   const [companyModules, setCompanyModules] = useState([]);
 
-  const availableRoles = isProductora ? ROLES.filter((r) => r.value === 'operador') : ROLES;
+  const PRODUCTORA_ASSIGNABLE = ['operador', 'control', 'coordinator', 'provider', 'empresa'];
+  const availableRoles = isProductora ? ROLES.filter((r) => PRODUCTORA_ASSIGNABLE.includes(r.value)) : ROLES;
   const canManageUser = (u) => {
     if (!u) return false;
     if (u.id === currentUser?.id) return false;
-    if (isProductora) return u.role === 'operador' && (u.company || '') === myCompany;
+    if (isProductora) return PRODUCTORA_ASSIGNABLE.includes(u.role) && (u.company || '') === myCompany;
     return true;
   };
 
@@ -133,10 +134,10 @@ export default function Users() {
       options: events.map((e) => ({ value: e.id, label: e.name })),
       full: true, hint: 'Eventos a los que este usuario tiene acceso (operadores).',
     },
-    ...(isProductora ? [] : [{
+    {
       name: 'allowed_paths', label: 'Módulos permitidos', type: 'toggle-group',
       options: MODULE_OPTIONS, full: true, hint: 'Si seleccionás módulos, el usuario solo verá esos. Vacío = sin restricción.',
-    }]),
+    },
     { name: 'blocked', label: 'Bloqueado (sin acceso al sistema)', type: 'checkbox' },
     { name: 'password', label: 'Nueva contraseña', type: 'password', placeholder: 'Dejar en blanco para no cambiar', full: true, hint: 'Mínimo 6 caracteres' },
   ], [events, availableRoles]);
@@ -184,12 +185,14 @@ export default function Users() {
     if (isProductora) {
       const res = await base44.functions.invoke('updateOperator', {
         user_id: editing.id,
+        role: data.role,
         assigned_event_ids: assignedEventIds,
+        allowed_paths: allowedPaths,
         blocked: !!data.blocked,
       });
       if (res.data?.error) throw new Error(res.data.error);
-      await logAudit('update', 'User', editing.id, `Operador actualizado (eventos: ${assignedEventIds.length})`);
-      setUsers((prev) => prev.map((u) => (u.id === editing.id ? { ...u, assigned_event_ids: assignedEventIds, blocked: !!data.blocked } : u)));
+      await logAudit('update', 'User', editing.id, `Usuario actualizado (rol: ${data.role}, eventos: ${assignedEventIds.length}, módulos: ${allowedPaths.length})`);
+      setUsers((prev) => prev.map((u) => (u.id === editing.id ? { ...u, role: data.role, assigned_event_ids: assignedEventIds, allowed_paths: allowedPaths, blocked: !!data.blocked } : u)));
     } else {
       await base44.entities.User.update(editing.id, { role: data.role, company: newCompany, assigned_event_ids: assignedEventIds, allowed_paths: allowedPaths, blocked: !!data.blocked });
       await syncUserCompany(editing.id, oldCompany, newCompany);

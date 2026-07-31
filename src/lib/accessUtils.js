@@ -51,7 +51,9 @@ export function isWithinEventPhases(event, eventPhases, date = new Date()) {
 
 export function canModify(user) {
   const role = user?.role || user?.data?.role;
-  return role !== 'operador';
+  // Roles de portal externo (proveedor/empresa) no acreditan en la app principal;
+  // operadores y roles internos sí pueden acreditar.
+  return role !== 'provider' && role !== 'empresa';
 }
 
 export function speakResult(ok) {
