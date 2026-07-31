@@ -1,7 +1,6 @@
 import { base44 } from '@/api/base44Client';
 
 // Normaliza el nombre del archivo a ASCII puro (sin tildes, eñes ni símbolos).
-// Si después de normalizar queda inválido, usa un nombre genérico.
 export function prepareUploadFile(file) {
   const ext = (file.name.match(/\.([a-zA-Z0-9]+)$/) || [])[1] || '';
   const safe = file.name
@@ -21,21 +20,31 @@ export function prepareUploadFile(file) {
   return { uploadFile, originalName: file.name };
 }
 
-// Sube el archivo probando primero con su tipo real y, si el gateway lo
-// rechaza (403/415) o hay error de red, reintenta una vez como
-// application/octet-stream con el mismo nombre .pdf (destraba filtros de
-// content-type que bloquean PDFs puntuales).
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+    reader.readAsDataURL(file);
+  });
+}
+
+// Sube el archivo. Intenta primero la subida multipart directa (tipo real y,
+// si falla, como octet-stream). Si ambas fallan, usa la función backend
+// uploadDocumentBase64 (envía el archivo como base64) para destrabar el
+// "Network Error" que el gateway produce al resetear ciertos PDFs puntuales.
 export async function uploadDocument(file) {
   const { uploadFile, originalName } = prepareUploadFile(file);
   const asOctet = new File([uploadFile], uploadFile.name, { type: 'application/octet-stream' });
   const attempts = [uploadFile, asOctet];
-  let lastErr;
+  let multipartErr = null;
+
   for (let i = 0; i < attempts.length; i++) {
     try {
       const res = await base44.integrations.Core.UploadFile({ file: attempts[i] });
       return { file_url: res?.file_url, originalName };
     } catch (err) {
-      lastErr = err;
+      multipartErr = err;
       const status = err?.response?.status;
       const code = err?.code || '';
       const isNetwork = !err?.response || code === 'ERR_NETWORK' || /network/i.test(err?.message || '');
@@ -44,7 +53,22 @@ export async function uploadDocument(file) {
       await new Promise((r) => setTimeout(r, 600));
     }
   }
-  throw lastErr;
+
+  // Fallback base64 vía backend (bypass del reset de contenido del gateway)
+  try {
+    const dataUrl = await readFileAsDataURL(file);
+    const res = await base44.functions.invoke('uploadDocumentBase64', {
+      base64: dataUrl,
+      filename: originalName,
+      mime_type: file.type || 'application/octet-stream',
+    });
+    if (res?.data?.file_url) return { file_url: res.data.file_url, originalName };
+    throw new Error(res?.data?.error || 'No se pudo subir el archivo');
+  } catch (err) {
+    // Si el fallback tampoco llegó al servidor, preservar el error original
+    const fallbackNetwork = !err?.response && (/network/i.test(err?.message || '') || err?.code === 'ERR_NETWORK');
+    throw fallbackNetwork && multipartErr ? multipartErr : err;
+  }
 }
 
 // Mensaje de error legible que expone el estado HTTP y el cuerpo real de la
