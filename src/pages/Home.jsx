@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Users, CalendarDays, IdCard, DoorOpen, TrendingUp } from 'lucide-react';
+import { useAuth } from '@/lib/AuthContext';
+import { isOperator } from '@/lib/accessUtils';
 
 function StatCard({ icon: Icon, label, value, sub, color }) {
   return (
@@ -20,6 +22,8 @@ function StatCard({ icon: Icon, label, value, sub, color }) {
 }
 
 export default function Home() {
+  const { user } = useAuth();
+  const isOp = isOperator(user);
   const [stats, setStats] = useState({ people: 0, events: 0, accreditations: 0, accesses: 0 });
   const [recent, setRecent] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -75,10 +79,12 @@ export default function Home() {
         <StatCard icon={Users} label="Personas" value={loading ? '—' : stats.people} sub="en directorio" color="bg-emerald-50 text-emerald-700" />
         <StatCard icon={CalendarDays} label="Eventos" value={loading ? '—' : stats.events} sub="registrados" color="bg-amber-50 text-amber-700" />
         <StatCard icon={IdCard} label="Acreditaciones" value={loading ? '—' : stats.accreditations} sub="activas" color="bg-emerald-50 text-emerald-700" />
-        <StatCard icon={DoorOpen} label="Accesos hoy" value={loading ? '—' : stats.accesses} sub="validados hoy" color="bg-slate-100 text-slate-700" />
+        {!isOp && (
+          <StatCard icon={DoorOpen} label="Accesos hoy" value={loading ? '—' : stats.accesses} sub="validados hoy" color="bg-slate-100 text-slate-700" />
+        )}
       </div>
 
-      {/* Recent accesses */}
+      {!isOp && (
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-bold text-slate-900">Ingresos recientes</h3>
@@ -102,6 +108,7 @@ export default function Home() {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

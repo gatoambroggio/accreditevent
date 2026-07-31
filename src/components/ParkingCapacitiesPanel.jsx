@@ -3,8 +3,12 @@ import { base44 } from '@/api/base44Client';
 import { Save } from 'lucide-react';
 import { computeSectorOccupancy, sectorStatus } from '@/lib/parkingCapacity';
 import FilterSelect from '@/components/ui/filter-select';
+import { useAuth } from '@/lib/AuthContext';
+import { canManage } from '@/lib/accessUtils';
 
 export default function ParkingCapacitiesPanel() {
+  const { user } = useAuth();
+  const canEdit = canManage(user);
   const [sectors, setSectors] = useState([]);
   const [events, setEvents] = useState([]);
   const [vehicles, setVehicles] = useState([]);
@@ -99,7 +103,8 @@ export default function ParkingCapacitiesPanel() {
                         value={capacities[s.value] ?? ''}
                         onChange={(e) => handleCapChange(s.value, e.target.value)}
                         placeholder="Sin límite"
-                        className="w-28 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                        disabled={!canEdit}
+                        className="w-28 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:bg-slate-100"
                       />
                       <span className="text-xs text-slate-400">vehículos</span>
                     </div>
@@ -116,12 +121,14 @@ export default function ParkingCapacitiesPanel() {
                 </div>
               );
             })}
-            <div className="flex items-center gap-3 pt-1">
-              <button onClick={handleSaveCapacities} disabled={savingCaps} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50">
-                {savingCaps ? 'Guardando…' : <><Save className="h-4 w-4" /> Guardar capacidades</>}
-              </button>
-              {capSaved && <span className="text-sm font-medium text-emerald-600">✓ Capacidades guardadas</span>}
-            </div>
+            {canEdit && (
+              <div className="flex items-center gap-3 pt-1">
+                <button onClick={handleSaveCapacities} disabled={savingCaps} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50">
+                  {savingCaps ? 'Guardando…' : <><Save className="h-4 w-4" /> Guardar capacidades</>}
+                </button>
+                {capSaved && <span className="text-sm font-medium text-emerald-600">✓ Capacidades guardadas</span>}
+              </div>
+            )}
           </div>
         )
       ) : (

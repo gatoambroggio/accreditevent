@@ -260,9 +260,11 @@ export default function Vehicles() {
           className={`${btnOutline} disabled:opacity-40 disabled:cursor-not-allowed`}>
           <Printer className="h-4 w-4" /> Imprimir ({selected.size})
         </button>
-        <button onClick={openNew} className={btnPrimary}>
-          <Plus className="h-4 w-4" /> Acreditar vehículo
-        </button>
+        {canManageRecords && (
+          <button onClick={openNew} className={btnPrimary}>
+            <Plus className="h-4 w-4" /> Acreditar vehículo
+          </button>
+        )}
       </PageHeader>
 
       <div className="flex flex-wrap items-center gap-3">
