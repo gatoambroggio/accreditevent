@@ -67,14 +67,9 @@ export default function CompanyDocUploadModal({ company, onClose }) {
         status: 'pending',
         expires_at: expiresAt || null,
       };
-      const me = await base44.auth.me().catch(() => null);
-      const role = me?.data?.role || me?.role || '';
-      if (role === 'productora') {
-        // RLS bloquea crear documentos de empresas proveedoras — usar service-role
-        await base44.functions.invoke('createDocument', payload);
-      } else {
-        await base44.entities.Document.create(payload);
-      }
+      // RLS bloquea crear documentos de empresas proveedoras — siempre vía service-role
+      const res = await base44.functions.invoke('createDocument', payload);
+      if (res?.data?.error) throw new Error(res.data.error);
       await logAudit('admin-upload-company-doc', 'Document', company.id, `${company.name}: ${file.name}`);
       setFile(null);
       setDocType('');

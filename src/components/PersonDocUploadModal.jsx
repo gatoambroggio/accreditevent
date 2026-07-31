@@ -44,13 +44,8 @@ export default function PersonDocUploadModal({ person, onClose, onUploaded }) {
         status: 'pending',
         expires_at: expiresAt || null,
       };
-      const me = await base44.auth.me().catch(() => null);
-      const role = me?.data?.role || me?.role || '';
-      if (role === 'productora') {
-        await base44.functions.invoke('createDocument', payload);
-      } else {
-        await base44.entities.Document.create(payload);
-      }
+      const res = await base44.functions.invoke('createDocument', payload);
+      if (res?.data?.error) throw new Error(res.data.error);
       await logAudit('admin-upload-doc', 'Document', person.id, `${person.full_name}: ${file.name}`);
       setSuccess(true);
       setTimeout(() => { onUploaded?.(); }, 1200);
