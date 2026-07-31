@@ -20,6 +20,8 @@ import { usePagination } from '@/lib/usePagination';
 import { generateBadgeCode } from '@/lib/badgeCode';
 import { buildShowDayOptions, SETUP_PHASE_OPTIONS, getShowDays, PHASE_EXCLUSIVE_GROUPS } from '@/lib/eventPhases';
 import { INSURANCE_KIND_LABELS, formatInsuranceAmount } from '@/lib/insuranceKind';
+import { useAuth } from '@/lib/AuthContext';
+import { canManage } from '@/lib/accessUtils';
 
 const validateAutonomo = (data) => {
   const e = {};
@@ -104,6 +106,8 @@ export default function PersonasAutonomas() {
   const [accreditingId, setAccreditingId] = useState(null);
   const [docUploadPerson, setDocUploadPerson] = useState(null);
   const [selectedEventId, setSelectedEventId] = useState('');
+  const { user } = useAuth();
+  const canManageRecords = canManage(user);
 
   const refreshDocs = async () => {
     try {
@@ -464,12 +468,16 @@ export default function PersonasAutonomas() {
         <button onClick={handleExport} className={btnOutline}>
           <Download className="h-4 w-4" /> Exportar
         </button>
-        <button onClick={() => setDniScannerOpen(true)} className={btnOutline}>
-          <ScanLine className="h-4 w-4" /> Escanear DNI
-        </button>
-        <button onClick={openNew} className={btnPrimary}>
-          <Plus className="h-4 w-4" /> Nueva persona
-        </button>
+        {canManageRecords && (
+          <button onClick={() => setDniScannerOpen(true)} className={btnOutline}>
+            <ScanLine className="h-4 w-4" /> Escanear DNI
+          </button>
+        )}
+        {canManageRecords && (
+          <button onClick={openNew} className={btnPrimary}>
+            <Plus className="h-4 w-4" /> Nueva persona
+          </button>
+        )}
       </PageHeader>
 
       <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
@@ -531,7 +539,7 @@ export default function PersonasAutonomas() {
                 <Td>
                   <div className="flex items-center gap-2">
                     <InsuranceBadge doc={doc} />
-                    {doc && doc.status === 'pending' && (
+                    {doc && doc.status === 'pending' && canManageRecords && (
                       <>
                         <button onClick={() => handleApproveInsurance(p.id)} title="Aprobar seguro" className="rounded-md border border-emerald-200 bg-emerald-50 p-1.5 text-emerald-600 transition hover:bg-emerald-100">
                           <ShieldCheck className="h-3.5 w-3.5" />
@@ -556,12 +564,16 @@ export default function PersonasAutonomas() {
                         {accreditingId === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <IdCard className="h-3.5 w-3.5" />}
                       </button>
                     )}
-                    <button onClick={() => setDocUploadPerson(p)} className={btnIcon} title="Subir documento">
-                      <FileText className="h-3.5 w-3.5" />
-                    </button>
-                    <button onClick={() => openEdit(p)} className={btnIcon}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
+                    {canManageRecords && (
+                      <button onClick={() => setDocUploadPerson(p)} className={btnIcon} title="Subir documento">
+                        <FileText className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {canManageRecords && (
+                      <button onClick={() => openEdit(p)} className={btnIcon}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
                 </Td>
               </Tr>
@@ -584,7 +596,7 @@ export default function PersonasAutonomas() {
         onSubmit={handleSubmit}
         validate={validateAutonomo}
         onDelete={editing ? handleDelete : null}
-        canDelete={!!editing}
+        canDelete={!!editing && canManageRecords}
         submitLabel={editing ? 'Guardar cambios' : 'Crear persona'}
         entityName="Person"
         onFieldChange={(name, value) => { if (name === 'event_id') setSelectedEventId(value); }}

@@ -20,6 +20,8 @@ import Pagination from '@/components/ui/pagination';
 import { usePagination } from '@/lib/usePagination';
 import { getInsuranceCoverageMap, isPersonInsured, isPersonInsurancePending } from '@/lib/insuranceUtils';
 import { buildPhaseOptions, getShowDays } from '@/lib/eventPhases';
+import { useAuth } from '@/lib/AuthContext';
+import { canManage } from '@/lib/accessUtils';
 
 const validatePerson = (data) => {
   const e = {};
@@ -80,6 +82,8 @@ export default function People() {
   const [coverageMap, setCoverageMap] = useState({});
   const [insuranceFilter, setInsuranceFilter] = useState('');
   const [selectedEventId, setSelectedEventId] = useState('');
+  const { user } = useAuth();
+  const canManageRecords = canManage(user);
 
   React.useEffect(() => {
     (async () => {
@@ -407,15 +411,21 @@ export default function People() {
         <button onClick={handleExport} className={btnOutline}>
           <Download className="h-4 w-4" /> Exportar
         </button>
-        <button onClick={() => setDniScannerOpen(true)} className={btnOutline}>
-          <ScanLine className="h-4 w-4" /> Escanear DNI
-        </button>
-        <button onClick={() => setImportOpen(true)} className={btnOutline}>
-          <FileSpreadsheet className="h-4 w-4" /> Importar Excel
-        </button>
-        <button onClick={openNew} className={btnPrimary}>
-          <Plus className="h-4 w-4" /> Nuevo empleado
-        </button>
+        {canManageRecords && (
+          <button onClick={() => setDniScannerOpen(true)} className={btnOutline}>
+            <ScanLine className="h-4 w-4" /> Escanear DNI
+          </button>
+        )}
+        {canManageRecords && (
+          <button onClick={() => setImportOpen(true)} className={btnOutline}>
+            <FileSpreadsheet className="h-4 w-4" /> Importar Excel
+          </button>
+        )}
+        {canManageRecords && (
+          <button onClick={openNew} className={btnPrimary}>
+            <Plus className="h-4 w-4" /> Nuevo empleado
+          </button>
+        )}
       </PageHeader>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -432,9 +442,11 @@ export default function People() {
           <button onClick={handleExportSelected} className={btnOutline}>
             <Download className="h-4 w-4" /> Exportar selección
           </button>
-          <button onClick={handleBulkDelete} className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700">
-            <Trash2 className="h-4 w-4" /> Eliminar selección
-          </button>
+          {canManageRecords && (
+            <button onClick={handleBulkDelete} className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700">
+              <Trash2 className="h-4 w-4" /> Eliminar selección
+            </button>
+          )}
           <button onClick={() => setSelected(new Set())} className="text-sm text-slate-500 hover:text-slate-700">Limpiar</button>
         </div>
       )}
@@ -495,12 +507,16 @@ export default function People() {
               <Td><StatusBadge status={p.status} /></Td>
               <Td className="text-right">
                 <div className="inline-flex items-center gap-1">
-                  <button onClick={() => setDocUploadPerson(p)} className={btnIcon} title="Subir documento">
-                    <FileText className="h-3.5 w-3.5" />
-                  </button>
-                  <button onClick={() => openEdit(p)} className={btnIcon} title="Editar">
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
+                  {canManageRecords && (
+                    <button onClick={() => setDocUploadPerson(p)} className={btnIcon} title="Subir documento">
+                      <FileText className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  {canManageRecords && (
+                    <button onClick={() => openEdit(p)} className={btnIcon} title="Editar">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
               </Td>
             </Tr>
@@ -522,7 +538,7 @@ export default function People() {
         onSubmit={handleSubmit}
         validate={validatePerson}
         onDelete={editing ? handleDelete : null}
-        canDelete={!!editing}
+        canDelete={!!editing && canManageRecords}
         submitLabel={editing ? 'Guardar cambios' : 'Crear empleado'}
         entityName="Person"
         onFieldChange={(name, value) => { if (name === 'event_id') setSelectedEventId(value); }}

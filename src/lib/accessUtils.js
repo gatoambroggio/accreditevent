@@ -56,6 +56,17 @@ export function canModify(user) {
   return role !== 'provider' && role !== 'empresa';
 }
 
+export function isOperator(user) {
+  const role = user?.role || user?.data?.role;
+  return role === 'operador';
+}
+
+// Los operadores solo pueden acreditar / denegar. No editar ni eliminar registros.
+export function canManage(user) {
+  const role = user?.role || user?.data?.role;
+  return role !== 'operador' && role !== 'provider' && role !== 'empresa';
+}
+
 export function speakResult(ok) {
   try {
     const u = new SpeechSynthesisUtterance(ok ? 'Aceptado' : 'Denegado');

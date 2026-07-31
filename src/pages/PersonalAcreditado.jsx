@@ -12,6 +12,8 @@ import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
 import Pagination from '@/components/ui/pagination';
 import { usePagination } from '@/lib/usePagination';
 import { PHASE_LABELS } from '@/lib/eventPhases';
+import { useAuth } from '@/lib/AuthContext';
+import { canManage } from '@/lib/accessUtils';
 
 export default function PersonalAcreditado() {
   const [events, setEvents] = useState([]);
@@ -23,6 +25,8 @@ export default function PersonalAcreditado() {
   const [editing, setEditing] = useState(null);
   const [statusFilter, setStatusFilter] = useState('active');
   const [detailPerson, setDetailPerson] = useState(null);
+  const { user } = useAuth();
+  const canManageRecords = canManage(user);
 
   useEffect(() => {
     (async () => {
@@ -203,22 +207,26 @@ export default function PersonalAcreditado() {
                   </span>
                 </Td>
                 <Td>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setEditing(a)}
-                      className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-emerald-700"
-                      title="Editar acreditación"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(a)}
-                      className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-red-50 hover:text-red-600"
-                      title="Eliminar acreditación"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
+                  {canManageRecords ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setEditing(a)}
+                        className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-emerald-700"
+                        title="Editar acreditación"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(a)}
+                        className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-red-50 hover:text-red-600"
+                        title="Eliminar acreditación"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-slate-300">—</span>
+                  )}
                 </Td>
               </Tr>
             );

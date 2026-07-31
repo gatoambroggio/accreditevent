@@ -8,6 +8,7 @@ import VehicleBadgePrint from '@/components/VehicleBadgePrint';
 import BatchVehicleBadgePrint from '@/components/BatchVehicleBadgePrint';
 import { useParkingSectors } from '@/lib/useParkingSectors';
 import { useAuth } from '@/lib/AuthContext';
+import { canManage } from '@/lib/accessUtils';
 import { base44 } from '@/api/base44Client';
 import { computeSectorOccupancy, sectorStatus } from '@/lib/parkingCapacity';
 import PageHeader from '@/components/ui/page-header';
@@ -57,6 +58,7 @@ export default function Vehicles() {
   const { items, loading, error, create, update, remove, reload } = useCrud('Vehicle');
   const { user: currentUser } = useAuth();
   const isProductora = currentUser?.role === 'productora';
+  const canManageRecords = canManage(currentUser);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [query, setQuery] = useState('');
@@ -385,9 +387,11 @@ export default function Vehicles() {
                   <button onClick={() => openPrint(v)} className={btnIconSm} title="Imprimir credencial">
                     <Printer className="h-3.5 w-3.5" />
                   </button>
-                  <button onClick={() => openEdit(v)} className={btnIconSm}>
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
+                  {canManageRecords && (
+                    <button onClick={() => openEdit(v)} className={btnIconSm}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
               </Td>
             </Tr>
@@ -409,7 +413,7 @@ export default function Vehicles() {
         onSubmit={handleSubmit}
         validate={validateVehicle}
         onDelete={editing ? handleDelete : null}
-        canDelete={!!editing}
+        canDelete={!!editing && canManageRecords}
         submitLabel={editing ? 'Guardar cambios' : 'Crear vehículo'}
         entityName="Vehicle"
       />

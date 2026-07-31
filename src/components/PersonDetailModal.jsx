@@ -13,8 +13,12 @@ import { useCustomFields } from '@/lib/useCustomFields';
 import { getInsuranceStatus } from '@/lib/insuranceUtils';
 import { INSURANCE_KIND_LABELS, formatInsuranceAmount } from '@/lib/insuranceKind';
 import { phaseLabel } from '@/lib/eventPhases';
+import { useAuth } from '@/lib/AuthContext';
+import { isOperator } from '@/lib/accessUtils';
 
 export default function PersonDetailModal({ person, onClose, readOnly = false }) {
+  const { user } = useAuth();
+  const effReadOnly = readOnly || isOperator(user);
   const [docs, setDocs] = useState([]);
   const [bio, setBio] = useState(null);
   const [vehicles, setVehicles] = useState([]);
@@ -244,7 +248,7 @@ export default function PersonDetailModal({ person, onClose, readOnly = false })
                 <p className="mt-0.5 text-sm text-slate-400">Sin biometría registrada</p>
               )}
             </div>
-            {!loading && !readOnly && (
+            {!loading && !effReadOnly && (
               <button
                 onClick={() => setDniBioOpen(true)}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50"
@@ -387,7 +391,7 @@ export default function PersonDetailModal({ person, onClose, readOnly = false })
                       <ExternalLink className="h-3.5 w-3.5" />
                     </button>
                   )}
-                  {doc.status === 'pending' && !readOnly && (
+                  {doc.status === 'pending' && !effReadOnly && (
                     <>
                       <button onClick={() => openReview(doc, 'approved')} className="rounded-md border border-emerald-200 bg-emerald-50 p-1.5 text-emerald-700 transition hover:bg-emerald-100" title="Aprobar">
                         <Check className="h-3.5 w-3.5" />
@@ -397,7 +401,7 @@ export default function PersonDetailModal({ person, onClose, readOnly = false })
                       </button>
                     </>
                   )}
-                  {!readOnly && (
+                  {!effReadOnly && (
                     <button onClick={() => handleDeleteDoc(doc)} className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600" title="Eliminar">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -409,7 +413,7 @@ export default function PersonDetailModal({ person, onClose, readOnly = false })
           </div>
 
           {/* Upload from backend */}
-          {!loading && !readOnly && (
+          {!loading && !effReadOnly && (
             <div className="mt-4 rounded-lg border border-dashed border-slate-300 bg-slate-50/50 p-4">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Subir documentación</p>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -446,7 +450,7 @@ export default function PersonDetailModal({ person, onClose, readOnly = false })
             <div className="mt-5">
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Vehículos asignados</p>
-                {!readOnly && (
+                {!effReadOnly && (
                   <button onClick={openNewVehicle}
                     className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50">
                     <Plus className="h-3 w-3" /> Agregar
@@ -483,7 +487,7 @@ export default function PersonDetailModal({ person, onClose, readOnly = false })
                           className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-emerald-700" title="Imprimir credencial">
                           <Printer className="h-3.5 w-3.5" />
                         </button>
-                        {!readOnly && (
+                        {!effReadOnly && (
                           <button onClick={() => openEditVehicle(v)}
                             className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700">
                             <Pencil className="h-3.5 w-3.5" />

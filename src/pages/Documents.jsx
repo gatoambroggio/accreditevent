@@ -83,6 +83,7 @@ export default function Documents() {
   }, []);
 
   const isProductora = userRole === 'productora';
+  const isOp = userRole === 'operador';
   const items = isProductora ? productoraDocs : crudItems;
   const loading = isProductora ? productoraLoading : crudLoading;
   const error = isProductora ? productoraError : crudError;
@@ -233,10 +234,12 @@ export default function Documents() {
   return (
     <div className="space-y-6">
       <PageHeader kicker="Revisión" title="Documentos">
-        <button onClick={() => setShowTypes((s) => !s)} className={btnOutline}>
-          {showTypes ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-          <Settings2 className="h-4 w-4" /> Tipos de documento
-        </button>
+        {!isOp && (
+          <button onClick={() => setShowTypes((s) => !s)} className={btnOutline}>
+            {showTypes ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            <Settings2 className="h-4 w-4" /> Tipos de documento
+          </button>
+        )}
         <button onClick={handleExport} className={btnOutline}>
           <Download className="h-4 w-4" /> Exportar
         </button>
@@ -290,7 +293,7 @@ export default function Documents() {
         <FilterSelect value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} placeholder="Todos los estados" />
       </div>
 
-      {selected.size > 0 && (
+      {selected.size > 0 && !isOp && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5">
           <span className="text-sm font-semibold text-emerald-700">{selected.size} seleccionado(s)</span>
           <button onClick={handleBulkDelete} disabled={deleting}
@@ -310,14 +313,16 @@ export default function Documents() {
       >
         <thead>
           <tr className="border-b border-slate-100 bg-slate-50">
-            <Th className="w-10">
-              <input
-                type="checkbox"
-                checked={isAllSelected}
-                onChange={toggleSelectAll}
-                className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-              />
-            </Th>
+            {!isOp && (
+              <Th className="w-10">
+                <input
+                  type="checkbox"
+                  checked={isAllSelected}
+                  onChange={toggleSelectAll}
+                  className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                />
+              </Th>
+            )}
             <Th>Persona</Th>
             <Th>Empresa</Th>
             <Th>Tipo</Th>
@@ -330,14 +335,16 @@ export default function Documents() {
         <tbody>
           {paginated.map((d) => (
             <Tr key={d.id}>
-              <Td>
-                <input
-                  type="checkbox"
-                  checked={selected.has(d.id)}
-                  onChange={() => toggleSelect(d.id)}
-                  className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                />
-              </Td>
+              {!isOp && (
+                <Td>
+                  <input
+                    type="checkbox"
+                    checked={selected.has(d.id)}
+                    onChange={() => toggleSelect(d.id)}
+                    className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                  />
+                </Td>
+              )}
               <Td className="text-sm font-semibold text-slate-900">{d.person_name || '—'}</Td>
               <Td className="text-sm text-slate-500">{d.company || '—'}</Td>
               <Td className="text-sm text-slate-500">{docTypeLabel(d.document_type)}</Td>
@@ -351,16 +358,18 @@ export default function Documents() {
               <Td><StatusBadge status={d.status} /></Td>
               <Td className="text-right">
                 <div className="flex items-center justify-end gap-1.5">
-                  {isInsuranceDoc(d) && (
+                  {!isOp && isInsuranceDoc(d) && (
                     <button onClick={() => setValidatingDoc(d)}
                       className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100">
                       <ShieldCheck className="h-3.5 w-3.5" /> Validar seguro
                     </button>
                   )}
-                  <button onClick={() => setReviewing(d)}
-                    className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">
-                    <Eye className="h-3.5 w-3.5" /> Revisar
-                  </button>
+                  {!isOp && (
+                    <button onClick={() => setReviewing(d)}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">
+                      <Eye className="h-3.5 w-3.5" /> Revisar
+                    </button>
+                  )}
                 </div>
               </Td>
             </Tr>
