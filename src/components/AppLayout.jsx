@@ -107,15 +107,12 @@ export default function AppLayout() {
   }, []);
 
   useEffect(() => {
-    const userRole = user?.role || user?.data?.role;
     (async () => {
-      if (userRole === 'operador') {
-        try {
-          const res = await base44.functions.invoke('getOperatorModules');
-          const body = res?.data ?? res;
-          if (body?.ok && Array.isArray(body.modules)) setOperatorModules(body.modules);
-        } catch {}
-      }
+      try {
+        const res = await base44.functions.invoke('getOperatorModules');
+        const body = res?.data ?? res;
+        if (body?.ok && Array.isArray(body.modules)) setOperatorModules(body.modules);
+      } catch {}
     })();
   }, [user?.role, user?.data?.role]);
 
@@ -143,35 +140,31 @@ export default function AppLayout() {
     }
   }, [location.pathname]);
 
+  // effectivePaths: módulos permitidos para el usuario actual. Prioriza la lista
+  // fresca desde el backend (asignación individual del operador, o company
+  // operator_allowed_paths para operadores sin asignación individual), y sólo
+  // usa allowed_paths de la sesión como respaldo si el backend no devolvió nada.
   const userAllowedPaths = user?.allowed_paths || user?.data?.allowed_paths || [];
-  const hasPathRestriction = Array.isArray(userAllowedPaths) && userAllowedPaths.length > 0;
-  const hasOperatorCompanyModules = role === 'operador' && Array.isArray(operatorModules) && operatorModules.length > 0;
+  const effectivePaths = (Array.isArray(operatorModules) && operatorModules.length > 0) ? operatorModules : userAllowedPaths;
+  const hasRestriction = Array.isArray(effectivePaths) && effectivePaths.length > 0;
   const visibleItems = NAV_ITEMS.filter((item) => {
     if (item.module && !settings?.enabled_modules?.[item.module]) return false;
     if (item.providerOnly) return isProvider;
     if (isProvider) return false;
     if (isEmpresa) return false;
-    // Los módulos asignados por usuario (allowed_paths) tienen prioridad sobre
-    // los módulos generales de operador de la empresa (operator_allowed_paths).
-    if (hasPathRestriction) {
+    if (hasRestriction) {
       if (item.path === '/') return true;
-      if (item.expandable && item.children?.some((c) => userAllowedPaths.includes(c.path))) return true;
-      if (!userAllowedPaths.includes(item.path)) return false;
-      return true;
-    } else if (hasOperatorCompanyModules) {
-      if (item.path === '/') return true;
-      if (item.expandable && item.children?.some((c) => operatorModules.includes(c.path))) return true;
-      if (!operatorModules.includes(item.path)) return false;
+      if (item.expandable && item.children?.some((c) => effectivePaths.includes(c.path))) return true;
+      if (!effectivePaths.includes(item.path)) return false;
       return true;
     }
     if (item.roles) {
-    return item.roles.includes(role);
+      return item.roles.includes(role);
     }
-    const hasSpecificPermissions = hasOperatorCompanyModules || hasPathRestriction;
-    if (!hasSpecificPermissions && settings?.role_access?.[item.path]) {
-    return settings.role_access[item.path].includes(role);
+    if (settings?.role_access?.[item.path]) {
+      return settings.role_access[item.path].includes(role);
     }
-    return hasSpecificPermissions || userLevel >= item.minLevel;
+    return userLevel >= item.minLevel;
   });
 
   const isActive = (path) => (path === '/' ? location.pathname === '/' : location.pathname.startsWith(path));

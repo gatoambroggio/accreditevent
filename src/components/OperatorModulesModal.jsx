@@ -1,23 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, Save } from 'lucide-react';
+import { MODULES } from '@/lib/modules';
 
-const MODULE_OPTIONS = [
-  { value: '/', label: 'Resumen' },
-  { value: '/accreditations', label: 'Acreditaciones' },
-  { value: '/accreditation-facial', label: 'Acreditación facial' },
-  { value: '/dni-scan', label: 'Escaneo de DNI' },
-  { value: '/access-control', label: 'Control de acceso' },
-  { value: '/emergency-scan', label: 'Escaneo de emergencia' },
-  { value: '/access-monitor', label: 'Monitor en vivo' },
-  { value: '/vehicles', label: 'Vehículos acreditados' },
-  { value: '/parking-sectors', label: 'Sectores de estacionamiento' },
-  { value: '/parking-capacities', label: 'Capacidades por evento' },
-  { value: '/documents', label: 'Documentos' },
-  { value: '/people', label: 'Personal de Empresas' },
-  { value: '/personas-autonomas', label: 'Personas Autónomas' },
-  { value: '/registered-people', label: 'Personas registradas' },
-  { value: '/reports', label: 'Reportes' },
-];
+// Módulos configurables para los operadores de la productora: todos los
+// operativos (se excluyen los reservados a administración). Derivado de la
+// lista central para mantener sincronizado con el menú real.
+const ADMIN_ONLY_MODULES = ['/users', '/audit', '/settings', '/companies', '/apariencia', '/custom-fields'];
+const MODULE_OPTIONS = MODULES
+  .filter((m) => !ADMIN_ONLY_MODULES.includes(m.path))
+  .map((m) => ({ value: m.path, label: m.label }));
 
 export default function OperatorModulesModal({ open, onClose, initialModules = [], onSave }) {
   const [selected, setSelected] = useState([]);
