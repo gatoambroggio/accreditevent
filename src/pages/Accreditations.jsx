@@ -105,7 +105,8 @@ export default function Accreditations() {
     .filter((p) => !items.some((a) => a.person_id === p.id && a.event_id === selectedEventId))
     .map((p) => ({ value: p.id, label: `${p.full_name} — ${p.document || 'sin doc'} (${p.person_type})` }));
 
-  const showDayOptions = buildShowDayOptions(getShowDays(events, selectedEventId || editing?.event_id || eventFilter || ''));
+  const showDaysCount = getShowDays(events, selectedEventId || editing?.event_id || eventFilter || '');
+  const showDayOptions = buildShowDayOptions(showDaysCount);
 
   const fields = [
     { name: 'event_id', label: 'Evento', type: 'select', options: eventOptions, required: true },
@@ -120,7 +121,7 @@ export default function Accreditations() {
       name: 'event_phases', label: 'Días / Fases del evento', type: 'toggle-group',
       sections: [
         { label: 'Fases de montaje', options: SETUP_PHASE_OPTIONS },
-        { label: 'Días de show', options: showDayOptions, exclusiveGroups: PHASE_EXCLUSIVE_GROUPS },
+        { label: `Días de show (${showDaysCount} ${showDaysCount > 1 ? 'días' : 'día'})`, options: showDayOptions, exclusiveGroups: PHASE_EXCLUSIVE_GROUPS },
       ],
       hint: 'Días de show: elegí "Todo el show" o días específicos (Día 1..N), son mutuamente excluyentes. Armado y desarme son independientes.',
       full: true,
@@ -145,11 +146,17 @@ export default function Accreditations() {
     setEditing(null);
     setPersonVehicles([]);
     setVehicleApprovals({});
-    const baseEventId = eventFilter || '';
+    const p = personId ? people.find((x) => x.id === personId) : null;
+    const personEventId = p ? pickPersonDefaultEvent(p, events) : '';
     const activeEvent = events.find((e) => e.status === 'active' && (!e.end_at || new Date(e.end_at).getTime() > Date.now()));
-    const defaultEventId = baseEventId || activeEvent?.id || '';
+    const defaultEventId = personEventId || eventFilter || activeEvent?.id || '';
     setSelectedEventId(defaultEventId);
-    setNewInitial({ event_id: defaultEventId, person_id: personId || '' });
+    setNewInitial({
+      event_id: defaultEventId,
+      person_id: personId || '',
+      access_level: p?.access_area || '',
+      event_phases: Array.isArray(p?.event_phases) ? p.event_phases.join(',') : (p?.event_phases || ''),
+    });
     setModalOpen(true);
   };
 
