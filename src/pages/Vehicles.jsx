@@ -70,6 +70,7 @@ export default function Vehicles() {
   const [batchOpen, setBatchOpen] = useState(false);
   const [settings, setSettings] = useState(null);
   const [events, setEvents] = useState([]);
+  const [accreditations, setAccreditations] = useState([]);
   const { sectors } = useParkingSectors();
 
   const [peopleLoaded, setPeopleLoaded] = useState(false);
@@ -113,6 +114,13 @@ export default function Vehicles() {
 
   const capacityEvent = useMemo(() => events.find((e) => e.id === eventFilter) || null, [events, eventFilter]);
   const occupancy = useMemo(() => computeSectorOccupancy(items, eventFilter || null), [items, eventFilter]);
+
+  const printingAccredId = useMemo(() => {
+    if (!printingVehicle) return null;
+    const evIds = Array.isArray(printingVehicle.event_ids) ? printingVehicle.event_ids : [];
+    const acc = accreditations.find((a) => a.person_id === printingVehicle.person_id && evIds.includes(a.event_id));
+    return acc?.id || null;
+  }, [printingVehicle, accreditations]);
 
   const { page, setPage, totalPages, paginated } = usePagination(filtered, 15);
 
@@ -175,12 +183,14 @@ export default function Vehicles() {
   React.useEffect(() => {
     (async () => {
       try {
-        const [all, evs] = await Promise.all([
+        const [all, evs, accs] = await Promise.all([
           base44.entities.SystemSetting.list('-created_date', 1),
           base44.entities.Event.list('-start_at', 200),
+          base44.entities.Accreditation.list('-created_date', 5000),
         ]);
         if (all[0]) setSettings(all[0]);
         setEvents(evs);
+        setAccreditations(accs);
       } catch {}
     })();
     loadPeople();
@@ -426,6 +436,7 @@ export default function Vehicles() {
           settings={settings}
           events={events.filter((e) => printingVehicle.event_ids?.includes(e.id))}
           parkingSectors={sectors}
+          accreditationId={printingAccredId}
           onClose={() => setPrintingVehicle(null)}
         />
       )}

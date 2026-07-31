@@ -2,10 +2,14 @@ import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { X, Printer, Car } from 'lucide-react';
 import { printBadge } from '@/lib/printBadge';
+import { base44 } from '@/api/base44Client';
 
-export default function VehicleBadgePrint({ vehicle, settings, events = [], parkingSectors = [], onClose }) {
+export default function VehicleBadgePrint({ vehicle, settings, events = [], parkingSectors = [], accreditationId, onClose }) {
   const handlePrint = () => {
     printBadge();
+    if (accreditationId) {
+      base44.entities.Accreditation.update(accreditationId, { delivered_vehicular: true }).catch(() => {});
+    }
   };
 
   const orgName = settings?.organization_name || 'Acceso Eventos';

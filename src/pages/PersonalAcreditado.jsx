@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Download, Users, BadgeCheck, Fingerprint, Pencil, Trash2 } from 'lucide-react';
+import { Download, Users, BadgeCheck, Fingerprint, Pencil, Trash2, Check, Minus } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
 import AccreditationEditModal from '@/components/AccreditationEditModal';
 import PersonDetailModal from '@/components/PersonDetailModal';
@@ -112,15 +112,6 @@ export default function PersonalAcreditado() {
     }
   };
 
-  const handleToggleDelivered = async (a, field) => {
-    try {
-      await base44.entities.Accreditation.update(a.id, { [field]: !a[field] });
-      setAccreditations((prev) => prev.map((x) => (x.id === a.id ? { ...x, [field]: !a[field] } : x)));
-    } catch (e) {
-      alert('No se pudo actualizar: ' + (e?.message || e));
-    }
-  };
-
   const eventName = (id) => events.find((e) => e.id === id)?.name || '—';
   const selectedEventName = eventFilter ? eventName(eventFilter) : 'Todos los eventos';
 
@@ -220,26 +211,18 @@ export default function PersonalAcreditado() {
                 </Td>
                 <Td>
                   <div className="flex flex-col gap-1.5">
-                    <label className="inline-flex items-center gap-1.5 text-xs text-slate-600">
-                      <input
-                        type="checkbox"
-                        checked={!!a.delivered_personal}
-                        onChange={() => handleToggleDelivered(a, 'delivered_personal')}
-                        disabled={!canManageRecords}
-                        className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-50"
-                      />
-                      Personal
-                    </label>
-                    <label className="inline-flex items-center gap-1.5 text-xs text-slate-600">
-                      <input
-                        type="checkbox"
-                        checked={!!a.delivered_vehicular}
-                        onChange={() => handleToggleDelivered(a, 'delivered_vehicular')}
-                        disabled={!canManageRecords}
-                        className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-50"
-                      />
-                      Vehicular
-                    </label>
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${a.delivered_personal ? 'text-emerald-700' : 'text-slate-400'}`}>
+                      <span className={`grid h-4 w-4 place-items-center rounded-full ${a.delivered_personal ? 'bg-emerald-100' : 'bg-slate-100'}`}>
+                        {a.delivered_personal ? <Check className="h-3 w-3" /> : <Minus className="h-3 w-3 text-slate-300" />}
+                      </span>
+                      {a.delivered_personal ? 'Entregada' : 'Pendiente'} · Personal
+                    </span>
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${a.delivered_vehicular ? 'text-emerald-700' : 'text-slate-400'}`}>
+                      <span className={`grid h-4 w-4 place-items-center rounded-full ${a.delivered_vehicular ? 'bg-emerald-100' : 'bg-slate-100'}`}>
+                        {a.delivered_vehicular ? <Check className="h-3 w-3" /> : <Minus className="h-3 w-3 text-slate-300" />}
+                      </span>
+                      {a.delivered_vehicular ? 'Entregada' : 'Pendiente'} · Vehicular
+                    </span>
                   </div>
                 </Td>
                 <Td>

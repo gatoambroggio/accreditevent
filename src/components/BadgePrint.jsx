@@ -3,11 +3,15 @@ import { QRCodeSVG } from 'qrcode.react';
 import { X, Printer } from 'lucide-react';
 import { printBadge } from '@/lib/printBadge';
 import { usePrinterSettings } from '@/lib/usePrinterSettings';
+import { base44 } from '@/api/base44Client';
 
 export default function BadgePrint({ accreditation, event, onClose }) {
   const { printerPersonal } = usePrinterSettings();
   const handlePrint = () => {
     printBadge();
+    if (accreditation?.id) {
+      base44.entities.Accreditation.update(accreditation.id, { delivered_personal: true }).catch(() => {});
+    }
   };
 
   return (
