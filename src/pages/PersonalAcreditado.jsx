@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Download, Users, BadgeCheck, Fingerprint } from 'lucide-react';
+import { Download, Users, BadgeCheck, Fingerprint, Pencil } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
+import AccreditationEditModal from '@/components/AccreditationEditModal';
 import StatusBadge from '@/components/StatusBadge';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
@@ -18,6 +19,8 @@ export default function PersonalAcreditado() {
   const [loading, setLoading] = useState(true);
   const [eventFilter, setEventFilter] = useState('');
   const [query, setQuery] = useState('');
+  const [editing, setEditing] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('active');
 
   useEffect(() => {
     (async () => {
@@ -29,7 +32,7 @@ export default function PersonalAcreditado() {
         ]);
         setEvents(evs);
         // Personal acreditado = acreditaciones activas/autorizadas (no bloqueadas ni revocadas)
-        setAccreditations(accs.filter((a) => a.status === 'active'));
+        setAccreditations(accs);
         setPeople(ps);
       } catch {
       } finally {
@@ -51,6 +54,7 @@ export default function PersonalAcreditado() {
 
   const rows = useMemo(() => {
     let result = accreditations;
+    if (statusFilter) result = result.filter((a) => a.status === statusFilter);
     if (eventFilter) result = result.filter((a) => a.event_id === eventFilter);
     const q = query.toLowerCase().trim();
     if (q) {
@@ -60,7 +64,7 @@ export default function PersonalAcreditado() {
       });
     }
     return result;
-  }, [accreditations, eventFilter, query, peopleById]);
+  }, [accreditations, eventFilter, statusFilter, query, peopleById]);
 
   const { page, setPage, totalPages, paginated } = usePagination(rows, 15);
 
@@ -102,8 +106,7 @@ export default function PersonalAcreditado() {
       </PageHeader>
 
       <p className="text-sm text-slate-500 max-w-3xl">
-        Listado de todas las personas <strong>acreditadas y autorizadas</strong> (estado activo) para el evento seleccionado.
-        No incluye bloqueadas ni revocadas.
+        Listado de las personas acreditadas para el evento. Podés filtrar por estado y editar los datos de acceso.
       </p>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -112,6 +115,18 @@ export default function PersonalAcreditado() {
           onChange={setEventFilter}
           options={eventOptions}
           placeholder="Todos los eventos"
+          className="sm:max-w-xs"
+        />
+        <FilterSelect
+          value={statusFilter}
+          onChange={setStatusFilter}
+          options={[
+            { value: '', label: 'Todos los estados' },
+            { value: 'active', label: 'Autorizados' },
+            { value: 'blocked', label: 'Bloqueados' },
+            { value: 'revoked', label: 'Revocados' },
+          ]}
+          placeholder="Todos los estados"
           className="sm:max-w-xs"
         />
         <SearchInput value={query} onChange={setQuery} placeholder="Buscar por nombre, credencial, documento…" />
@@ -136,6 +151,7 @@ export default function PersonalAcreditado() {
             <Th>Credencial</Th>
             <Th>Evento</Th>
             <Th>Estado</Th>
+            <Th>Acciones</Th>
           </tr>
         </thead>
         <tbody>
@@ -164,6 +180,15 @@ export default function PersonalAcreditado() {
                     <StatusBadge status={a.status} />
                   </span>
                 </Td>
+                <Td>
+                  <button
+                    onClick={() => setEditing(a)}
+                    className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-emerald-700"
+                    title="Editar acreditación"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                </Td>
               </Tr>
             );
           })}
@@ -175,8 +200,21 @@ export default function PersonalAcreditado() {
       )}
 
       <p className="text-xs text-slate-400">
-        Mostrando {rows.length} {rows.length === 1 ? 'persona autorizada' : 'personas autorizadas'} — {selectedEventName}.
+        Mostrando {rows.length} {rows.length === 1 ? 'persona' : 'personas'} — {selectedEventName}.
       </p>
+
+      <AccreditationEditModal
+        open={!!editing}
+        onClose={() => setEditing(null)}
+        accreditation={editing}
+        events={events}
+        onSaved={async () => {
+          try {
+            const accs = await base44.entities.Accreditation.list('-created_date', 500);
+            setAccreditations(accs);
+          } catch {}
+        }}
+      />
     </div>
   );
 }

@@ -20,6 +20,7 @@ import {
   ScanLine,
   BarChart3,
   Bell,
+  BadgeCheck,
   Settings as SettingsIcon,
   Layers,
   Cpu,
@@ -50,6 +51,7 @@ const NAV_ITEMS = [
   { path: '/provider-companies', label: 'Empresas de servicios', icon: Briefcase, minLevel: 1 },
   // Acreditaciones
   { path: '/accreditations', label: 'Acreditaciones', icon: IdCard, minLevel: 0 },
+  { path: '/personal-acreditado', label: 'Personal acreditado', icon: BadgeCheck, minLevel: 1 },
   { path: '/access-levels', label: 'Niveles de acceso', icon: Layers, minLevel: 1 },
   { path: '/accreditation-facial', label: 'Acreditación facial', icon: ScanFace, minLevel: 1 },
   { path: '/dni-scan', label: 'Escaneo de DNI', icon: ScanLine, minLevel: 0 },
