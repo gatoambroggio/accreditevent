@@ -3,6 +3,7 @@ import { X, Upload, Loader2, CheckCircle2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useDocumentTypes } from '@/lib/useDocumentTypes';
 import { logAudit } from '@/lib/audit';
+import { prepareUploadFile } from '@/lib/safeUpload';
 
 export default function PersonDocUploadModal({ person, onClose, onUploaded }) {
   const { docTypes } = useDocumentTypes();
@@ -28,16 +29,21 @@ export default function PersonDocUploadModal({ person, onClose, onUploaded }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!file || !docType) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setError('El archivo supera el máximo de 10 MB.');
+      return;
+    }
     setUploading(true);
     setError('');
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { uploadFile, originalName } = prepareUploadFile(file);
+      const { file_url } = await base44.integrations.Core.UploadFile({ file: uploadFile });
       const payload = {
         person_id: person.id,
         person_name: person.full_name,
         company: person.company || '',
         document_type: docType,
-        original_name: file.name,
+        original_name: originalName,
         file_url,
         mime_type: file.type,
         size: file.size,
