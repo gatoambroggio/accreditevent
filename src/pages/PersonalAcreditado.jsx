@@ -29,8 +29,8 @@ export default function PersonalAcreditado() {
       try {
         const [evs, accs, ps] = await Promise.all([
           base44.entities.Event.list('-created_date', 200),
-          base44.entities.Accreditation.list('-created_date', 500),
-          base44.entities.Person.list('-created_date', 500),
+          base44.entities.Accreditation.list('-created_date', 5000),
+          base44.entities.Person.list('-created_date', 5000),
         ]);
         setEvents(evs);
         // Personal acreditado = acreditaciones activas/autorizadas (no bloqueadas ni revocadas)

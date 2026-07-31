@@ -33,7 +33,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function Accreditations() {
-  const { items, loading, error, create, update, remove, reload } = useCrud('Accreditation');
+  const { items, loading, error, create, update, remove, reload } = useCrud('Accreditation', { limit: 5000 });
   const { zones } = useZones();
   const { personTypes } = usePersonTypes();
   const { sectors } = useParkingSectors();
