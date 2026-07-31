@@ -123,12 +123,20 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
   };
 
   const togglePhase = (phase) => {
-    setForm((f) => ({
-      ...f,
-      event_phases: f.event_phases.includes(phase)
-        ? f.event_phases.filter((p) => p !== phase)
-        : [...f.event_phases, phase],
-    }));
+    setForm((f) => {
+      const current = f.event_phases || [];
+      if (current.includes(phase)) {
+        return { ...f, event_phases: current.filter((p) => p !== phase) };
+      }
+      let next = [...current, phase];
+      // Excluyencia: "Día del show" (dia_evento) vs días específicos (dia_1..dia_6)
+      if (phase === 'dia_evento') {
+        next = next.filter((p) => !/^dia_\d$/.test(p));
+      } else if (/^dia_\d$/.test(phase)) {
+        next = next.filter((p) => p !== 'dia_evento');
+      }
+      return { ...f, event_phases: next };
+    });
   };
 
   const toggleEvent = (eventId) => {

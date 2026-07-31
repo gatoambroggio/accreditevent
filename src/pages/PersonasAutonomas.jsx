@@ -18,7 +18,7 @@ import { btnPrimary, btnOutline, btnIcon } from '@/components/ui/button-styles';
 import Pagination from '@/components/ui/pagination';
 import { usePagination } from '@/lib/usePagination';
 import { generateBadgeCode } from '@/lib/badgeCode';
-import { buildPhaseOptions, getShowDays } from '@/lib/eventPhases';
+import { buildPhaseOptions, getShowDays, PHASE_EXCLUSIVE_GROUPS } from '@/lib/eventPhases';
 
 const validateAutonomo = (data) => {
   const e = {};
@@ -262,7 +262,8 @@ export default function PersonasAutonomas() {
       {
         name: 'event_phases', label: 'Días / Fases del evento', type: 'toggle-group',
         options: buildPhaseOptions(getShowDays(events, selectedEventId || editing?.event_id || '')),
-        hint: 'Seleccioná los días de show y fases (armado/desarme) en los que participa.',
+        exclusiveGroups: PHASE_EXCLUSIVE_GROUPS,
+        hint: '“Día del show” = acceso a todo el show (excluye días específicos). “Día 1..N” = días puntuales. Ambas opciones son excluyentes. Armado y desarme son independientes.',
         full: true,
       },
       {

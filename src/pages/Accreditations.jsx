@@ -28,7 +28,7 @@ import { getInsuranceStatus } from '@/lib/insuranceUtils';
 import { pickPersonDefaultEvent } from '@/lib/personDefaultEvent';
 import { useAuth } from '@/lib/AuthContext';
 import { canModify } from '@/lib/accessUtils';
-import { buildPhaseOptions, getShowDays } from '@/lib/eventPhases';
+import { buildPhaseOptions, getShowDays, PHASE_EXCLUSIVE_GROUPS } from '@/lib/eventPhases';
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Activa' },
@@ -170,7 +170,8 @@ export default function Accreditations() {
     {
       name: 'event_phases', label: 'Días / Fases del evento', type: 'toggle-group',
       options: phaseOptions,
-      hint: 'Seleccioná los días de show y fases (armado/desarme) en los que la persona tiene acceso.',
+      exclusiveGroups: PHASE_EXCLUSIVE_GROUPS,
+      hint: '“Día del show” = acceso a todo el show (excluye días específicos). “Día 1..N” = días puntuales. Ambas opciones son excluyentes. Armado y desarme son independientes.',
       full: true,
     },
     { name: 'status', label: 'Estado', type: 'select', options: STATUS_OPTIONS },
