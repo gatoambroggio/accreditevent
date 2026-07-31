@@ -389,7 +389,7 @@ export default function Accreditations() {
       </PageHeader>
 
       <p className="text-sm text-slate-500 max-w-3xl">
-        Listado de personas <strong>pendientes de acreditar</strong> para el evento seleccionado. Una vez acreditadas, pasan al módulo <strong>Personal acreditado</strong>.
+        Listado de personas <strong>pendientes de acreditar</strong> (sin credencial activa). Una vez acreditadas, pasan al módulo <strong>Personal acreditado</strong>. El filtro de evento define para qué evento se las acreditará.
       </p>
 
       <div className="flex flex-wrap items-center gap-3">
