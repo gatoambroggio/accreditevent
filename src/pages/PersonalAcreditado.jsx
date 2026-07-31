@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Download, Users, BadgeCheck, Fingerprint, Pencil, Trash2 } from 'lucide-react';
+import { Download, Users, BadgeCheck, Fingerprint, Pencil, Trash2, Check } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
 import AccreditationEditModal from '@/components/AccreditationEditModal';
+import EquipacionModal from '@/components/EquipacionModal';
 import PersonDetailModal from '@/components/PersonDetailModal';
 import StatusBadge from '@/components/StatusBadge';
 import PageHeader from '@/components/ui/page-header';
@@ -25,6 +26,7 @@ export default function PersonalAcreditado() {
   const [editing, setEditing] = useState(null);
   const [statusFilter, setStatusFilter] = useState('active');
   const [detailPerson, setDetailPerson] = useState(null);
+  const [equipAccred, setEquipAccred] = useState(null);
   const { user } = useAuth();
   const canManageRecords = canManage(user);
 
@@ -167,6 +169,7 @@ export default function PersonalAcreditado() {
             <Th>Credencial</Th>
             <Th>Evento</Th>
             <Th>Estado</Th>
+            <Th>Equipación</Th>
             <Th>Acciones</Th>
           </tr>
         </thead>
@@ -205,6 +208,29 @@ export default function PersonalAcreditado() {
                     <BadgeCheck className="h-3.5 w-3.5 text-emerald-500" />
                     <StatusBadge status={a.status} />
                   </span>
+                </Td>
+                <Td>
+                  {(() => {
+                    const eq = Array.isArray(a.equipacion) ? a.equipacion : [];
+                    const total = eq.length;
+                    const delivered = eq.filter((e) => e.delivered).length;
+                    if (total === 0) return <span className="text-slate-300">—</span>;
+                    const complete = delivered === total;
+                    const cls = complete
+                      ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                      : delivered === 0
+                        ? 'bg-slate-100 text-slate-500 ring-slate-200'
+                        : 'bg-amber-50 text-amber-700 ring-amber-200';
+                    const content = (
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${cls}`}>
+                        {complete && <Check className="h-3 w-3" />}
+                        {delivered}/{total}
+                      </span>
+                    );
+                    return canManageRecords ? (
+                      <button onClick={() => setEquipAccred(a)} className="transition hover:opacity-80">{content}</button>
+                    ) : content;
+                  })()}
                 </Td>
                 <Td>
                   {canManageRecords ? (
@@ -258,6 +284,16 @@ export default function PersonalAcreditado() {
           } catch {}
         }}
       />
+
+      {equipAccred && (
+        <EquipacionModal
+          accreditation={equipAccred}
+          onClose={() => setEquipAccred(null)}
+          onSaved={(items) => {
+            setAccreditations((prev) => prev.map((x) => (x.id === equipAccred.id ? { ...x, equipacion: items } : x)));
+          }}
+        />
+      )}
     </div>
   );
 }
