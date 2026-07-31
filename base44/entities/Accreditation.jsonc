@@ -91,25 +91,6 @@
       "default": false,
       "description": "Indica si la credencial vehicular fue impresa/entregada"
     },
-    "equipacion": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "item": {
-            "type": "string",
-            "description": "Nombre del \u00edtem de equipaci\u00f3n"
-          },
-          "delivered": {
-            "type": "boolean",
-            "default": false,
-            "description": "Indica si el \u00edtem fue entregado al personal"
-          }
-        }
-      },
-      "default": [],
-      "description": "Equipaci\u00f3n entregada al personal (lista de \u00edtems con estado de entrega)"
-    },
     "custom_fields": {
       "type": "object",
       "description": "Campos personalizados definidos por el administrador",

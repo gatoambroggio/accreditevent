@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Download, Users, BadgeCheck, Fingerprint, Pencil, Trash2, Check } from 'lucide-react';
+import { Download, Users, BadgeCheck, Fingerprint, Pencil, Trash2 } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
 import AccreditationEditModal from '@/components/AccreditationEditModal';
-import EquipacionModal from '@/components/EquipacionModal';
 import PersonDetailModal from '@/components/PersonDetailModal';
 import StatusBadge from '@/components/StatusBadge';
 import PageHeader from '@/components/ui/page-header';
@@ -26,7 +25,6 @@ export default function PersonalAcreditado() {
   const [editing, setEditing] = useState(null);
   const [statusFilter, setStatusFilter] = useState('active');
   const [detailPerson, setDetailPerson] = useState(null);
-  const [equipAccred, setEquipAccred] = useState(null);
   const { user } = useAuth();
   const canManageRecords = canManage(user);
 
@@ -82,7 +80,7 @@ export default function PersonalAcreditado() {
   );
 
   const handleExport = () => {
-    const headers = ['Nombre', 'Documento', 'Tipo', 'Área', 'Zonas de acceso', 'Días/Fases', 'Biometría', 'Credencial', 'Empresa', 'Evento', 'Estado'];
+    const headers = ['Nombre', 'Documento', 'Tipo', 'Área', 'Zonas de acceso', 'Días/Fases', 'Biometría', 'Credencial', 'Cred. personal', 'Cred. vehicular', 'Empresa', 'Evento', 'Estado'];
     const data = rows.map((a) => {
       const p = peopleById[a.person_id] || {};
       return [
@@ -94,6 +92,8 @@ export default function PersonalAcreditado() {
         phaseLabel(a.event_phases),
         a.has_biometric ? 'Sí' : 'No',
         a.badge_code || '',
+        a.delivered_personal ? 'Entregada' : 'No',
+        a.delivered_vehicular ? 'Entregada' : 'No',
         a.company || '',
         a.event_name || '',
         a.status || '',
@@ -109,6 +109,15 @@ export default function PersonalAcreditado() {
       setAccreditations((prev) => prev.filter((x) => x.id !== a.id));
     } catch (e) {
       alert('No se pudo eliminar: ' + (e?.message || e));
+    }
+  };
+
+  const handleToggleDelivered = async (a, field) => {
+    try {
+      await base44.entities.Accreditation.update(a.id, { [field]: !a[field] });
+      setAccreditations((prev) => prev.map((x) => (x.id === a.id ? { ...x, [field]: !a[field] } : x)));
+    } catch (e) {
+      alert('No se pudo actualizar: ' + (e?.message || e));
     }
   };
 
@@ -169,7 +178,7 @@ export default function PersonalAcreditado() {
             <Th>Credencial</Th>
             <Th>Evento</Th>
             <Th>Estado</Th>
-            <Th>Equipación</Th>
+            <Th>Credenciales</Th>
             <Th>Acciones</Th>
           </tr>
         </thead>
@@ -210,27 +219,28 @@ export default function PersonalAcreditado() {
                   </span>
                 </Td>
                 <Td>
-                  {(() => {
-                    const eq = Array.isArray(a.equipacion) ? a.equipacion : [];
-                    const total = eq.length;
-                    const delivered = eq.filter((e) => e.delivered).length;
-                    if (total === 0) return <span className="text-slate-300">—</span>;
-                    const complete = delivered === total;
-                    const cls = complete
-                      ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-                      : delivered === 0
-                        ? 'bg-slate-100 text-slate-500 ring-slate-200'
-                        : 'bg-amber-50 text-amber-700 ring-amber-200';
-                    const content = (
-                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${cls}`}>
-                        {complete && <Check className="h-3 w-3" />}
-                        {delivered}/{total}
-                      </span>
-                    );
-                    return canManageRecords ? (
-                      <button onClick={() => setEquipAccred(a)} className="transition hover:opacity-80">{content}</button>
-                    ) : content;
-                  })()}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="inline-flex items-center gap-1.5 text-xs text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={!!a.delivered_personal}
+                        onChange={() => handleToggleDelivered(a, 'delivered_personal')}
+                        disabled={!canManageRecords}
+                        className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-50"
+                      />
+                      Personal
+                    </label>
+                    <label className="inline-flex items-center gap-1.5 text-xs text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={!!a.delivered_vehicular}
+                        onChange={() => handleToggleDelivered(a, 'delivered_vehicular')}
+                        disabled={!canManageRecords}
+                        className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-50"
+                      />
+                      Vehicular
+                    </label>
+                  </div>
                 </Td>
                 <Td>
                   {canManageRecords ? (
@@ -284,16 +294,6 @@ export default function PersonalAcreditado() {
           } catch {}
         }}
       />
-
-      {equipAccred && (
-        <EquipacionModal
-          accreditation={equipAccred}
-          onClose={() => setEquipAccred(null)}
-          onSaved={(items) => {
-            setAccreditations((prev) => prev.map((x) => (x.id === equipAccred.id ? { ...x, equipacion: items } : x)));
-          }}
-        />
-      )}
     </div>
   );
 }
