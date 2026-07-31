@@ -44,9 +44,12 @@ export default function PersonDocUploadModal({ person, onClose, onUploaded }) {
         status: 'pending',
         expires_at: expiresAt || null,
       };
-      const res = await base44.functions.invoke('createDocument', payload);
+      const res = await Promise.race([
+        base44.functions.invoke('createDocument', payload),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('El servidor tardó demasiado. Reintentá.')), 45000)),
+      ]);
       if (res?.data?.error) throw new Error(res.data.error);
-      await logAudit('admin-upload-doc', 'Document', person.id, `${person.full_name}: ${file.name}`);
+      logAudit('admin-upload-doc', 'Document', person.id, `${person.full_name}: ${file.name}`).catch(() => {});
       setSuccess(true);
       setTimeout(() => { onUploaded?.(); }, 1200);
     } catch (err) {

@@ -68,9 +68,12 @@ export default function CompanyDocUploadModal({ company, onClose }) {
         expires_at: expiresAt || null,
       };
       // RLS bloquea crear documentos de empresas proveedoras — siempre vía service-role
-      const res = await base44.functions.invoke('createDocument', payload);
+      const res = await Promise.race([
+        base44.functions.invoke('createDocument', payload),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('El servidor tardó demasiado. Reintentá.')), 45000)),
+      ]);
       if (res?.data?.error) throw new Error(res.data.error);
-      await logAudit('admin-upload-company-doc', 'Document', company.id, `${company.name}: ${file.name}`);
+      logAudit('admin-upload-company-doc', 'Document', company.id, `${company.name}: ${file.name}`).catch(() => {});
       setFile(null);
       setDocType('');
       setExpiresAt('');
