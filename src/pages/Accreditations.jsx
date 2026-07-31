@@ -1,15 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useCrud } from '@/lib/crud';
-import { Plus, Pencil, Printer, Download, ScanFace, Trash2 } from 'lucide-react';
+import { Plus, Download, IdCard } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
-import BiometricButton from '@/components/BiometricButton';
 import EntityModal from '@/components/EntityModal';
-import StatusBadge from '@/components/StatusBadge';
-import BadgePrint from '@/components/BadgePrint';
-import BatchBadgePrint from '@/components/BatchBadgePrint';
-import DniToBiometric from '@/components/DniToBiometric';
-import BatchVehicleBadgePrint from '@/components/BatchVehicleBadgePrint';
 import PersonDetailModal from '@/components/PersonDetailModal';
 import VehicleAccreditSection from '@/components/VehicleAccreditSection';
 import { useZones } from '@/lib/useZones';
@@ -20,7 +14,7 @@ import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
 import FilterSelect from '@/components/ui/filter-select';
 import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
-import { btnPrimary, btnOutline, btnIcon } from '@/components/ui/button-styles';
+import { btnPrimary, btnOutline } from '@/components/ui/button-styles';
 import Pagination from '@/components/ui/pagination';
 import { usePagination } from '@/lib/usePagination';
 import { logAudit } from '@/lib/audit';
@@ -29,6 +23,8 @@ import { pickPersonDefaultEvent } from '@/lib/personDefaultEvent';
 import { useAuth } from '@/lib/AuthContext';
 import { canModify } from '@/lib/accessUtils';
 import { buildShowDayOptions, SETUP_PHASE_OPTIONS, getShowDays, PHASE_EXCLUSIVE_GROUPS } from '@/lib/eventPhases';
+import BadgePrint from '@/components/BadgePrint';
+import BatchVehicleBadgePrint from '@/components/BatchVehicleBadgePrint';
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Activa' },
@@ -48,18 +44,13 @@ export default function Accreditations() {
     personTypes.forEach((t) => { map[t.value] = t.badge_prefix || 'GE'; });
     return map;
   }, [personTypes]);
-  const accessLevels = [...new Set(zones.map((z) => z.value))];
   const [events, setEvents] = useState([]);
   const [people, setPeople] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [eventFilter, setEventFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
   const [query, setQuery] = useState('');
   const [badgeAccred, setBadgeAccred] = useState(null);
-  const [selected, setSelected] = useState(new Set());
-  const [batchOpen, setBatchOpen] = useState(false);
-  const [dniBioAccred, setDniBioAccred] = useState(null);
   const [personVehicles, setPersonVehicles] = useState([]);
   const [vehicleApprovals, setVehicleApprovals] = useState({});
   const [selectedEventId, setSelectedEventId] = useState('');
@@ -73,94 +64,57 @@ export default function Accreditations() {
       try {
         const [evs, ps, sts] = await Promise.all([
           base44.entities.Event.list('-created_date', 200),
-          base44.entities.Person.list('-created_date', 200),
+          base44.entities.Person.list('-created_date', 500),
           base44.entities.SystemSetting.list('-created_date', 1),
         ]);
         setEvents(evs);
         setPeople(ps);
         setSettings(sts[0] || null);
+        const activeEvent = evs.find((e) => e.status === 'active' && (!e.end_at || new Date(e.end_at).getTime() > Date.now()));
+        if (activeEvent) setEventFilter(activeEvent.id);
       } catch {}
     })();
   }, []);
 
-  const filtered = useMemo(() => {
-    let result = items;
-    if (eventFilter) result = result.filter((a) => a.event_id === eventFilter);
-    if (statusFilter) result = result.filter((a) => a.status === statusFilter);
+  // Personas ya acreditadas para el evento seleccionado
+  const accreditedPersonIds = useMemo(() => {
+    const set = new Set();
+    items.forEach((a) => { if (a.event_id === eventFilter) set.add(a.person_id); });
+    return set;
+  }, [items, eventFilter]);
+
+  // Personas pendientes de acreditar (sin acreditación para el evento)
+  const pendingPeople = useMemo(() => {
+    let result = people;
+    if (eventFilter) {
+      result = result.filter((p) => !accreditedPersonIds.has(p.id));
+    } else {
+      result = result.filter((p) => !items.some((a) => a.person_id === p.id));
+    }
     const q = query.toLowerCase().trim();
     if (q) {
-      result = result.filter((a) =>
-        `${a.person_name} ${a.badge_code} ${a.person_type}`.toLowerCase().includes(q)
+      result = result.filter((p) =>
+        `${p.full_name} ${p.document || ''} ${p.company || ''} ${p.person_type || ''}`.toLowerCase().includes(q)
       );
     }
     return result;
-  }, [items, eventFilter, statusFilter, query]);
+  }, [people, accreditedPersonIds, items, eventFilter, query]);
 
-  const { page, setPage, totalPages, paginated } = usePagination(filtered, 15);
-
-  const allFilteredIds = useMemo(() => filtered.map((a) => a.id), [filtered]);
-  const isAllSelected = allFilteredIds.length > 0 && allFilteredIds.every((id) => selected.has(id));
-  const toggleSelect = (id) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-  const toggleSelectAll = () => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (isAllSelected) {
-        allFilteredIds.forEach((id) => next.delete(id));
-      } else {
-        allFilteredIds.forEach((id) => next.add(id));
-      }
-      return next;
-    });
-  };
-  const handleBulkDelete = async () => {
-    if (!confirm(`¿Eliminar ${selected.size} acreditación(es)? Esta acción no se puede deshacer.`)) return;
-    for (const id of selected) {
-      const accred = items.find((a) => a.id === id);
-      if (accred) await deleteVehiclesForPersonEvent(accred.person_id, accred.event_id);
-      try { await base44.entities.Accreditation.delete(id); } catch {}
-    }
-    setSelected(new Set());
-    await reload();
-  };
-
-  const handleBatchPrint = () => {
-    const selectedAccreds = filtered.filter((a) => selected.has(a.id));
-    if (selectedAccreds.length === 0) return;
-    setBatchOpen(true);
-  };
-
-  const handleExport = () => {
-    exportToExcel(
-      ['Persona', 'Tipo', 'Evento', 'Código', 'Área de acceso', 'Estado', 'Biometría'],
-      filtered.map((a) => [
-        a.person_name || '',
-        zones.find((z) => z.value === a.person_type)?.label || a.person_type || '',
-        a.event_name || '',
-        a.badge_code || '',
-        zones.find((z) => z.value === (a.access_level || a.area))?.label || a.access_level || a.area || '',
-        a.status || '',
-        a.has_biometric ? 'Sí' : 'No',
-      ]),
-      'acreditaciones'
-    );
-  };
+  const { page, setPage, totalPages, paginated } = usePagination(pendingPeople, 15);
 
   const eventOptions = events
-    .filter((e) => e.status !== 'closed' || (editing && editing.event_id === e.id))
+    .filter((e) => e.status !== 'closed' || eventFilter === e.id)
     .map((e) => ({ value: e.id, label: e.name }));
-  const personOptions = people.map((p) => ({ value: p.id, label: `${p.full_name} — ${p.document || 'sin doc'} (${p.person_type})` }));
-  const showDayOptions = buildShowDayOptions(getShowDays(events, selectedEventId || editing?.event_id || ''));
+
+  const personOptions = people
+    .filter((p) => !items.some((a) => a.person_id === p.id && a.event_id === selectedEventId))
+    .map((p) => ({ value: p.id, label: `${p.full_name} — ${p.document || 'sin doc'} (${p.person_type})` }));
+
+  const showDayOptions = buildShowDayOptions(getShowDays(events, selectedEventId || editing?.event_id || eventFilter || ''));
 
   const fields = [
     { name: 'event_id', label: 'Evento', type: 'select', options: eventOptions, required: true },
-    { name: 'person_id', label: 'Persona', type: 'searchable-select', options: personOptions, required: true, placeholder: 'Buscar por nombre o documento…', full: true },
-    ...(editing ? [{ name: 'badge_code', label: 'Código de credencial', type: 'text', required: true }] : []),
+    { name: 'person_id', label: 'Persona', type: 'searchable-select', options: personOptions, required: true, placeholder: 'Buscar por nombre o documento…', full: true, disabled: !!newInitial.person_id },
     {
       name: 'access_level', label: 'Zonas de acceso', type: 'toggle-group',
       options: zones.map((z) => ({ value: z.value, label: z.label })),
@@ -173,55 +127,35 @@ export default function Accreditations() {
         { label: 'Fases de montaje', options: SETUP_PHASE_OPTIONS },
         { label: 'Días de show', options: showDayOptions, exclusiveGroups: PHASE_EXCLUSIVE_GROUPS },
       ],
-      hint: 'Días de show: elegí “Todo el show” o días específicos (Día 1..N), son mutuamente excluyentes. Armado y desarme son independientes.',
+      hint: 'Días de show: elegí "Todo el show" o días específicos (Día 1..N), son mutuamente excluyentes. Armado y desarme son independientes.',
       full: true,
     },
     { name: 'status', label: 'Estado', type: 'select', options: STATUS_OPTIONS },
     { name: 'block_reason', label: 'Motivo de bloqueo / denegación', type: 'textarea', full: true, hint: 'Documentá la razón si el acceso está bloqueado o revocado.', placeholder: 'Ej: Documentación vencida, sanción disciplinaria…' },
     { name: 'has_biometric', label: 'Biometría registrada', type: 'checkbox' },
-    ...(editing ? [] : [
-      { name: 'print_badge', label: 'Imprimir credencial al acreditar', type: 'checkbox' },
-      {
-        name: 'print_type', label: 'Credenciales a imprimir', type: 'toggle-group',
-        options: [
-          { value: 'personal', label: 'Personal' },
-          { value: 'vehicular', label: 'Vehicular' },
-        ],
-        hint: 'Seleccioná personal, vehicular o ambas.',
-      },
-    ]),
+    { name: 'print_badge', label: 'Imprimir credencial al acreditar', type: 'checkbox' },
+    {
+      name: 'print_type', label: 'Credenciales a imprimir', type: 'toggle-group',
+      options: [
+        { value: 'personal', label: 'Personal' },
+        { value: 'vehicular', label: 'Vehicular' },
+      ],
+      hint: 'Seleccioná personal, vehicular o ambas.',
+    },
     { name: 'delivered_personal', label: 'Credencial personal entregada', type: 'checkbox' },
     { name: 'delivered_vehicular', label: 'Credencial vehicular entregada', type: 'checkbox' },
   ];
 
-  const openNew = () => {
+  const openNew = (personId) => {
     setEditing(null);
     setPersonVehicles([]);
     setVehicleApprovals({});
-    const activeEvent = events.find((e) => e.status === 'active' && (!e.end_at || new Date(e.end_at).getTime() + (e.grace_hours || 0) * 3600000 > Date.now()));
-    const defaultEventId = activeEvent?.id || '';
+    const baseEventId = eventFilter || '';
+    const activeEvent = events.find((e) => e.status === 'active' && (!e.end_at || new Date(e.end_at).getTime() > Date.now()));
+    const defaultEventId = baseEventId || activeEvent?.id || '';
     setSelectedEventId(defaultEventId);
-    setNewInitial({ event_id: defaultEventId });
+    setNewInitial({ event_id: defaultEventId, person_id: personId || '' });
     setModalOpen(true);
-  };
-  const openEdit = (item) => {
-    const normalized = { ...item, access_level: item.access_level || item.area || '' };
-    setPersonVehicles([]);
-    setVehicleApprovals({});
-    setSelectedEventId(item.event_id || '');
-    if (Array.isArray(normalized.event_phases)) {
-      normalized.event_phases = normalized.event_phases.join(',');
-    }
-    setEditing(normalized);
-    setModalOpen(true);
-  };
-
-  const openPersonDetail = async (accred) => {
-    let p = people.find((pp) => pp.id === accred.person_id);
-    if (!p && accred.person_id) {
-      try { p = await base44.entities.Person.get(accred.person_id); } catch {}
-    }
-    if (p) setDetailPerson(p);
   };
 
   const handleFieldChange = async (name, value, setField, formData) => {
@@ -236,7 +170,6 @@ export default function Accreditations() {
         setSelectedEventId(defaultEventId);
       }
       try {
-        // Biometric check via backend (service role) so productoras can see empresa-created biometrics
         const [docCheck, vehs] = await Promise.all([
           base44.functions.invoke('checkPersonDocuments', { person_id: value, event_id: formData?.event_id }),
           base44.entities.Vehicle.filter({ person_id: value }, '-created_date', 10),
@@ -259,18 +192,13 @@ export default function Accreditations() {
     if (existing.some((a) => !editing || a.id !== editing.id)) {
       throw new Error('Esta persona ya tiene una credencial registrada para este evento.');
     }
-    if (!editing) {
-      const res = await base44.functions.invoke('checkPersonDocuments', { person_id: data.person_id, event_id: data.event_id });
-      if (res.data?.has_pending) {
-        throw new Error(`No se puede asignar: la persona tiene documentación pendiente o vencida (${res.data.pending_statuses.join(', ')}).`);
-      }
+    const res = await base44.functions.invoke('checkPersonDocuments', { person_id: data.person_id, event_id: data.event_id });
+    if (res.data?.has_pending) {
+      throw new Error(`No se puede asignar: la persona tiene documentación pendiente o vencida (${res.data.pending_statuses.join(', ')}).`);
     }
     const evt = events.find((e) => e.id === data.event_id);
-    let person = people.find((p) => p.id === data.person_id);
-    if (!person && data.person_id) {
-      try { person = await base44.entities.Person.get(data.person_id); } catch {}
-    }
-    if (!editing && person) {
+    const person = people.find((p) => p.id === data.person_id);
+    if (person) {
       const ins = await getInsuranceStatus(person);
       if (!ins.insured) {
         throw new Error(`No se puede acreditar: ${person?.full_name || 'la persona'} no tiene seguro aprobado${person?.company ? ` (empresa: ${person.company})` : ''}.`);
@@ -293,39 +221,33 @@ export default function Accreditations() {
       person_name: person?.full_name || '',
       person_type: primaryZone,
       person_email: person?.email || '',
-      badge_code: editing ? data.badge_code : generateBadgeCode(person?.person_type, items.map((a) => a.badge_code), typePrefixes),
+      badge_code: generateBadgeCode(person?.person_type, items.map((a) => a.badge_code), typePrefixes),
       area: primaryZone,
       access_level: accessLevelValue,
       event_phases: finalPhases,
       status: data.status || 'active',
       block_reason: data.block_reason || '',
       has_biometric: data.has_biometric || false,
-      delivered_personal: (!editing && data.print_badge && printTypes.includes('personal')) || !!data.delivered_personal,
-      delivered_vehicular: (!editing && data.print_badge && printTypes.includes('vehicular') && approvedVehicles.length > 0) || !!data.delivered_vehicular,
+      delivered_personal: (data.print_badge && printTypes.includes('personal')) || !!data.delivered_personal,
+      delivered_vehicular: (data.print_badge && printTypes.includes('vehicular') && approvedVehicles.length > 0) || !!data.delivered_vehicular,
     };
-    let createdAccred = null;
-    if (editing) {
-      await update(editing.id, payload);
-      await logAudit('update-accreditation', 'Accreditation', editing.id, `${person?.full_name} → ${evt?.name}`);
-    } else {
-      createdAccred = await create(payload);
-      await logAudit('create-accreditation', 'Accreditation', createdAccred.id, `${person?.full_name} → ${evt?.name}`);
-      const sendEmailEnabled = settings?.enabled_modules?.accreditation_email ?? true;
-      const sendWhatsAppEnabled = settings?.enabled_modules?.accreditation_whatsapp ?? true;
-      if (evt?.pickup_address) {
-        const mapsUrl = evt.pickup_lat && evt.pickup_lng
-          ? `https://www.google.com/maps?q=${evt.pickup_lat},${evt.pickup_lng}`
-          : `https://www.google.com/maps?q=${encodeURIComponent(evt.pickup_address)}`;
-        const pickupDate = evt.pickup_date
-          ? new Date(evt.pickup_date + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-          : 'a confirmar';
-        const pickupTime = evt.pickup_start_time && evt.pickup_end_time
-          ? `${evt.pickup_start_time} a ${evt.pickup_end_time} hs`
-          : (evt.pickup_start_time || 'a confirmar');
-
-        if (sendEmailEnabled && person?.email) {
-          try {
-            const htmlBody = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background-color:#f0fdf4;font-family:Arial,Helvetica,sans-serif;">
+    const createdAccred = await create(payload);
+    await logAudit('create-accreditation', 'Accreditation', createdAccred.id, `${person?.full_name} → ${evt?.name}`);
+    const sendEmailEnabled = settings?.enabled_modules?.accreditation_email ?? true;
+    const sendWhatsAppEnabled = settings?.enabled_modules?.accreditation_whatsapp ?? true;
+    if (evt?.pickup_address) {
+      const mapsUrl = evt.pickup_lat && evt.pickup_lng
+        ? `https://www.google.com/maps?q=${evt.pickup_lat},${evt.pickup_lng}`
+        : `https://www.google.com/maps?q=${encodeURIComponent(evt.pickup_address)}`;
+      const pickupDate = evt.pickup_date
+        ? new Date(evt.pickup_date + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+        : 'a confirmar';
+      const pickupTime = evt.pickup_start_time && evt.pickup_end_time
+        ? `${evt.pickup_start_time} a ${evt.pickup_end_time} hs`
+        : (evt.pickup_start_time || 'a confirmar');
+      if (sendEmailEnabled && person?.email) {
+        try {
+          const htmlBody = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background-color:#f0fdf4;font-family:Arial,Helvetica,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0fdf4;padding:32px 16px;">
 <tr><td align="center">
 <table width="560" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
@@ -355,54 +277,49 @@ export default function Accreditations() {
 </table>
 </td></tr>
 </table></body></html>`;
-            await base44.integrations.Core.SendEmail({
-              to: person.email,
-              subject: `Tu acreditación para ${evt.name} está lista`,
-              body: htmlBody,
-            });
-          } catch {}
-        }
-
-        if (sendWhatsAppEnabled && person?.phone) {
-          let cleanPhone = person.phone.replace(/\D/g, '');
-          if (!cleanPhone.startsWith('54')) {
-            cleanPhone = '54' + cleanPhone.replace(/^0/, '');
-          }
-          const waMessage = encodeURIComponent(
-            `Hola ${person.full_name},\n\n` +
-            `Tu acreditación para "${evt.name}" ya está lista.\n\n` +
-            `Podés retirarla el día ${pickupDate}, en el horario de ${pickupTime}.\n\n` +
-            `Ver ubicación en el mapa: ${mapsUrl}\n\n` +
-            `Te esperamos.\n\nAccreditEvent`
-          );
-          const waLink = document.createElement('a');
-          waLink.href = `https://wa.me/${cleanPhone}?text=${waMessage}`;
-          waLink.target = '_blank';
-          waLink.rel = 'noopener noreferrer';
-          document.body.appendChild(waLink);
-          waLink.click();
-          document.body.removeChild(waLink);
-        }
-      }
-      // Send confirmation email to company contact (#8)
-      if (sendEmailEnabled && person?.company) {
-        try {
-          const comps = await base44.entities.ProviderCompany.filter({ name: person.company });
-          if (comps[0]?.contact_email) {
-            const approvedVehicles = personVehicles.filter((v) => vehicleApprovals[v.id]?.approved);
-            const vehicleLines = approvedVehicles.length > 0
-              ? approvedVehicles.map((v) => `• ${v.brand} ${v.model} — Patente: ${v.plate}${v.color ? ` (${v.color})` : ''}`).join('<br>')
-              : 'Sin vehículos acreditados.';
-            await base44.integrations.Core.SendEmail({
-              to: comps[0].contact_email,
-              subject: `Acreditación confirmada — ${person.full_name} en ${evt.name}`,
-              body: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;color:#1e293b;"><h2>Resumen de acreditación</h2><p><strong>Evento:</strong> ${evt.name}</p><h3>Personas acreditadas:</h3><p>• ${person.full_name} — ${person.document || 'sin documento'} (Credencial: ${payload.badge_code})</p><h3>Vehículos autorizados:</h3><p>${vehicleLines}</p></body></html>`,
-            });
-          }
+          await base44.integrations.Core.SendEmail({
+            to: person.email,
+            subject: `Tu acreditación para ${evt.name} está lista`,
+            body: htmlBody,
+          });
         } catch {}
       }
+      if (sendWhatsAppEnabled && person?.phone) {
+        let cleanPhone = person.phone.replace(/\D/g, '');
+        if (!cleanPhone.startsWith('54')) {
+          cleanPhone = '54' + cleanPhone.replace(/^0/, '');
+        }
+        const waMessage = encodeURIComponent(
+          `Hola ${person.full_name},\n\n` +
+          `Tu acreditación para "${evt.name}" ya está lista.\n\n` +
+          `Podés retirarla el día ${pickupDate}, en el horario de ${pickupTime}.\n\n` +
+          `Ver ubicación en el mapa: ${mapsUrl}\n\n` +
+          `Te esperamos.\n\nAccreditEvent`
+        );
+        const waLink = document.createElement('a');
+        waLink.href = `https://wa.me/${cleanPhone}?text=${waMessage}`;
+        waLink.target = '_blank';
+        waLink.rel = 'noopener noreferrer';
+        document.body.appendChild(waLink);
+        waLink.click();
+        document.body.removeChild(waLink);
+      }
     }
-    // Vehicle accreditation — apply per-vehicle approvals
+    if (sendEmailEnabled && person?.company) {
+      try {
+        const comps = await base44.entities.ProviderCompany.filter({ name: person.company });
+        if (comps[0]?.contact_email) {
+          const vehicleLines = approvedVehicles.length > 0
+            ? approvedVehicles.map((v) => `• ${v.brand} ${v.model} — Patente: ${v.plate}${v.color ? ` (${v.color})` : ''}`).join('<br>')
+            : 'Sin vehículos acreditados.';
+          await base44.integrations.Core.SendEmail({
+            to: comps[0].contact_email,
+            subject: `Acreditación confirmada — ${person.full_name} en ${evt.name}`,
+            body: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;color:#1e293b;"><h2>Resumen de acreditación</h2><p><strong>Evento:</strong> ${evt.name}</p><h3>Personas acreditadas:</h3><p>• ${person.full_name} — ${person.document || 'sin documento'} (Credencial: ${payload.badge_code})</p><h3>Vehículos autorizados:</h3><p>${vehicleLines}</p></body></html>`,
+          });
+        }
+      } catch {}
+    }
     if (approvedVehicles.length > 0) {
       for (const v of approvedVehicles) {
         try {
@@ -418,14 +335,12 @@ export default function Accreditations() {
         } catch {}
       }
     }
-    // Sync phases back to Person (productora authority)
     if (person && finalPhases.length > 0) {
       try {
         await base44.entities.Person.update(person.id, { event_phases: finalPhases });
       } catch {}
     }
-    // Impresión opcional tras acreditar
-    if (!editing && data.print_badge) {
+    if (data.print_badge) {
       if (printTypes.includes('personal')) {
         setBadgeAccred(createdAccred);
       }
@@ -441,38 +356,29 @@ export default function Accreditations() {
     }
     setPersonVehicles([]);
     setVehicleApprovals({});
+    await reload();
   };
 
-  const deleteVehiclesForPersonEvent = async (personId, eventId) => {
-    if (!personId || !eventId) return;
-    try {
-      const vehs = await base44.entities.Vehicle.filter({ person_id: personId }, '-created_date', 50);
-      const linked = vehs.filter((v) => Array.isArray(v.event_ids) && v.event_ids.includes(eventId));
-      const evt = events.find((e) => e.id === eventId);
-      for (const v of linked) {
-        try {
-          // Solo se desvincula el evento del vehículo; el registro se conserva en la persona.
-          const remainingEventIds = v.event_ids.filter((id) => id !== eventId);
-          const remainingEventNames = (v.event_names || []).filter((n) => n !== evt?.name);
-          const updateData = {
-            event_ids: remainingEventIds,
-            event_names: remainingEventNames,
-          };
-          // Si el vehículo ya no está vinculado a ningún evento, deja de figurar como acreditado
-          if (remainingEventIds.length === 0) {
-            updateData.status = 'pending';
-          }
-          await base44.entities.Vehicle.update(v.id, updateData);
-        } catch {}
-      }
-    } catch {}
+  const handleExport = () => {
+    exportToExcel(
+      ['Persona', 'Documento', 'Tipo', 'Empresa', 'Teléfono', 'Evento'],
+      pendingPeople.map((p) => [
+        p.full_name || '',
+        p.document || '',
+        zones.find((z) => z.value === p.person_type)?.label || p.person_type || '',
+        p.company || '',
+        p.phone || '',
+        events.find((e) => e.id === eventFilter)?.name || '',
+      ]),
+      'pendientes_acreditar'
+    );
   };
 
-  const handleDelete = async () => {
-    await logAudit('delete-accreditation', 'Accreditation', editing.id, editing.person_name);
-    await deleteVehiclesForPersonEvent(editing.person_id, editing.event_id);
-    await remove(editing.id);
+  const openPersonDetail = (p) => {
+    if (p) setDetailPerson(p);
   };
+
+  const selectedEventName = events.find((e) => e.id === eventFilter)?.name || 'Todos los eventos';
 
   return (
     <div className="space-y-6">
@@ -480,126 +386,79 @@ export default function Accreditations() {
         <button onClick={handleExport} className={btnOutline}>
           <Download className="h-4 w-4" /> Exportar
         </button>
-        <button onClick={openNew} className={btnPrimary}>
-          <Plus className="h-4 w-4" /> Nueva acreditación
-        </button>
+        {canEdit && (
+          <button onClick={() => openNew('')} className={btnPrimary}>
+            <Plus className="h-4 w-4" /> Nueva acreditación
+          </button>
+        )}
       </PageHeader>
 
+      <p className="text-sm text-slate-500 max-w-3xl">
+        Listado de personas <strong>pendientes de acreditar</strong> para el evento seleccionado. Una vez acreditadas, pasan al módulo <strong>Personal acreditado</strong>.
+      </p>
+
       <div className="flex flex-wrap items-center gap-3">
-        <SearchInput value={query} onChange={setQuery} placeholder="Buscar por persona, código o tipo…" />
-        <FilterSelect value={eventFilter} onChange={setEventFilter} options={events.map((e) => ({ value: e.id, label: e.name }))} placeholder="Todos los eventos" />
-        <FilterSelect value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} placeholder="Todos los estados" />
+        <SearchInput value={query} onChange={setQuery} placeholder="Buscar por nombre, documento o empresa…" />
+        <FilterSelect value={eventFilter} onChange={setEventFilter} options={eventOptions} placeholder="Todos los eventos" />
       </div>
 
-      {selected.size > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5">
-          <span className="text-sm font-semibold text-emerald-700">{selected.size} seleccionada(s)</span>
-          <button onClick={handleBatchPrint} className={btnOutline}>
-            <Printer className="h-4 w-4" /> Imprimir selección
-          </button>
-          {canEdit && (
-            <button onClick={handleBulkDelete} className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700">
-              <Trash2 className="h-4 w-4" /> Eliminar selección
-            </button>
-          )}
-          <button onClick={() => setSelected(new Set())} className="text-sm text-slate-500 hover:text-slate-700">Limpiar</button>
-        </div>
-      )}
-
-      <DataTable loading={loading} error={error} isEmpty={filtered.length === 0} emptyMessage="No hay acreditaciones registradas." tableClassName="min-w-[800px]">
+      <DataTable loading={loading} error={error} isEmpty={pendingPeople.length === 0} emptyMessage="No hay personas pendientes de acreditar para el filtro seleccionado." emptyIcon={IdCard} tableClassName="min-w-[700px]">
         <thead>
           <tr className="border-b border-slate-100 bg-slate-50">
-            <Th className="w-10">
-              <input
-                type="checkbox"
-                checked={isAllSelected}
-                onChange={toggleSelectAll}
-                className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-              />
-            </Th>
             <Th>Persona</Th>
-            <Th>Evento</Th>
-            <Th>Código</Th>
-            <Th>Área de acceso</Th>
-            <Th>Estado</Th>
-            <Th>Entrega</Th>
-            <Th>Bio</Th>
-            <Th />
+            <Th>Documento</Th>
+            <Th>Tipo</Th>
+            <Th>Empresa</Th>
+            <Th>Teléfono</Th>
+            {canEdit && <Th className="text-right">Acción</Th>}
           </tr>
         </thead>
         <tbody>
-          {paginated.map((a) => (
-            <Tr key={a.id}>
-              <Td>
-                <input
-                  type="checkbox"
-                  checked={selected.has(a.id)}
-                  onChange={() => toggleSelect(a.id)}
-                  className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                />
-              </Td>
+          {paginated.map((p) => (
+            <Tr key={p.id}>
               <Td>
                 <button
-                  onClick={() => openPersonDetail(a)}
+                  onClick={() => openPersonDetail(p)}
                   className="text-left text-sm font-semibold text-slate-900 transition hover:text-emerald-700 hover:underline"
                 >
-                  {a.person_name || '—'}
+                  {p.full_name || '—'}
                 </button>
-                <p className="text-xs text-slate-400">{zones.find((z) => z.value === a.person_type)?.label || a.person_type}</p>
-              </Td>
-              <Td className="text-sm text-slate-500">{a.event_name || '—'}</Td>
-              <Td><code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700">{a.badge_code}</code></Td>
-              <Td className="text-sm text-slate-500">{(a.access_level || a.area || '').split(',').map((z) => zones.find((zz) => zz.value === z.trim())?.label || z.trim()).filter(Boolean).join(', ') || '—'}</Td>
-              <Td><StatusBadge status={a.status} /></Td>
-              <Td>
-                {a.delivered_personal && a.delivered_vehicular ? (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">Completa</span>
-                ) : a.delivered_personal ? (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 ring-1 ring-blue-200">Personal</span>
-                ) : a.delivered_vehicular ? (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-200">Vehicular</span>
-                ) : (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500 ring-1 ring-slate-200">Pendiente</span>
+                {p.access_area && (
+                  <p className="text-xs text-slate-400 capitalize">{p.access_area}</p>
                 )}
               </Td>
-              <Td>
-                <BiometricButton accreditation={a} onRegistered={reload} />
-              </Td>
-              <Td className="text-right">
-                <div className="flex items-center justify-end gap-1">
-                  <button onClick={() => setBadgeAccred(a)} className={btnIcon} title="Imprimir credencial">
-                    <Printer className="h-3.5 w-3.5" />
+              <Td className="text-sm text-slate-500">{p.document || '—'}</Td>
+              <Td className="text-sm text-slate-500">{zones.find((z) => z.value === p.person_type)?.label || p.person_type || '—'}</Td>
+              <Td className="text-sm text-slate-500">{p.company || '—'}</Td>
+              <Td className="text-sm text-slate-500">{p.phone || '—'}</Td>
+              {canEdit && (
+                <Td className="text-right">
+                  <button
+                    onClick={() => openNew(p.id)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-800"
+                  >
+                    <IdCard className="h-3.5 w-3.5" /> Acreditar
                   </button>
-                  <button onClick={() => setDniBioAccred(a)} className={btnIcon} title="Biometría desde DNI">
-                    <ScanFace className="h-3.5 w-3.5" />
-                  </button>
-                  {canEdit && (
-                    <button onClick={() => openEdit(a)} className={btnIcon} title="Editar">
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
-              </Td>
+                </Td>
+              )}
             </Tr>
           ))}
         </tbody>
       </DataTable>
 
-      {filtered.length > 15 && (
-        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} totalItems={filtered.length} pageSize={15} />
+      {pendingPeople.length > 15 && (
+        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} totalItems={pendingPeople.length} pageSize={15} />
       )}
 
       <EntityModal
         open={modalOpen}
-        onClose={() => { setModalOpen(false); setPersonVehicles([]); setVehicleApprovals({}); setSelectedEventId(''); }}
-        title={editing ? 'Editar acreditación' : 'Nueva acreditación'}
-        kicker={editing ? 'EDITAR ACREDITACIÓN' : 'CREAR ACREDITACIÓN'}
+        onClose={() => { setModalOpen(false); setPersonVehicles([]); setVehicleApprovals({}); setSelectedEventId(''); setNewInitial({}); }}
+        title="Nueva acreditación"
+        kicker="CREAR ACREDITACIÓN"
         fields={fields}
-        initialData={editing || newInitial}
+        initialData={newInitial}
         onSubmit={handleSubmit}
-        onDelete={editing ? handleDelete : null}
-        canDelete={!!editing && canEdit}
-        submitLabel={editing ? 'Guardar cambios' : 'Crear acreditación'}
+        submitLabel="Acreditar"
         onFieldChange={handleFieldChange}
         entityName="Accreditation"
         topContent={personVehicles.length > 0 ? (
@@ -608,7 +467,7 @@ export default function Accreditations() {
             approvals={vehicleApprovals}
             setApprovals={setVehicleApprovals}
             sectors={sectors}
-            event={events.find((e) => e.id === (selectedEventId || editing?.event_id || ''))}
+            event={events.find((e) => e.id === (selectedEventId || newInitial.event_id || ''))}
           />
         ) : undefined}
       />
@@ -618,22 +477,6 @@ export default function Accreditations() {
           accreditation={badgeAccred}
           event={events.find((e) => e.id === badgeAccred.event_id)}
           onClose={() => setBadgeAccred(null)}
-        />
-      )}
-
-      {batchOpen && (
-        <BatchBadgePrint
-          accreditations={filtered.filter((a) => selected.has(a.id))}
-          events={events}
-          onClose={() => setBatchOpen(false)}
-        />
-      )}
-
-      {dniBioAccred && (
-        <DniToBiometric
-          person={{ id: dniBioAccred.person_id, full_name: dniBioAccred.person_name, company: dniBioAccred.company }}
-          onSaved={reload}
-          onClose={() => setDniBioAccred(null)}
         />
       )}
 

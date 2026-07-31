@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { Download, Users, BadgeCheck, Fingerprint, Pencil } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
 import AccreditationEditModal from '@/components/AccreditationEditModal';
+import PersonDetailModal from '@/components/PersonDetailModal';
 import StatusBadge from '@/components/StatusBadge';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
@@ -21,6 +22,7 @@ export default function PersonalAcreditado() {
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState(null);
   const [statusFilter, setStatusFilter] = useState('active');
+  const [detailPerson, setDetailPerson] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -159,7 +161,17 @@ export default function PersonalAcreditado() {
             const p = peopleById[a.person_id] || {};
             return (
               <Tr key={a.id}>
-                <Td className="font-medium text-slate-800">{a.person_name || '—'}</Td>
+                <Td>
+                  <button
+                    onClick={() => {
+                      const p = peopleById[a.person_id];
+                      if (p) setDetailPerson(p);
+                    }}
+                    className="text-left text-sm font-medium text-slate-800 transition hover:text-emerald-700 hover:underline"
+                  >
+                    {a.person_name || '—'}
+                  </button>
+                </Td>
                 <Td className="text-slate-600">{p.document || '—'}</Td>
                 <Td className="text-slate-600">{a.person_type || '—'}</Td>
                 <Td className="text-slate-600">{a.area || '—'}</Td>
@@ -202,6 +214,10 @@ export default function PersonalAcreditado() {
       <p className="text-xs text-slate-400">
         Mostrando {rows.length} {rows.length === 1 ? 'persona' : 'personas'} — {selectedEventName}.
       </p>
+
+      {detailPerson && (
+        <PersonDetailModal person={detailPerson} onClose={() => setDetailPerson(null)} readOnly />
+      )}
 
       <AccreditationEditModal
         open={!!editing}
