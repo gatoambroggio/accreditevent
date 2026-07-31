@@ -39,6 +39,7 @@ export default function PersonDetailModal({ person, onClose, readOnly = false })
   const { customFields } = useCustomFields('Person');
   const [dniBioOpen, setDniBioOpen] = useState(false);
   const [insurance, setInsurance] = useState(null);
+  const [accreditations, setAccreditations] = useState([]);
   const { docTypes } = useDocumentTypes();
   const { sectors } = useParkingSectors();
 
@@ -64,11 +65,12 @@ export default function PersonDetailModal({ person, onClose, readOnly = false })
     if (!person) return;
     (async () => {
       try {
-        const [docData, bioData, vehData, evs] = await Promise.all([
+        const [docData, bioData, vehData, evs, accs] = await Promise.all([
           base44.entities.Document.filter({ person_id: person.id }, '-created_date', 100),
           base44.entities.Biometric.filter({ person_id: person.id, status: 'active' }, '-created_date', 1),
           base44.entities.Vehicle.filter({ person_id: person.id }, '-created_date', 50),
           base44.entities.Event.list('-start_at', 200),
+          base44.entities.Accreditation.filter({ person_id: person.id }, '-created_date', 100),
         ]);
         const active = docData.filter((d) => !isExpired(d));
         const expired = docData.filter((d) => isExpired(d)).slice(0, 3);
@@ -76,6 +78,7 @@ export default function PersonDetailModal({ person, onClose, readOnly = false })
         setBio(bioData[0] || null);
         setVehicles(vehData);
         setEvents(evs);
+        setAccreditations(accs);
         const ins = await getInsuranceStatus(person);
         setInsurance(ins);
       } catch {}
@@ -257,6 +260,33 @@ export default function PersonDetailModal({ person, onClose, readOnly = false })
               </button>
             )}
           </div>
+
+          {/* Credenciales entregadas */}
+          {!loading && accreditations.length > 0 && (
+            <div className="mb-5 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Credenciales</p>
+              {accreditations.map((a) => {
+                const ev = events.find((e) => e.id === a.event_id);
+                return (
+                  <div key={a.id} className="rounded-xl border border-slate-200 p-3">
+                    {accreditations.length > 1 && (
+                      <p className="mb-2 truncate text-[10px] font-semibold uppercase tracking-wider text-slate-400">{ev?.name || a.event_name || 'Evento'}</p>
+                    )}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className={`flex items-center gap-2 rounded-lg px-2.5 py-2 ${a.delivered_personal ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : 'bg-red-50 text-red-700 ring-1 ring-red-200'}`}>
+                        {a.delivered_personal ? <Check className="h-4 w-4 shrink-0" /> : <XCircle className="h-4 w-4 shrink-0" />}
+                        <span className="text-xs font-bold">Personal {a.delivered_personal ? 'entregada' : 'no entregada'}</span>
+                      </div>
+                      <div className={`flex items-center gap-2 rounded-lg px-2.5 py-2 ${a.delivered_vehicular ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : 'bg-red-50 text-red-700 ring-1 ring-red-200'}`}>
+                        {a.delivered_vehicular ? <Check className="h-4 w-4 shrink-0" /> : <XCircle className="h-4 w-4 shrink-0" />}
+                        <span className="text-xs font-bold">Vehicular {a.delivered_vehicular ? 'entregada' : 'no entregada'}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* Insurance status */}
           {!loading && insurance && (
