@@ -8,6 +8,7 @@ import { useParkingSectors } from '@/lib/useParkingSectors';
 import { generateBadgeCode } from '@/lib/badgeCode';
 import { getInsuranceStatus } from '@/lib/insuranceUtils';
 import { pickPersonDefaultEvent } from '@/lib/personDefaultEvent';
+import { buildShowDayOptions, SETUP_PHASE_OPTIONS, getShowDays, PHASE_EXCLUSIVE_GROUPS } from '@/lib/eventPhases';
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Activa' },
@@ -77,6 +78,9 @@ export default function FacialAccreditationForm({ open, event, identifiedPerson,
     [people]
   );
 
+  const showDaysCount = getShowDays(events, selectedEventId || event?.id || '');
+  const showDayOptions = buildShowDayOptions(showDaysCount);
+
   const fields = [
     { name: 'event_id', label: 'Evento', type: 'select', options: eventOptions, required: true },
     { name: 'person_id', label: 'Persona', type: 'searchable-select', options: personOptions, required: true, placeholder: 'Buscar por nombre o documento…', full: true },
@@ -87,12 +91,12 @@ export default function FacialAccreditationForm({ open, event, identifiedPerson,
       full: true,
     },
     {
-      name: 'event_phases', label: 'Fases del evento', type: 'toggle-group',
-      options: [
-        { value: 'armado', label: 'Armado' },
-        { value: 'dia_evento', label: 'Show' },
-        { value: 'desarme', label: 'Desarme' },
+      name: 'event_phases', label: 'Días / Fases del evento', type: 'toggle-group',
+      sections: [
+        { label: 'Fases de montaje', options: SETUP_PHASE_OPTIONS },
+        { label: `Días de show (${showDaysCount} ${showDaysCount > 1 ? 'días' : 'día'})`, options: showDayOptions, exclusiveGroups: PHASE_EXCLUSIVE_GROUPS },
       ],
+      hint: 'Días de show: elegí "Todo el show" o días específicos (Día 1..N), son mutuamente excluyentes. Armado y desarme son independientes.',
       full: true,
     },
     { name: 'status', label: 'Estado', type: 'select', options: STATUS_OPTIONS },
