@@ -76,21 +76,16 @@ export default function Accreditations() {
     })();
   }, []);
 
-  // Personas ya acreditadas para el evento seleccionado
-  const accreditedPersonIds = useMemo(() => {
+  // Personas ya acreditadas (cualquier acreditación activa) — no deben figurar como pendientes
+  const activeAccreditedIds = useMemo(() => {
     const set = new Set();
-    items.forEach((a) => { if (a.event_id === eventFilter) set.add(a.person_id); });
+    items.forEach((a) => { if (a.status === 'active') set.add(a.person_id); });
     return set;
-  }, [items, eventFilter]);
+  }, [items]);
 
-  // Personas pendientes de acreditar (sin acreditación para el evento)
+  // Personas pendientes de acreditar (sin ninguna acreditación activa)
   const pendingPeople = useMemo(() => {
-    let result = people;
-    if (eventFilter) {
-      result = result.filter((p) => !accreditedPersonIds.has(p.id));
-    } else {
-      result = result.filter((p) => !items.some((a) => a.person_id === p.id));
-    }
+    let result = people.filter((p) => !activeAccreditedIds.has(p.id));
     const q = query.toLowerCase().trim();
     if (q) {
       result = result.filter((p) =>
@@ -98,7 +93,7 @@ export default function Accreditations() {
       );
     }
     return result;
-  }, [people, accreditedPersonIds, items, eventFilter, query]);
+  }, [people, activeAccreditedIds, query]);
 
   const { page, setPage, totalPages, paginated } = usePagination(pendingPeople, 15);
 

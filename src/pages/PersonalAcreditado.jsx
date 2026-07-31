@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Download, Users, BadgeCheck, Fingerprint, Pencil } from 'lucide-react';
+import { Download, Users, BadgeCheck, Fingerprint, Pencil, Trash2 } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
 import AccreditationEditModal from '@/components/AccreditationEditModal';
 import PersonDetailModal from '@/components/PersonDetailModal';
@@ -94,6 +94,16 @@ export default function PersonalAcreditado() {
       ];
     });
     exportToExcel(headers, data, 'personal_acreditado');
+  };
+
+  const handleDelete = async (a) => {
+    if (!window.confirm(`¿Eliminar la acreditación de ${a.person_name} (${a.badge_code})? La persona volverá a estar pendiente de acreditar.`)) return;
+    try {
+      await base44.entities.Accreditation.delete(a.id);
+      setAccreditations((prev) => prev.filter((x) => x.id !== a.id));
+    } catch (e) {
+      alert('No se pudo eliminar: ' + (e?.message || e));
+    }
   };
 
   const eventName = (id) => events.find((e) => e.id === id)?.name || '—';
@@ -193,13 +203,22 @@ export default function PersonalAcreditado() {
                   </span>
                 </Td>
                 <Td>
-                  <button
-                    onClick={() => setEditing(a)}
-                    className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-emerald-700"
-                    title="Editar acreditación"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setEditing(a)}
+                      className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-emerald-700"
+                      title="Editar acreditación"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(a)}
+                      className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:bg-red-50 hover:text-red-600"
+                      title="Eliminar acreditación"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </Td>
               </Tr>
             );
@@ -226,7 +245,7 @@ export default function PersonalAcreditado() {
         events={events}
         onSaved={async () => {
           try {
-            const accs = await base44.entities.Accreditation.list('-created_date', 500);
+            const accs = await base44.entities.Accreditation.list('-created_date', 5000);
             setAccreditations(accs);
           } catch {}
         }}
