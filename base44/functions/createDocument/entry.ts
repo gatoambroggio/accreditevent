@@ -46,6 +46,18 @@ export default async function(req) {
           authorized = providerCompanies.has(company);
         } catch {}
       }
+      // 3.b) Doc belongs to any existing provider company the productora manages
+      // (ProviderCompany read is already broad for productoras)
+      if (!authorized && company) {
+        try {
+          const providers = await base44.asServiceRole.entities.ProviderCompany.filter(
+            { name: company },
+            '-created_date',
+            5
+          );
+          authorized = providers.length > 0;
+        } catch {}
+      }
       // 4) Doc belongs to a person under the productora's scope
       if (!authorized && person_id) {
         try {
