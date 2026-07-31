@@ -54,6 +54,11 @@ export default function ProviderCompanies() {
     { name: 'responsible_name', label: 'Responsable', type: 'text', placeholder: 'Ej: Juan Pérez' },
     { name: 'address', label: 'Dirección', type: 'text', full: true, placeholder: 'Ej: Av. Corrientes 1234, CABA' },
     { name: 'description', label: 'Descripción / Rubro', type: 'textarea', full: true, placeholder: 'Ej: Proveedor de sonido e iluminación' },
+    { name: 'insurance_kind', label: 'Tipo de seguro requerido', type: 'select', hint: 'ART: sin monto de cobertura · AP: con monto', options: [
+      { value: '', label: 'Cualquiera' },
+      { value: 'ART', label: 'ART — Aseguradora de Riesgos del Trabajo' },
+      { value: 'AP', label: 'AP — Accidentes Personales' },
+    ] },
     { name: 'contact_phone', label: 'Teléfono de contacto', type: 'phone-ar', hint: 'Código de área sin 0 y número sin 15' },
     { name: 'contact_email', label: 'Email de contacto', type: 'email', placeholder: 'Ej: contacto@empresa.com' },
     { name: 'logo_url', label: 'Logo', type: 'image-upload', full: true },
@@ -141,6 +146,11 @@ export default function ProviderCompanies() {
                     {c.responsible_name && <p className="text-xs text-slate-400">Resp.: {c.responsible_name}</p>}
                     {c.address && <p className="text-xs text-slate-400">{c.address}</p>}
                     {c.description && <p className="text-xs text-slate-400">{c.description}</p>}
+                    {c.insurance_kind && (
+                      <span className="mt-1 inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
+                        {c.insurance_kind === 'ART' ? 'ART · sin monto' : 'AP · con monto'}
+                      </span>
+                    )}
                   </div>
                 </div>
               </Td>

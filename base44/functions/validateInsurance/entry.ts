@@ -74,6 +74,27 @@ export default async function(req) {
 
     const extracted = extractResult.output;
 
+    // Determinar tipo de seguro (ART / AP) desde OCR + tipo de documento
+    const detectKind = (documentType: string, coverageType: string) => {
+      const dt = (documentType || '').toLowerCase();
+      const ct = (coverageType || '').toUpperCase();
+      if (dt.includes('art')) return 'ART';
+      if (dt.includes('work') || dt.includes('trabajo') || dt.includes('personal') || dt.includes('ap')) return 'AP';
+      if (ct.includes('ART')) return 'ART';
+      if (/ACCIDENTES PERSONALES|\bAP\b|TRABAJO|RESPONSABILIDAD CIVIL|\bRC\b/.test(ct)) return 'AP';
+      return 'AP';
+    };
+    const detectedKind = detectKind(doc.document_type, extracted.coverage_type);
+
+    // Tipo de seguro requerido por la empresa proveedora
+    let requiredKind = '';
+    try {
+      const providers = await base44.asServiceRole.entities.ProviderCompany.list('-created_date', 500);
+      const provider = providers.find((p) => (p.name || '').toUpperCase() === (doc.company || '').toUpperCase());
+      requiredKind = (provider as any)?.insurance_kind || '';
+    } catch {}
+    const kindMatch = !requiredKind || detectedKind === requiredKind;
+
     // Normalize helpers
     const normalizeName = (s) => (s || '').toLowerCase().trim().replace(/\s+/g, ' ');
 
@@ -197,15 +218,19 @@ export default async function(req) {
 
     const requiredAmount = event?.insurance_insured_amount || 0;
     const docAmount = extracted.coverage_amount || 0;
-    const amountOk = !requiredAmount || docAmount >= requiredAmount;
+    // ART no lleva monto de cobertura — se omite la validación de monto para ART
+    const amountOk = detectedKind === 'ART' ? true : (!requiredAmount || docAmount >= requiredAmount);
 
     const insuranceIssues = [];
     if (nonRepetitionClauses.length > 0 && !nonRepetitionOk) {
       const missing = (clauseValidation?.clauses || []).filter(c => !c.found).map(c => c.clause);
       insuranceIssues.push(`Faltan ${missing.length} cláusula(s) de no repetición en la póliza`);
     }
-    if (requiredAmount && docAmount < requiredAmount) {
+    if (detectedKind !== 'ART' && requiredAmount && docAmount < requiredAmount) {
       insuranceIssues.push(`El monto asegurado ($${docAmount.toLocaleString('es-AR')}) es menor al mínimo requerido ($${requiredAmount.toLocaleString('es-AR')})`);
+    }
+    if (requiredKind && !kindMatch) {
+      insuranceIssues.push(`El tipo de seguro detectado (${detectedKind}) no coincide con el requerido para la empresa (${requiredKind})`);
     }
 
     const coveredCount = reconciliation.filter(e => e.is_covered).length;
@@ -227,8 +252,8 @@ export default async function(req) {
     const isCompanyLevelDoc = !doc.person_id && !!doc.company;
     const employeeCoverageOk = !employeeValidation || !hasInsuredList || uncoveredCount === 0;
     const overallValid = isCompanyLevelDoc
-      ? dateValid && (!eventCoverage || eventCoverage.covers_event) && employeeCoverageOk && nonRepetitionOk && amountOk
-      : dniMatch && dateValid && (!eventCoverage || eventCoverage.covers_event) && employeeCoverageOk && nonRepetitionOk && amountOk;
+      ? dateValid && (!eventCoverage || eventCoverage.covers_event) && employeeCoverageOk && nonRepetitionOk && amountOk && kindMatch
+      : dniMatch && dateValid && (!eventCoverage || eventCoverage.covers_event) && employeeCoverageOk && nonRepetitionOk && amountOk && kindMatch;
 
     return Response.json({
       valid: overallValid,
@@ -243,7 +268,8 @@ export default async function(req) {
         coverage_amount: extracted.coverage_amount || 0,
         valid_from: extracted.valid_from || '',
         valid_until: extracted.valid_until || '',
-        coverage_type: extracted.coverage_type || ''
+        coverage_type: extracted.coverage_type || '',
+        insurance_kind: detectedKind
       },
       validation: {
         dni_match: dniMatch,
@@ -255,6 +281,9 @@ export default async function(req) {
         date_issues: dateIssues,
         event_coverage: eventCoverage,
         coverage_amount: extracted.coverage_amount || 0,
+        detected_kind: detectedKind,
+        required_kind: requiredKind,
+        kind_match: kindMatch,
         insurance_config: {
           non_repetition_clauses: nonRepetitionClauses,
           clause_validation: clauseValidation,

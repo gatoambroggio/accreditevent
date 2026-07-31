@@ -35,6 +35,16 @@
       "format": "email",
       "description": "Email de contacto de la empresa"
     },
+    "insurance_kind": {
+      "type": "string",
+      "enum": [
+        "ART",
+        "AP",
+        ""
+      ],
+      "default": "",
+      "description": "Tipo de seguro que corresponde a la empresa: ART (Aseguradora de Riesgos del Trabajo, sin monto) o AP (Accidentes Personales, con monto)"
+    },
     "custom_fields": {
       "type": "object",
       "description": "Campos personalizados definidos por el administrador",

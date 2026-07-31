@@ -1,21 +1,27 @@
-// Distinguición entre los dos tipos de seguro: ART y Seguro de Trabajo.
-// El seguro de trabajo es el que lleva monto asegurado visible.
+// Distinguición entre los dos tipos de seguro: ART y AP (Accidentes Personales).
+// ART (Aseguradora de Riesgos del Trabajo) no lleva monto de cobertura.
+// AP (Accidentes Personales) sí lleva monto asegurado visible.
 
 export const INSURANCE_KIND_LABELS = {
   ART: 'ART',
-  TRABAJO: 'Seguro de trabajo',
+  AP: 'Accidentes Personales',
 };
 
-// Deriva el tipo de seguro ('ART' | 'TRABAJO') a partir del tipo de documento
+// Deriva el tipo de seguro ('ART' | 'AP') a partir del tipo de documento
 // y/o el tipo de cobertura detectado por OCR.
 export function deriveInsuranceKind(documentType = '', coverageType = '') {
   const dt = (documentType || '').toLowerCase();
   const ct = (coverageType || '').toUpperCase();
   if (dt.includes('art')) return 'ART';
-  if (dt.includes('work') || dt.includes('trabajo')) return 'TRABAJO';
+  if (dt.includes('work') || dt.includes('trabajo') || dt.includes('personal') || dt.includes('ap')) return 'AP';
   if (ct.includes('ART')) return 'ART';
-  if (/TRABAJO|RESPONSABILIDAD CIVIL|ACCIDENTES PERSONALES|\bRC\b/.test(ct)) return 'TRABAJO';
-  return 'TRABAJO';
+  if (/ACCIDENTES PERSONALES|\bAP\b|TRABAJO|RESPONSABILIDAD CIVIL|\bRC\b/.test(ct)) return 'AP';
+  return 'AP';
+}
+
+// ART no lleva monto de cobertura; AP sí.
+export function hasCoverageAmount(kind) {
+  return kind === 'AP';
 }
 
 export function formatInsuranceAmount(amount) {
