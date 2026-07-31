@@ -17,8 +17,18 @@ export default function CompanyDocUploadModal({ company, onClose }) {
 
   const loadDocs = async () => {
     try {
-      const docs = await base44.entities.Document.filter({ company: company.name }, '-created_date', 100);
-      setDocuments(docs.filter((d) => !d.person_id));
+      const me = await base44.auth.me().catch(() => null);
+      const role = me?.data?.role || me?.role || '';
+      let docs;
+      if (role === 'productora') {
+        // RLS bloquea leer documentos de empresas proveedoras — usar service-role
+        const res = await base44.functions.invoke('getProductoraDocuments', {});
+        docs = (res?.data?.documents || []).filter((d) => d.company === company.name && !d.person_id);
+      } else {
+        docs = await base44.entities.Document.filter({ company: company.name }, '-created_date', 100);
+        docs = docs.filter((d) => !d.person_id);
+      }
+      setDocuments(docs);
     } catch {
       setDocuments([]);
     }
@@ -46,7 +56,7 @@ export default function CompanyDocUploadModal({ company, onClose }) {
     setError('');
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      await base44.entities.Document.create({
+      const payload = {
         company: company.name,
         person_name: company.name,
         document_type: docType,
@@ -56,7 +66,15 @@ export default function CompanyDocUploadModal({ company, onClose }) {
         size: file.size,
         status: 'pending',
         expires_at: expiresAt || null,
-      });
+      };
+      const me = await base44.auth.me().catch(() => null);
+      const role = me?.data?.role || me?.role || '';
+      if (role === 'productora') {
+        // RLS bloquea crear documentos de empresas proveedoras — usar service-role
+        await base44.functions.invoke('createDocument', payload);
+      } else {
+        await base44.entities.Document.create(payload);
+      }
       await logAudit('admin-upload-company-doc', 'Document', company.id, `${company.name}: ${file.name}`);
       setFile(null);
       setDocType('');

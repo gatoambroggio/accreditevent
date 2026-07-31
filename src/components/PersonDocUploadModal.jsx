@@ -32,7 +32,7 @@ export default function PersonDocUploadModal({ person, onClose, onUploaded }) {
     setError('');
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      await base44.entities.Document.create({
+      const payload = {
         person_id: person.id,
         person_name: person.full_name,
         company: person.company || '',
@@ -43,7 +43,14 @@ export default function PersonDocUploadModal({ person, onClose, onUploaded }) {
         size: file.size,
         status: 'pending',
         expires_at: expiresAt || null,
-      });
+      };
+      const me = await base44.auth.me().catch(() => null);
+      const role = me?.data?.role || me?.role || '';
+      if (role === 'productora') {
+        await base44.functions.invoke('createDocument', payload);
+      } else {
+        await base44.entities.Document.create(payload);
+      }
       await logAudit('admin-upload-doc', 'Document', person.id, `${person.full_name}: ${file.name}`);
       setSuccess(true);
       setTimeout(() => { onUploaded?.(); }, 1200);
