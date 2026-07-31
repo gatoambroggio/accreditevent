@@ -7,7 +7,7 @@ import FaceCapture from '@/components/FaceCapture';
 import { useZones } from '@/lib/useZones';
 import { useParkingSectors } from '@/lib/useParkingSectors';
 import { extractFaceFromDni } from '@/lib/dniFaceExtract';
-import { buildPhaseOptions } from '@/lib/eventPhases';
+import { buildShowDayOptions, SETUP_PHASE_OPTIONS } from '@/lib/eventPhases';
 
 const EMPTY = { first_name: '', last_name: '', document: '', phone: '', employment_type: 'fijo', access_area: '', event_phases: [], event_ids: [], notes: '', obra_social: '', carnet_obra_social: '', emergency_contact_name: '', emergency_contact_phone: '', allergies: '', blood_type: '', coordinator_name: '', veh_id: null, veh_plate: '', veh_brand: '', veh_model: '', veh_color: '', veh_type: 'auto', veh_parking_sector: '' };
 const normalizeType = (v) => (v === 'eventual' || v === 'esporadico' ? 'eventual' : 'fijo');
@@ -98,14 +98,14 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
   const setField = (name, value) => setForm((f) => ({ ...f, [name]: value }));
 
   // Fases dinámicas: usa el mayor show_days entre los eventos asignados al empleado
-  const phaseOptions = useMemo(() => {
+  const showDayOptions = useMemo(() => {
     const selected = (form.event_ids || [])
       .map((id) => approvedEvents.find((e) => e.event_id === id))
       .filter(Boolean);
     const maxDays = selected.length
       ? Math.max(...selected.map((e) => Number(e.show_days) || 1))
       : 6;
-    return buildPhaseOptions(Math.min(6, Math.max(1, maxDays)));
+    return buildShowDayOptions(Math.min(6, Math.max(1, maxDays)));
   }, [form.event_ids, approvedEvents]);
 
   const handleDniScanned = (data) => {
@@ -388,23 +388,44 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
               </select>
             </label>
           </div>
-          <div>
-            <span className="mb-1.5 block text-xs font-semibold text-slate-600">Días / Fases del evento</span>
-            <div className="flex flex-wrap gap-1.5">
-              {phaseOptions.map(({ value, label }) => {
-                const active = form.event_phases.includes(value);
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => togglePhase(value)}
-                    className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}
-                  >
-                    {active && <CheckCircle2 className="mr-1 inline h-3 w-3" />}
-                    {label}
-                  </button>
-                );
-              })}
+          <div className="space-y-3">
+            <div>
+              <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Fases de montaje</span>
+              <div className="flex flex-wrap gap-1.5">
+                {SETUP_PHASE_OPTIONS.map(({ value, label }) => {
+                  const active = form.event_phases.includes(value);
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => togglePhase(value)}
+                      className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}
+                    >
+                      {active && <CheckCircle2 className="mr-1 inline h-3 w-3" />}
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Días de show</span>
+              <div className="flex flex-wrap gap-1.5">
+                {showDayOptions.map(({ value, label }) => {
+                  const active = form.event_phases.includes(value);
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => togglePhase(value)}
+                      className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}
+                    >
+                      {active && <CheckCircle2 className="mr-1 inline h-3 w-3" />}
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 

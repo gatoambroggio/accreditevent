@@ -146,39 +146,56 @@ export default function EntityModal({
 
     if (f.type === 'toggle-group') {
       const selectedValues = value ? String(value).split(',').map((v) => v.trim()).filter(Boolean) : [];
-      const exclusiveGroups = f.exclusiveGroups || [];
-      const groupOf = (v) => exclusiveGroups.findIndex((g) => g.includes(v));
+      // Secciones (opcional): grupos de opciones con su propia etiqueta, todos
+      // escriben al mismo campo. Permite separar conceptos (p.ej. fases de montaje
+      // vs. días de show) sin mezclarlos visualmente.
+      const sections = f.sections && f.sections.length
+        ? f.sections
+        : [{ label: f.label, options: f.options || [], exclusiveGroups: f.exclusiveGroups || [] }];
+      const allGroups = [...(f.exclusiveGroups || []), ...sections.flatMap((s) => s.exclusiveGroups || [])];
+      const groupOf = (v) => allGroups.findIndex((g) => g.includes(v));
+      const toggle = (oValue) => {
+        const active = selectedValues.includes(oValue);
+        let next;
+        if (active) {
+          next = selectedValues.filter((v) => v !== oValue);
+        } else {
+          next = [...selectedValues, oValue];
+          const g = groupOf(oValue);
+          if (g >= 0) {
+            // Excluyencia: quitar valores de otros grupos excluyentes
+            next = next.filter((v) => groupOf(v) === g || groupOf(v) === -1);
+          }
+        }
+        setField(f.name, next.join(','));
+      };
+      const renderOption = (o) => {
+        const active = selectedValues.includes(o.value);
+        return (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => toggle(o.value)}
+            className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+          >
+            {o.label}
+          </button>
+        );
+      };
       return (
         <div key={f.name} className={f.full ? 'sm:col-span-2' : ''}>
-          <span className="mb-1.5 block text-xs font-semibold text-slate-600">{f.label}{f.required && ' *'}</span>
-          <div className="flex flex-wrap gap-2">
-            {(f.options || []).map((o) => {
-              const active = selectedValues.includes(o.value);
-              return (
-                <button
-                  key={o.value}
-                  type="button"
-                  onClick={() => {
-                    let next;
-                    if (active) {
-                      next = selectedValues.filter((v) => v !== o.value);
-                    } else {
-                      next = [...selectedValues, o.value];
-                      const g = groupOf(o.value);
-                      if (g >= 0) {
-                        // Excluyencia: quitar valores de otros grupos excluyentes
-                        next = next.filter((v) => groupOf(v) === g || groupOf(v) === -1);
-                      }
-                    }
-                    setField(f.name, next.join(','));
-                  }}
-                  className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-                >
-                  {o.label}
-                </button>
-              );
-            })}
+          {!f.sections && (
+            <span className="mb-1.5 block text-xs font-semibold text-slate-600">{f.label}{f.required && ' *'}</span>
+          )}
+          <div className="space-y-3">
+            {sections.map((s, i) => (
+              <div key={i}>
+                <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">{s.label}</span>
+                <div className="flex flex-wrap gap-2">{(s.options || []).map(renderOption)}</div>
+              </div>
+            ))}
           </div>
+          {f.hint && <p className="mt-1.5 text-xs text-slate-400">{f.hint}</p>}
         </div>
       );
     }

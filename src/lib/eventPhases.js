@@ -25,6 +25,25 @@ export const PHASE_EXCLUSIVE_GROUPS = [
   ['dia_1', 'dia_2', 'dia_3', 'dia_4', 'dia_5', 'dia_6'],
 ];
 
+// Opciones de fases de montaje (armado/desarme), independientes de los días de show.
+export const SETUP_PHASE_OPTIONS = [
+  { value: 'armado', label: 'Armado' },
+  { value: 'desarme', label: 'Desarme' },
+];
+
+// Construye las opciones de días de show (Día del show + Día 1..N).
+export function buildShowDayOptions(showDays) {
+  const n = Math.max(1, Math.min(6, Number(showDays) || 1));
+  const days = [];
+  for (let i = 1; i <= n; i++) {
+    days.push({ value: `dia_${i}`, label: `Día ${i}` });
+  }
+  return [
+    { value: 'dia_evento', label: 'Día del show' },
+    ...days,
+  ];
+}
+
 // Etiquetas legibles para cada fase/día (incluye valores legacy y día_1..día_6).
 export const PHASE_LABELS = {
   armado: 'Armado',

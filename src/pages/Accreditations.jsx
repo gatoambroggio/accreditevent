@@ -28,7 +28,7 @@ import { getInsuranceStatus } from '@/lib/insuranceUtils';
 import { pickPersonDefaultEvent } from '@/lib/personDefaultEvent';
 import { useAuth } from '@/lib/AuthContext';
 import { canModify } from '@/lib/accessUtils';
-import { buildPhaseOptions, getShowDays, PHASE_EXCLUSIVE_GROUPS } from '@/lib/eventPhases';
+import { buildShowDayOptions, SETUP_PHASE_OPTIONS, getShowDays, PHASE_EXCLUSIVE_GROUPS } from '@/lib/eventPhases';
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Activa' },
@@ -155,7 +155,7 @@ export default function Accreditations() {
     .filter((e) => e.status !== 'closed' || (editing && editing.event_id === e.id))
     .map((e) => ({ value: e.id, label: e.name }));
   const personOptions = people.map((p) => ({ value: p.id, label: `${p.full_name} — ${p.document || 'sin doc'} (${p.person_type})` }));
-  const phaseOptions = buildPhaseOptions(getShowDays(events, selectedEventId || editing?.event_id || ''));
+  const showDayOptions = buildShowDayOptions(getShowDays(events, selectedEventId || editing?.event_id || ''));
 
   const fields = [
     { name: 'event_id', label: 'Evento', type: 'select', options: eventOptions, required: true },
@@ -169,9 +169,11 @@ export default function Accreditations() {
     },
     {
       name: 'event_phases', label: 'Días / Fases del evento', type: 'toggle-group',
-      options: phaseOptions,
-      exclusiveGroups: PHASE_EXCLUSIVE_GROUPS,
-      hint: '“Día del show” = acceso a todo el show (excluye días específicos). “Día 1..N” = días puntuales. Ambas opciones son excluyentes. Armado y desarme son independientes.',
+      sections: [
+        { label: 'Fases de montaje', options: SETUP_PHASE_OPTIONS },
+        { label: 'Días de show', options: showDayOptions, exclusiveGroups: PHASE_EXCLUSIVE_GROUPS },
+      ],
+      hint: '“Día del show” = acceso a todo el show (excluye días específicos). “Día 1..N” = días puntuales. Armado y desarme son independientes de los días de show.',
       full: true,
     },
     { name: 'status', label: 'Estado', type: 'select', options: STATUS_OPTIONS },
