@@ -27,7 +27,20 @@ export function isWithinEventPhases(event, eventPhases, date = new Date()) {
     dia_evento: ['start_at', 'end_at'],
     desarme: ['desarme_start', 'desarme_end'],
   };
+  const showStart = event.start_at ? new Date(event.start_at) : null;
   return eventPhases.some((phase) => {
+    // Días individuales de show (dia_1 .. dia_6): cada día es el día calendario
+    // correspondiente a (N-1) días después del inicio del show.
+    if (phase.startsWith('dia_') && showStart) {
+      const n = parseInt(phase.slice(4), 10);
+      if (!n || n < 1 || n > 6) return false;
+      const dayStart = new Date(showStart);
+      dayStart.setDate(dayStart.getDate() + (n - 1));
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setHours(23, 59, 59, 999);
+      return now >= dayStart.getTime() && now <= dayEnd.getTime();
+    }
     const [startField, endField] = PHASE_DATES[phase] || [];
     const start = event[startField];
     const end = event[endField];

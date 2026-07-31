@@ -19,6 +19,7 @@ import { btnPrimary, btnOutline, btnIcon } from '@/components/ui/button-styles';
 import Pagination from '@/components/ui/pagination';
 import { usePagination } from '@/lib/usePagination';
 import { getInsuranceCoverageMap, isPersonInsured, isPersonInsurancePending } from '@/lib/insuranceUtils';
+import { buildPhaseOptions, getShowDays } from '@/lib/eventPhases';
 
 const validatePerson = (data) => {
   const e = {};
@@ -78,6 +79,7 @@ export default function People() {
   const [docUploadPerson, setDocUploadPerson] = useState(null);
   const [coverageMap, setCoverageMap] = useState({});
   const [insuranceFilter, setInsuranceFilter] = useState('');
+  const [selectedEventId, setSelectedEventId] = useState('');
 
   React.useEffect(() => {
     (async () => {
@@ -213,12 +215,9 @@ export default function People() {
         options: activeEvents.map((e) => ({ value: e.id, label: e.name })),
       },
       {
-        name: 'event_phases', label: 'Fases del evento', type: 'toggle-group',
-        options: [
-          { value: 'armado', label: 'Armado' },
-          { value: 'dia_evento', label: 'Show' },
-          { value: 'desarme', label: 'Desarme' },
-        ],
+        name: 'event_phases', label: 'Días / Fases del evento', type: 'toggle-group',
+        options: buildPhaseOptions(getShowDays(events, selectedEventId || editing?.event_id || '')),
+        hint: 'Seleccioná los días de show y fases (armado/desarme) en los que participa.',
         full: true,
       },
     {
@@ -250,15 +249,16 @@ export default function People() {
       { name: 'emergency_contact_phone', label: 'Contacto de emergencia — Teléfono', type: 'phone-ar' },
       { name: 'coordinator_name', label: 'Coordinador asignado', type: 'text', placeholder: 'Ej: Carlos López' },
     ];
-  }, [zones, events, editing, companies, sectors]);
+  }, [zones, events, editing, companies, sectors, selectedEventId]);
 
-  const openNew = () => { setEditing(null); setDniPrefill(null); setModalOpen(true); };
+  const openNew = () => { setEditing(null); setDniPrefill(null); setSelectedEventId(''); setModalOpen(true); };
   const openEdit = async (item) => {
     setDniPrefill(null);
     const normalized = { ...item };
     if (!normalized.event_id && normalized.event_ids?.length) {
       normalized.event_id = normalized.event_ids[0];
     }
+    setSelectedEventId(normalized.event_id || '');
     if (Array.isArray(normalized.event_phases)) {
       normalized.event_phases = normalized.event_phases.join(',');
     }
@@ -525,6 +525,7 @@ export default function People() {
         canDelete={!!editing}
         submitLabel={editing ? 'Guardar cambios' : 'Crear empleado'}
         entityName="Person"
+        onFieldChange={(name, value) => { if (name === 'event_id') setSelectedEventId(value); }}
       />
 
       <DniScannerModal open={dniScannerOpen} onClose={() => setDniScannerOpen(false)} onScanned={handleDniScanned} />

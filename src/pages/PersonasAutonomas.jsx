@@ -18,6 +18,7 @@ import { btnPrimary, btnOutline, btnIcon } from '@/components/ui/button-styles';
 import Pagination from '@/components/ui/pagination';
 import { usePagination } from '@/lib/usePagination';
 import { generateBadgeCode } from '@/lib/badgeCode';
+import { buildPhaseOptions, getShowDays } from '@/lib/eventPhases';
 
 const validateAutonomo = (data) => {
   const e = {};
@@ -91,6 +92,7 @@ export default function PersonasAutonomas() {
   const [documents, setDocuments] = useState([]);
   const [accreditingId, setAccreditingId] = useState(null);
   const [docUploadPerson, setDocUploadPerson] = useState(null);
+  const [selectedEventId, setSelectedEventId] = useState('');
 
   const refreshDocs = async () => {
     try {
@@ -258,12 +260,9 @@ export default function PersonasAutonomas() {
         options: activeEvents.map((e) => ({ value: e.id, label: e.name })),
       },
       {
-        name: 'event_phases', label: 'Fases del evento', type: 'toggle-group',
-        options: [
-          { value: 'armado', label: 'Armado' },
-          { value: 'dia_evento', label: 'Show' },
-          { value: 'desarme', label: 'Desarme' },
-        ],
+        name: 'event_phases', label: 'Días / Fases del evento', type: 'toggle-group',
+        options: buildPhaseOptions(getShowDays(events, selectedEventId || editing?.event_id || '')),
+        hint: 'Seleccioná los días de show y fases (armado/desarme) en los que participa.',
         full: true,
       },
       {
@@ -286,11 +285,12 @@ export default function PersonasAutonomas() {
       { name: 'emergency_contact_name', label: 'Contacto de emergencia — Nombre', type: 'text', placeholder: 'Ej: María Pérez' },
       { name: 'emergency_contact_phone', label: 'Contacto de emergencia — Teléfono', type: 'phone-ar' },
     ];
-  }, [zones, events, editing, sectors]);
+  }, [zones, events, editing, sectors, selectedEventId]);
 
-  const openNew = () => { setEditing(null); setDniPrefill(null); setModalOpen(true); };
+  const openNew = () => { setEditing(null); setDniPrefill(null); setSelectedEventId(''); setModalOpen(true); };
   const openEdit = async (item) => {
     setDniPrefill(null);
+    setSelectedEventId(item.event_id || '');
     const normalized = { ...item };
     if (Array.isArray(normalized.event_phases)) {
       normalized.event_phases = normalized.event_phases.join(',');
@@ -573,6 +573,7 @@ export default function PersonasAutonomas() {
         canDelete={!!editing}
         submitLabel={editing ? 'Guardar cambios' : 'Crear persona'}
         entityName="Person"
+        onFieldChange={(name, value) => { if (name === 'event_id') setSelectedEventId(value); }}
       />
 
       <DniScannerModal open={dniScannerOpen} onClose={() => setDniScannerOpen(false)} onScanned={handleDniScanned} />

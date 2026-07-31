@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Loader2, UserPlus, FileImage, ScanFace, CheckCircle2, FileText, CalendarDays, MapPin, ScanLine, Heart, Car } from 'lucide-react';
 import DniScannerModal from '@/components/DniScannerModal';
 import { base44 } from '@/api/base44Client';
@@ -7,15 +7,10 @@ import FaceCapture from '@/components/FaceCapture';
 import { useZones } from '@/lib/useZones';
 import { useParkingSectors } from '@/lib/useParkingSectors';
 import { extractFaceFromDni } from '@/lib/dniFaceExtract';
+import { buildPhaseOptions } from '@/lib/eventPhases';
 
 const EMPTY = { first_name: '', last_name: '', document: '', phone: '', employment_type: 'fijo', access_area: '', event_phases: [], event_ids: [], notes: '', obra_social: '', carnet_obra_social: '', emergency_contact_name: '', emergency_contact_phone: '', allergies: '', blood_type: '', coordinator_name: '', veh_id: null, veh_plate: '', veh_brand: '', veh_model: '', veh_color: '', veh_type: 'auto', veh_parking_sector: '' };
 const normalizeType = (v) => (v === 'eventual' || v === 'esporadico' ? 'eventual' : 'fijo');
-
-const PHASES = [
-  { value: 'armado', label: 'Armado' },
-  { value: 'dia_evento', label: 'Show' },
-  { value: 'desarme', label: 'Desarme' },
-];
 
 function buildForm(editing) {
   if (!editing) return EMPTY;
@@ -101,6 +96,17 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
   }, [editing, open]);
 
   const setField = (name, value) => setForm((f) => ({ ...f, [name]: value }));
+
+  // Fases dinámicas: usa el mayor show_days entre los eventos asignados al empleado
+  const phaseOptions = useMemo(() => {
+    const selected = (form.event_ids || [])
+      .map((id) => approvedEvents.find((e) => e.event_id === id))
+      .filter(Boolean);
+    const maxDays = selected.length
+      ? Math.max(...selected.map((e) => Number(e.show_days) || 1))
+      : 6;
+    return buildPhaseOptions(Math.min(6, Math.max(1, maxDays)));
+  }, [form.event_ids, approvedEvents]);
 
   const handleDniScanned = (data) => {
     setForm((f) => ({
@@ -375,9 +381,9 @@ export default function EmployeeFormModal({ open, onClose, onSubmit, editing, co
             </label>
           </div>
           <div>
-            <span className="mb-1.5 block text-xs font-semibold text-slate-600">Fases del evento</span>
+            <span className="mb-1.5 block text-xs font-semibold text-slate-600">Días / Fases del evento</span>
             <div className="flex flex-wrap gap-1.5">
-              {PHASES.map(({ value, label }) => {
+              {phaseOptions.map(({ value, label }) => {
                 const active = form.event_phases.includes(value);
                 return (
                   <button

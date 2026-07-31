@@ -64,6 +64,7 @@ export default function Events() {
       });
     }
     baseFields.push(
+      { name: 'show_days', label: 'Días de show', type: 'number', full: true, hint: 'Cantidad de días de show del evento (1 a 6). Define qué días podrán asignarse al acreditar personas.', placeholder: '1' },
       { name: 'start_at', label: 'Show - Inicio', type: 'datetime-local' },
       { name: 'end_at', label: 'Show - Fin', type: 'datetime-local' },
       { name: 'armado_start', label: 'Armado - Inicio', type: 'datetime-local' },

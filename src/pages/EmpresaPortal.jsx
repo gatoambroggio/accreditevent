@@ -25,7 +25,7 @@ const DOC_TYPES = {
   other: 'Otro',
 };
 
-const PHASE_LABELS = { armado: 'Armado', dia_evento: 'Show', desarme: 'Desarme' };
+const PHASE_LABELS = { armado: 'Armado', dia_evento: 'Show', desarme: 'Desarme', dia_1: 'Día 1', dia_2: 'Día 2', dia_3: 'Día 3', dia_4: 'Día 4', dia_5: 'Día 5', dia_6: 'Día 6' };
 
 export default function EmpresaPortal() {
   const [user, setUser] = useState(null);
@@ -47,11 +47,12 @@ export default function EmpresaPortal() {
   const [accredByPerson, setAccredByPerson] = useState({});
   const [vehiclesByPerson, setVehiclesByPerson] = useState({});
   const [docsForInsurance, setDocsForInsurance] = useState([]);
+  const [eventShowDays, setEventShowDays] = useState({});
 
   const companyName = user?.company || user?.data?.company || '';
   const approvedEvents = approvals.filter((a) => a.status === 'approved').map((a) => a.event_name);
   const isApproved = approvedEvents.length > 0;
-  const approvedEventList = approvals.filter((a) => a.status === 'approved').map((a) => ({ event_id: a.event_id, event_name: a.event_name, productora: a.company }));
+  const approvedEventList = approvals.filter((a) => a.status === 'approved').map((a) => ({ event_id: a.event_id, event_name: a.event_name, productora: a.company, show_days: eventShowDays[a.event_id] || 1 }));
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const loadBlocked = isApproved && approvedEventList.every((ev) => {
@@ -79,6 +80,21 @@ export default function EmpresaPortal() {
       setEmployees(emps);
       setDocuments(docs);
       setApprovals(apprs);
+      // Traer show_days de cada evento aprobado (service role, bypass RLS)
+      try {
+        const approvedIds = apprs.filter((a) => a.status === 'approved').map((a) => a.event_id);
+        if (approvedIds.length > 0) {
+          const evResps = await Promise.all(
+            approvedIds.map((id) => base44.functions.invoke('getCompanyEvents', { event_id: id }).catch(() => null))
+          );
+          const map = {};
+          evResps.forEach((r) => {
+            const ev = r?.data?.events?.[0];
+            if (ev) map[ev.id] = ev.show_days || 1;
+          });
+          setEventShowDays(map);
+        }
+      } catch {}
       // Fetch accreditation status + vehicles for each employee (service role bypasses RLS)
       try {
         const statusRes = await base44.functions.invoke('getEmpresaEmployeeStatus', {});

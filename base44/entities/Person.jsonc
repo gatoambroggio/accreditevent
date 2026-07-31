@@ -61,11 +61,17 @@
         "enum": [
           "armado",
           "dia_evento",
+          "dia_1",
+          "dia_2",
+          "dia_3",
+          "dia_4",
+          "dia_5",
+          "dia_6",
           "desarme"
         ]
       },
       "default": [],
-      "description": "Fases del evento en las que participa el empleado"
+      "description": "Fases/d\u00edas del evento en las que participa el empleado (d\u00eda_1 .. d\u00eda_6 seg\u00fan show_days del evento)"
     },
     "event_id": {
       "type": "string",

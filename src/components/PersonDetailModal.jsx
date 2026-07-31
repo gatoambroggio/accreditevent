@@ -11,6 +11,7 @@ import { useParkingSectors } from '@/lib/useParkingSectors';
 import DniToBiometric from '@/components/DniToBiometric';
 import { useCustomFields } from '@/lib/useCustomFields';
 import { getInsuranceStatus } from '@/lib/insuranceUtils';
+import { phaseLabel } from '@/lib/eventPhases';
 
 export default function PersonDetailModal({ person, onClose, readOnly = false }) {
   const [docs, setDocs] = useState([]);
@@ -206,7 +207,7 @@ export default function PersonDetailModal({ person, onClose, readOnly = false })
               )}
               {person.event_phases?.map((p) => (
                 <span key={p} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-                  {{ armado: 'Armado', dia_evento: 'Show', desarme: 'Desarme' }[p] || p}
+                  {phaseLabel(p)}
                 </span>
               ))}
               {person.access_area && (

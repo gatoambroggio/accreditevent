@@ -28,6 +28,11 @@
       "format": "date-time",
       "description": "Show - fecha y hora de fin"
     },
+    "show_days": {
+      "type": "number",
+      "default": 1,
+      "description": "Cantidad de d\u00edas de show del evento (1 a 6). Define los d\u00edas seleccionables al acreditar."
+    },
     "armado_start": {
       "type": "string",
       "format": "date-time",

@@ -7,6 +7,7 @@ import { findBestMatch } from '@/lib/faceRecognition';
 import { canAccessAnyZone } from '@/lib/accessZones';
 import { useZones } from '@/lib/useZones';
 import { getEventStatus, EVENT_STATUS_INFO, speakResult, isWithinEventPhases } from '@/lib/accessUtils';
+import { phaseLabel } from '@/lib/eventPhases';
 
 export default function AccessStation() {
   const [phase, setPhase] = useState('select');
@@ -448,23 +449,13 @@ export default function AccessStation() {
           {(() => {
             const phases = result.event_phases || result.accred?.event_phases || [];
             if (phases.length === 0 && !result.accred) return null;
-            const PHASE_LABELS = { armado: 'Armado', dia_evento: 'Show', desarme: 'Desarme' };
-            const ALL_PHASES = ['armado', 'dia_evento', 'desarme'];
             return (
-              <div className="mt-2 flex items-center gap-2">
-                {ALL_PHASES.map((ph) => {
-                  const enabled = phases.includes(ph);
-                  return (
-                    <span
-                      key={ph}
-                      className={`rounded-full px-3 py-0.5 text-xs font-semibold ring-1 ring-inset ${
-                        enabled ? 'bg-white/20 text-white ring-white/30' : 'bg-white/5 text-white/40 ring-white/10'
-                      }`}
-                    >
-                      {enabled ? '✓' : '✗'} {PHASE_LABELS[ph]}
-                    </span>
-                  );
-                })}
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                {phases.map((ph) => (
+                  <span key={ph} className="rounded-full bg-white/20 px-3 py-0.5 text-xs font-semibold text-white ring-1 ring-inset ring-white/30">
+                    ✓ {phaseLabel(ph)}
+                  </span>
+                ))}
               </div>
             );
           })()}

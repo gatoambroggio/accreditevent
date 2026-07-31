@@ -28,6 +28,7 @@ import { getInsuranceStatus } from '@/lib/insuranceUtils';
 import { pickPersonDefaultEvent } from '@/lib/personDefaultEvent';
 import { useAuth } from '@/lib/AuthContext';
 import { canModify } from '@/lib/accessUtils';
+import { buildPhaseOptions, getShowDays } from '@/lib/eventPhases';
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Activa' },
@@ -154,6 +155,7 @@ export default function Accreditations() {
     .filter((e) => e.status !== 'closed' || (editing && editing.event_id === e.id))
     .map((e) => ({ value: e.id, label: e.name }));
   const personOptions = people.map((p) => ({ value: p.id, label: `${p.full_name} — ${p.document || 'sin doc'} (${p.person_type})` }));
+  const phaseOptions = buildPhaseOptions(getShowDays(events, selectedEventId || editing?.event_id || ''));
 
   const fields = [
     { name: 'event_id', label: 'Evento', type: 'select', options: eventOptions, required: true },
@@ -166,12 +168,9 @@ export default function Accreditations() {
       full: true,
     },
     {
-      name: 'event_phases', label: 'Fases del evento', type: 'toggle-group',
-      options: [
-        { value: 'armado', label: 'Armado' },
-        { value: 'dia_evento', label: 'Show' },
-        { value: 'desarme', label: 'Desarme' },
-      ],
+      name: 'event_phases', label: 'Días / Fases del evento', type: 'toggle-group',
+      options: phaseOptions,
+      hint: 'Seleccioná los días de show y fases (armado/desarme) en los que la persona tiene acceso.',
       full: true,
     },
     { name: 'status', label: 'Estado', type: 'select', options: STATUS_OPTIONS },
