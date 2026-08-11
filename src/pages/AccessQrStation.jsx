@@ -14,6 +14,9 @@ import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { saveEventData, getEventData, getCacheAgeMs, queueAccessLog, setCachedVerifier, getCachedVerifier } from '@/lib/offlineAccess';
 import { validatePersonAccred, validateVehicleObj } from '@/lib/offlineValidation';
 
+const PERSON_LIMIT = 3000;
+const VEHICLE_LIMIT = 3000;
+
 export default function AccessQrStation({ mode = 'person' }) {
   const [phase, setPhase] = useState('select');
   const [events, setEvents] = useState([]);
@@ -25,20 +28,18 @@ export default function AccessQrStation({ mode = 'person' }) {
   const [cycle, setCycle] = useState(0);
   const [verifying, setVerifying] = useState(false);
   const [result, setResult] = useState(null);
-  // Flujo unificado persona + vehículo (mode='person')
-  const [personResult, setPersonResult] = useState(null);
-  const [vehicleResult, setVehicleResult] = useState(null);
-  const [awaitingVehicle, setAwaitingVehicle] = useState(false);
   const [scanMode, setScanMode] = useScanMode();
-  const [offlineMode, setOfflineMode] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [cacheAge, setCacheAge] = useState(null);
+  const [accreditations, setAccreditations] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
   const qrCooldown = useRef(false);
   const { zones } = useZones();
   const { sectors: parkingSectors } = useParkingSectors();
   const online = useOnlineStatus();
   const { pendingCount, syncing, refresh: refreshPending } = useOfflineSync(online);
-  const effectiveOffline = offlineMode || !online;
+  // Modo offline AUTOMÁTICO: se activa solo cuando no hay conexión.
+  const effectiveOffline = !online;
 
   useEffect(() => {
     (async () => {
@@ -58,11 +59,13 @@ export default function AccessQrStation({ mode = 'person' }) {
     setDownloading(true);
     try {
       const [accs, allVehs] = await Promise.all([
-        base44.entities.Accreditation.filter({ status: 'active', event_id: evt.id }, '-created_date', 2000),
-        base44.entities.Vehicle.list('-created_date', 2000),
+        base44.entities.Accreditation.filter({ status: 'active', event_id: evt.id }, '-created_date', PERSON_LIMIT),
+        base44.entities.Vehicle.list('-created_date', VEHICLE_LIMIT),
       ]);
       const vehs = (allVehs || []).filter((v) => (v.event_ids || []).includes(evt.id));
-      saveEventData(evt.id, { accreditations: accs, vehicles: vehs });
+      setAccreditations(accs || []);
+      setVehicles(vehs || []);
+      saveEventData(evt.id, { accreditations: accs || [], vehicles: vehs || [] });
       setCacheAge(0);
     } catch {}
     setDownloading(false);
@@ -74,14 +77,20 @@ export default function AccessQrStation({ mode = 'person' }) {
     setSelectedEvent(evt);
     setPhase('active');
     setCycle((c) => c + 1);
+    setResult(null);
     setCacheAge(getCacheAgeMs(evt.id));
-    if (navigator.onLine) downloadEventData(evt);
+    if (navigator.onLine) {
+      downloadEventData(evt);
+    } else {
+      // Sin conexión: cargar datos desde caché local si existen.
+      const cache = getEventData(evt.id);
+      setAccreditations(cache?.accreditations || []);
+      setVehicles(cache?.vehicles || []);
+    }
   };
 
   const resetFlow = () => {
-    setPersonResult(null);
-    setVehicleResult(null);
-    setAwaitingVehicle(false);
+    setResult(null);
     setCycle((c) => c + 1);
   };
 
@@ -92,31 +101,36 @@ export default function AccessQrStation({ mode = 'person' }) {
     setSelectedZones(['general']);
     setSelectedSectors([]);
     setResult(null);
-    setPersonResult(null);
-    setVehicleResult(null);
-    setAwaitingVehicle(false);
     setVerifying(false);
+    setAccreditations([]);
+    setVehicles([]);
   };
 
-  const resolveAccreditations = async () => {
+  // Resuelve la lista de acreditaciones según el modo (online usa estado, offline usa caché).
+  const resolveAccreditations = () => {
     if (effectiveOffline) {
       const cache = getEventData(selectedEvent.id);
       return cache?.accreditations || [];
     }
-    return base44.entities.Accreditation.filter({ status: 'active', event_id: selectedEvent.id }, '-created_date', 500);
+    return accreditations;
   };
 
-  const resolveVehicle = async (code) => {
+  const resolveVehicles = () => {
     if (effectiveOffline) {
       const cache = getEventData(selectedEvent.id);
-      return cache?.vehicles?.find((v) => v.id === code) || null;
+      return cache?.vehicles || [];
     }
-    try { return await base44.entities.Vehicle.get(code); } catch { return null; }
+    return vehicles;
+  };
+
+  // Fallback online: obtener acreditación por id directo (por si excede el límite o RLS por evento).
+  const fallbackGetAccred = async (code) => {
+    if (effectiveOffline) return null;
+    try { return await base44.entities.Accreditation.get(code); } catch { return null; }
   };
 
   const handleQrDetected = async (code) => {
-    const finalShowing = mode === 'vehicle' ? !!result : (!!personResult && !awaitingVehicle);
-    if (qrCooldown.current || verifying || finalShowing) return;
+    if (qrCooldown.current || verifying || result) return;
     qrCooldown.current = true;
     setVerifying(true);
     const verifier = getCachedVerifier();
@@ -131,8 +145,8 @@ export default function AccessQrStation({ mode = 'person' }) {
           company: opts.company || selectedEvent.company,
           verified_by: verifier,
           method: 'manual',
-          resource_type: opts.resource_type || mode,
-          zone: opts.zone || selectedZones.join(', '),
+          resource_type: opts.resource_type || 'person',
+          zone: opts.zone || (opts.resource_type === 'vehicle' ? selectedSectors.join(', ') : selectedZones.join(', ')),
           result: res,
           access_level: opts.access_level || '',
         };
@@ -144,62 +158,70 @@ export default function AccessQrStation({ mode = 'person' }) {
         }
       };
 
-      // --- Modo vehículo (ruta /control-vehicular): validación simple ---
+      // --- Modo vehicular puro (ruta /control-vehicular) ---
       if (mode === 'vehicle') {
-        const vehicle = await resolveVehicle(code);
+        const vehs = resolveVehicles();
+        let vehicle = vehs.find((v) => v.id === code || (v.plate && v.plate.toUpperCase() === String(code).toUpperCase()));
+        if (!vehicle && !effectiveOffline) {
+          // fallback online directo por id
+          try { const dv = await base44.entities.Vehicle.get(code); if (dv && (dv.event_ids || []).includes(selectedEvent.id)) vehicle = dv; } catch {}
+        }
         const vr = validateVehicleObj(vehicle, selectedEvent, selectedSectors, parkingSectors);
-        await logAccess(vr.ok ? 'granted' : 'denied', vehicle ? { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, zone: selectedSectors.join(', ') } : {});
+        await logAccess(vr.ok ? 'granted' : 'denied', vehicle ? { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, resource_type: 'vehicle' } : { resource_type: 'vehicle' });
         if (vr.ok) {
-          setResult({ ok: true, person_name: vehicle.person_name, type: 'vehicle', vehicle });
+          setResult({ ok: true, type: 'vehicle', person_name: vehicle.person_name, vehicle });
         } else {
-          setResult({ ok: false, person_name: vehicle?.person_name, type: 'vehicle', vehicle, message: vr.message });
+          setResult({ ok: false, type: 'vehicle', person_name: vehicle?.person_name, vehicle, message: vr.message });
         }
         return;
       }
 
-      // --- Modo persona: flujo unificado persona + vehículo ---
-      // Paso 2: escaneo del vehículo
-      if (awaitingVehicle) {
-        const vehicle = await resolveVehicle(code);
-        const vr = validateVehicleObj(vehicle, selectedEvent, selectedSectors, parkingSectors);
-        await logAccess(vr.ok ? 'granted' : 'denied', vehicle ? { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, resource_type: 'vehicle', zone: selectedSectors.join(', ') } : { resource_type: 'vehicle' });
-        setVehicleResult(vr.ok ? { ok: true, person_name: vehicle.person_name, type: 'vehicle', vehicle } : { ok: false, person_name: vehicle?.person_name, type: 'vehicle', vehicle, message: vr.message });
-        setAwaitingVehicle(false);
+      // --- Modo persona: detección automática persona vs vehículo ---
+      const accs = resolveAccreditations();
+      const vehs = resolveVehicles();
+
+      // 1) ¿Es una acreditación de persona? (por id o badge_code)
+      let accred = accs.find((a) => a.id === code || (a.badge_code && a.badge_code === code));
+      // 2) ¿Es un vehículo? (por id o patente)
+      let vehicle = vehs.find((v) => v.id === code || (v.plate && v.plate.toUpperCase() === String(code).toUpperCase()));
+
+      // Fallback online directo si no se encontró en listado (superaba límite o RLS por evento asignado)
+      if (!accred && !vehicle && !effectiveOffline) {
+        accred = await fallbackGetAccred(code);
+      }
+
+      if (accred) {
+        const pv = validatePersonAccred(accred, selectedEvent, selectedZones, zones);
+        await logAccess(pv.ok ? 'granted' : 'denied', { id: accred.id, person_name: accred.person_name, badge_code: accred.badge_code, company: accred.company, access_level: accred.access_level });
+        setResult(pv.ok
+          ? { ok: true, type: 'person', person_name: accred.person_name, accred }
+          : { ok: false, type: 'person', person_name: accred.person_name || '', accred, message: pv.message });
         return;
       }
 
-      // Paso 1: validación de persona
-      const accreditations = await resolveAccreditations();
-      const accred = accreditations.find((a) => a.id === code);
-      const pv = validatePersonAccred(accred, selectedEvent, selectedZones, zones);
-      await logAccess(pv.ok ? 'granted' : 'denied', accred ? { id: accred.id, person_name: accred.person_name, badge_code: accred.badge_code, company: accred.company, access_level: accred.access_level } : {});
-      setVehicleResult(null);
-      setPersonResult(pv.ok
-        ? { ok: true, person_name: accred.person_name, accred }
-        : { ok: false, person_name: accred?.person_name || '', accred: accred || null, message: pv.message });
-      if (pv.ok) setAwaitingVehicle(true);
-    } catch (err) {
-      if (mode === 'vehicle') {
-        setResult({ ok: false, message: err.message || 'Error en la verificación.' });
-      } else {
-        setVehicleResult(null);
-        setAwaitingVehicle(false);
-        setPersonResult({ ok: false, message: err.message || 'Error en la verificación.' });
+      if (vehicle) {
+        const vr = validateVehicleObj(vehicle, selectedEvent, selectedSectors, parkingSectors);
+        await logAccess(vr.ok ? 'granted' : 'denied', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, resource_type: 'vehicle' });
+        setResult(vr.ok
+          ? { ok: true, type: 'vehicle', person_name: vehicle.person_name, vehicle }
+          : { ok: false, type: 'vehicle', person_name: vehicle?.person_name, vehicle, message: vr.message });
+        return;
       }
+
+      // No encontrado en ningún listado
+      await logAccess('denied', {});
+      setResult({ ok: false, type: 'unknown', message: 'Credencial no encontrada para este evento.' });
+    } catch (err) {
+      setResult({ ok: false, type: 'unknown', message: err.message || 'Error en la verificación.' });
     } finally {
       setVerifying(false);
       setTimeout(() => { qrCooldown.current = false; }, 1200);
     }
   };
 
-  const skipVehicle = () => {
-    setAwaitingVehicle(false);
-    setVehicleResult(null);
-  };
-
-  // Auto-clear: modo vehículo
+  // Auto-clear del resultado para continuar escaneando
   useEffect(() => {
-    if (mode === 'vehicle' && result) {
+    if (result) {
       speakResult(result.ok);
       const timer = setTimeout(() => {
         setResult(null);
@@ -207,28 +229,11 @@ export default function AccessQrStation({ mode = 'person' }) {
       }, 2500);
       return () => clearTimeout(timer);
     }
-  }, [mode, result]);
-
-  // Auto-clear: modo persona (resultado final combinado)
-  useEffect(() => {
-    if (mode === 'person' && personResult && !awaitingVehicle) {
-      const overallOk = personResult.ok && (vehicleResult ? vehicleResult.ok : true);
-      speakResult(overallOk);
-      const timer = setTimeout(() => {
-        setPersonResult(null);
-        setVehicleResult(null);
-        setAwaitingVehicle(false);
-        setCycle((c) => c + 1);
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [mode, personResult, awaitingVehicle, vehicleResult]);
+  }, [result]);
 
   const eventStatus = selectedEvent ? getEventStatus(selectedEvent) : null;
-  const finalShowing = mode === 'vehicle' ? !!result : (!!personResult && !awaitingVehicle);
-  const isPaused = verifying || finalShowing;
-  const hwDisabled = verifying || finalShowing;
-  const personOverallOk = personResult && personResult.ok && (vehicleResult ? vehicleResult.ok : true);
+  const isPaused = verifying || !!result;
+  const hwDisabled = verifying || !!result;
 
   return (
     <div className="min-h-screen bg-[hsl(120_14%_97%)]">
@@ -238,7 +243,7 @@ export default function AccessQrStation({ mode = 'person' }) {
           <div className="flex items-center gap-2.5">
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-[hsl(39_86%_63%)] text-sm font-extrabold text-[hsl(146_34%_11%)]">A</span>
             <span className="text-lg font-extrabold tracking-tight text-slate-900">
-              {mode === 'person' ? 'Control de Personas QR' : 'Control Vehicular QR'}
+              {mode === 'person' ? 'Control de Acceso QR' : 'Control Vehicular QR'}
             </span>
           </div>
           <div className="flex items-center gap-4">
@@ -269,7 +274,7 @@ export default function AccessQrStation({ mode = 'person' }) {
                 <h2 className="text-xl font-bold text-slate-900">Control de acceso por QR</h2>
                 <p className="text-sm text-slate-500">
                   {mode === 'person'
-                    ? 'Elegí el evento y la zona. Se valida la persona y luego el QR del vehículo.'
+                    ? 'Elegí el evento. Se detecta automáticamente si el QR es de persona o vehículo.'
                     : 'Elegí el evento y el sector para iniciar.'}
                 </p>
               </div>
@@ -314,9 +319,10 @@ export default function AccessQrStation({ mode = 'person' }) {
                     );
                   })}
                 </div>
+
                 {mode === 'person' && (
                   <div className="mt-5">
-                    <label className="mb-1.5 block text-xs font-semibold text-slate-600">Zona(s) de control</label>
+                    <label className="mb-1.5 block text-xs font-semibold text-slate-600">Zona(s) de control (personas)</label>
                     <p className="mb-2 text-xs text-slate-400">Seleccioná una o varias. Se permite el ingreso si la persona tiene acceso a alguna de las seleccionadas.</p>
                     <div className="flex flex-wrap gap-2">
                       {zones.map((z) => {
@@ -334,38 +340,38 @@ export default function AccessQrStation({ mode = 'person' }) {
                     </div>
                   </div>
                 )}
-                {mode === 'vehicle' && (
-                  <div className="mt-5">
-                    <label className="mb-1.5 block text-xs font-semibold text-slate-600">Sector(es) de estacionamiento</label>
-                    <p className="mb-2 text-xs text-slate-400">Seleccioná uno o varios. Se permite el ingreso si el vehículo tiene asignado alguno de los sectores seleccionados.</p>
-                    {parkingSectors.length === 0 ? (
-                      <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs text-slate-500">
-                        No hay sectores configurados. Se validará solo la asignación al evento.
-                      </div>
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {parkingSectors.map((s) => {
-                          const active = selectedSectors.includes(s.value);
-                          return (
-                            <button
-                              key={s.value}
-                              onClick={() => setSelectedSectors((prev) => active ? prev.filter((v) => v !== s.value) : [...prev, s.value])}
-                              className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-                            >
-                              {s.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
+
+                <div className="mt-5">
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-600">Sector(es) de estacionamiento (vehículos)</label>
+                  <p className="mb-2 text-xs text-slate-400">Seleccioná uno o varios. Se valida el sector del vehículo si se escanea una credencial vehicular.</p>
+                  {parkingSectors.length === 0 ? (
+                    <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs text-slate-500">
+                      No hay sectores configurados. Se validará solo la asignación al evento.
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {parkingSectors.map((s) => {
+                        const active = selectedSectors.includes(s.value);
+                        return (
+                          <button
+                            key={s.value}
+                            onClick={() => setSelectedSectors((prev) => active ? prev.filter((v) => v !== s.value) : [...prev, s.value])}
+                            className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${active ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                          >
+                            {s.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
                 <button
                   onClick={startStation}
                   disabled={!selectedEventId || (mode === 'person' && selectedZones.length === 0)}
                   className="mt-5 w-full rounded-lg bg-emerald-700 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50"
                 >
-                  Iniciar control de {mode === 'person' ? 'personas' : 'vehículos'}
+                  Iniciar control de acceso
                 </button>
               </>
             )}
@@ -384,17 +390,13 @@ export default function AccessQrStation({ mode = 'person' }) {
                 <p className="text-xs text-slate-500">
                   {selectedEvent.venue || 'Sin sede'} ·{' '}
                   {mode === 'person'
-                    ? `Zonas: ${selectedZones.map((z) => zones.find((zz) => zz.value === z)?.label || z).join(', ')}`
+                    ? `Zonas: ${selectedZones.map((z) => zones.find((zz) => zz.value === z)?.label || z).join(', ')} · Sectores: ${selectedSectors.length > 0 ? selectedSectors.map((s) => parkingSectors.find((ps) => ps.value === s)?.label || s).join(', ') : 'Todos'}`
                     : `Sectores: ${selectedSectors.length > 0 ? selectedSectors.map((s) => parkingSectors.find((ps) => ps.value === s)?.label || s).join(', ') : 'Todos'}`}
                 </p>
               </div>
               {eventStatus === 'ended' ? (
                 <div className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-inset ring-red-200">
                   <AlertTriangle className="h-4 w-4" /> Evento finalizado
-                </div>
-              ) : eventStatus === 'grace' ? (
-                <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">
-                  <Clock className="h-4 w-4" /> Período de gracia ({selectedEvent.grace_hours ?? 4}h)
                 </div>
               ) : eventStatus === 'upcoming' ? (
                 <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">
@@ -412,19 +414,15 @@ export default function AccessQrStation({ mode = 'person' }) {
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="mb-5">
                 <div className="flex items-center gap-3">
-                  <div className={`grid h-10 w-10 place-items-center rounded-lg ${mode === 'person' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-                    {mode === 'person' ? <User className="h-5 w-5" /> : <Car className="h-5 w-5" />}
+                  <div className="grid h-10 w-10 place-items-center rounded-lg bg-emerald-50 text-emerald-600">
+                    <User className="h-5 w-5" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-slate-900">
-                      {mode === 'person' ? 'Acceso de personas' : 'Acceso vehicular'}
-                    </h2>
+                    <h2 className="text-xl font-bold text-slate-900">Acceso por QR</h2>
                     <p className="text-sm text-slate-500">
                       {scanMode === 'scanner'
-                        ? 'Escaneá el código con el lector de la PDA para validar el ingreso.'
-                        : mode === 'person'
-                          ? 'Enfocá el QR de la credencial de la persona y luego el del vehículo.'
-                          : 'Enfocá el QR de la credencial vehicular para validar el ingreso.'}
+                        ? 'Apretá el gatillo y leé el QR de persona o vehículo: la app detecta el tipo automáticamente.'
+                        : 'Enfocá el QR de persona o vehículo: la app detecta el tipo automáticamente.'}
                     </p>
                   </div>
                 </div>
@@ -432,20 +430,18 @@ export default function AccessQrStation({ mode = 'person' }) {
                   <ScanModeToggle mode={scanMode} onChange={setScanMode} />
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                  <button
-                    onClick={() => setOfflineMode((v) => !v)}
-                    className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 font-semibold transition ${effectiveOffline ? 'border-amber-400 bg-amber-50 text-amber-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
-                  >
-                    <WifiOff className="h-3.5 w-3.5" /> Modo offline {effectiveOffline ? 'ON' : 'OFF'}
-                  </button>
-                  {downloading ? (
-                    <span className="inline-flex items-center gap-1.5 text-slate-500"><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Descargando datos…</span>
-                  ) : cacheAge != null ? (
-                    <span className="text-slate-500">Datos offline: {cacheAge === 0 ? 'actualizados' : `hace ${Math.max(1, Math.round(cacheAge / 60000))} min`}</span>
+                  {effectiveOffline ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-amber-400 bg-amber-50 px-3 py-1.5 font-semibold text-amber-700">
+                      <WifiOff className="h-3.5 w-3.5" /> Modo offline automático (sin conexión)
+                    </span>
+                  ) : downloading ? (
+                    <span className="inline-flex items-center gap-1.5 text-slate-500"><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Descargando datos del evento…</span>
                   ) : (
-                    <span className="text-slate-400">Sin datos offline</span>
+                    <span className="inline-flex items-center gap-1.5 text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" /> Online · {accreditations.length} personas / {vehicles.length} vehículos cargados</span>
                   )}
-                  {!online && <span className="inline-flex items-center gap-1 font-semibold text-red-600"><WifiOff className="h-3.5 w-3.5" /> Sin conexión</span>}
+                  {cacheAge != null && (
+                    <span className="text-slate-500">Caché: {cacheAge === 0 ? 'actualizada' : `hace ${Math.max(1, Math.round(cacheAge / 60000))} min`}</span>
+                  )}
                   {pendingCount > 0 && (
                     <span className={`inline-flex items-center gap-1 ${syncing ? 'text-emerald-600' : 'text-amber-600'}`}>
                       <CloudUpload className="h-3.5 w-3.5" /> {syncing ? 'Sincronizando…' : `${pendingCount} registro(s) pendientes`}
@@ -469,6 +465,15 @@ export default function AccessQrStation({ mode = 'person' }) {
                     ← Volver a selección de evento
                   </button>
                 </div>
+              ) : effectiveOffline && !getEventData(selectedEvent.id) ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <WifiOff className="h-12 w-12 text-amber-500" />
+                  <p className="mt-4 text-lg font-bold text-slate-900">Sin datos offline para este evento</p>
+                  <p className="mt-1 max-w-xs text-sm text-slate-500">Conectate a internet y abrí el control al menos una vez para descargar los datos. Luego podés operar sin conexión.</p>
+                  <button onClick={backToSelect} className="mt-6 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+                    ← Volver
+                  </button>
+                </div>
               ) : verifying ? (
                 <div className="flex flex-col items-center justify-center py-16">
                   <Loader2 className="h-10 w-10 animate-spin text-emerald-600" />
@@ -476,21 +481,6 @@ export default function AccessQrStation({ mode = 'person' }) {
                 </div>
               ) : (
                 <>
-                  {mode === 'person' && awaitingVehicle && (
-                    <div className="mb-4 rounded-xl border-2 border-emerald-300 bg-emerald-50 p-3 text-center">
-                      <p className="text-sm font-bold text-emerald-800">
-                        ✓ {personResult?.person_name} — Escanee el QR del vehículo
-                      </p>
-                      <button onClick={skipVehicle} className="mt-2 text-xs font-semibold text-emerald-700 underline">
-                        Omitir vehículo
-                      </button>
-                    </div>
-                  )}
-                  {effectiveOffline && !getEventData(selectedEvent.id) && (
-                    <div className="mb-4 rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-center text-sm font-semibold text-amber-800">
-                      Sin datos offline para este evento. Conectate y descargá los datos antes de usar modo offline.
-                    </div>
-                  )}
                   {scanMode === 'scanner' ? (
                     <HardwareScannerInput onScan={handleQrDetected} disabled={hwDisabled} />
                   ) : (
@@ -503,11 +493,11 @@ export default function AccessQrStation({ mode = 'person' }) {
         </>
       )}
 
-      {/* Full-screen result overlay — modo vehículo */}
-      {mode === 'vehicle' && result && (
+      {/* Full-screen result overlay */}
+      {result && (
         <div
           className={`fixed inset-0 z-[60] flex flex-col items-center justify-center ${result.ok ? 'bg-emerald-600' : 'bg-red-600'}`}
-          onClick={() => { setResult(null); setCycle((c) => c + 1); }}
+          onClick={resetFlow}
         >
           {result.ok ? (
             <CheckCircle2 className="h-32 w-32 text-white" strokeWidth={1.5} />
@@ -518,66 +508,29 @@ export default function AccessQrStation({ mode = 'person' }) {
             {result.ok ? 'ACEPTADO' : 'DENEGADO'}
           </p>
           <div className="mt-4 flex items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-sm font-semibold text-white">
-            <Car className="h-4 w-4" /> Vehículo
+            {result.type === 'vehicle' ? <Car className="h-4 w-4" /> : <User className="h-4 w-4" />}
+            {result.type === 'vehicle' ? 'Vehículo' : result.type === 'person' ? 'Persona' : 'Credencial'}
           </div>
-          {result.vehicle && (
+          {result.type === 'vehicle' && result.vehicle && (
             <p className="mt-2 text-xl font-bold text-white">
               {result.vehicle.plate} · {result.vehicle.brand} {result.vehicle.model}
             </p>
           )}
           {result.person_name && (
-            <p className="mt-2 text-lg text-white/80">{result.person_name}</p>
+            <p className="mt-2 text-lg text-white/90">{result.person_name}</p>
+          )}
+          {result.type === 'person' && result.accred?.access_level && (
+            <p className="mt-1 rounded-full bg-white/15 px-4 py-1.5 text-sm font-semibold text-white">
+              Acceso: {result.accred.access_level}
+            </p>
+          )}
+          {result.type === 'vehicle' && result.ok && result.vehicle?.parking_sector && (
+            <p className="mt-1 rounded-full bg-white/15 px-4 py-1.5 text-sm font-semibold text-white">
+              Estacionamiento: {parkingSectors.find((s) => s.value === result.vehicle.parking_sector)?.label || result.vehicle.parking_sector}
+            </p>
           )}
           {!result.ok && result.message && (
             <p className="mt-1 max-w-md px-6 text-center text-sm text-white/70">{result.message}</p>
-          )}
-        </div>
-      )}
-
-      {/* Full-screen result overlay — modo persona (persona + vehículo) */}
-      {mode === 'person' && personResult && !awaitingVehicle && (
-        <div
-          className={`fixed inset-0 z-[60] flex flex-col items-center justify-center ${personOverallOk ? 'bg-emerald-600' : 'bg-red-600'}`}
-          onClick={resetFlow}
-        >
-          {personOverallOk ? (
-            <CheckCircle2 className="h-28 w-28 text-white" strokeWidth={1.5} />
-          ) : (
-            <XCircle className="h-28 w-28 text-white" strokeWidth={1.5} />
-          )}
-          <p className="mt-4 text-5xl font-extrabold tracking-tight text-white sm:text-6xl">
-            {personOverallOk ? 'ACEPTADO' : 'DENEGADO'}
-          </p>
-
-          {/* Persona */}
-          <div className="mt-5 flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-semibold text-white">
-            <User className="h-4 w-4" />
-            <span>{personResult.person_name || 'Persona'}</span>
-            {personResult.ok ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
-          </div>
-          {!personResult.ok && personResult.message && (
-            <p className="mt-2 max-w-md px-6 text-center text-sm text-white/70">{personResult.message}</p>
-          )}
-
-          {/* Vehículo */}
-          {vehicleResult ? (
-            <>
-              <div className="mt-3 flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-semibold text-white">
-                <Car className="h-4 w-4" />
-                <span>{vehicleResult.vehicle?.plate} · {vehicleResult.vehicle?.brand} {vehicleResult.vehicle?.model}</span>
-                {vehicleResult.ok ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
-              </div>
-              {vehicleResult.ok && vehicleResult.vehicle?.parking_sector && (
-                <p className="mt-2 rounded-full bg-white/15 px-4 py-1.5 text-sm font-semibold text-white">
-                  Estacionamiento: {parkingSectors.find((s) => s.value === vehicleResult.vehicle.parking_sector)?.label || vehicleResult.vehicle.parking_sector}
-                </p>
-              )}
-              {!vehicleResult.ok && vehicleResult.message && (
-                <p className="mt-1 max-w-md px-6 text-center text-sm text-white/70">{vehicleResult.message}</p>
-              )}
-            </>
-          ) : (
-            <p className="mt-3 text-sm text-white/60">Sin vehículo</p>
           )}
         </div>
       )}
