@@ -146,14 +146,16 @@ export default function EmergencyScan() {
 
       {!result && !scanning && (
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
+          <div>
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
               {scanMode === 'scanner'
                 ? <ScanLine className="h-5 w-5 text-emerald-600" />
                 : <ScanFace className="h-5 w-5 text-emerald-600" />}
               {scanMode === 'scanner' ? 'Escaneá la credencial' : 'Capturá el rostro'}
             </div>
-            <ScanModeToggle mode={scanMode} onChange={setScanMode} />
+            <div className="mt-3">
+              <ScanModeToggle mode={scanMode} onChange={setScanMode} />
+            </div>
           </div>
           <p className="mt-1 text-sm text-slate-500">
             {scanMode === 'scanner'

@@ -1,15 +1,17 @@
 import React from 'react';
 import { Camera, ScanLine } from 'lucide-react';
 
+// Toggle apilado verticalmente (Cámara arriba, Escáner físico abajo) para que
+// both buttons fit on the same screen — no horizontal overflow on the PDA.
 export default function ScanModeToggle({ mode, onChange }) {
-  const base = 'inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition';
+  const base = 'inline-flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition';
   const cls = (active) =>
     active
       ? `${base} bg-emerald-600 text-white shadow-sm`
       : `${base} bg-white text-slate-600 border border-slate-200 hover:bg-slate-50`;
 
   return (
-    <div className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 p-1">
+    <div className="flex w-full flex-col gap-2">
       <button type="button" onClick={() => onChange('camera')} className={cls(mode === 'camera')}>
         <Camera className="h-4 w-4" /> Cámara
       </button>

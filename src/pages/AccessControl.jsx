@@ -422,9 +422,13 @@ export default function AccessControl({ standalone = false }) {
             </div>
 
             {/* Badge search */}
-            <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="mb-4">
               <label className="block text-xs font-semibold text-slate-600">Código de credencial</label>
-              {standalone && <ScanModeToggle mode={scanMode} onChange={setScanMode} />}
+              {standalone && (
+                <div className="mt-2">
+                  <ScanModeToggle mode={scanMode} onChange={setScanMode} />
+                </div>
+              )}
             </div>
             <form onSubmit={handleSearch} className="mb-5">
               <div className="flex gap-2">

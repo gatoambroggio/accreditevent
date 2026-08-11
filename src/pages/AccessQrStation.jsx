@@ -349,7 +349,7 @@ export default function AccessQrStation({ mode = 'person' }) {
 
           <div className="mx-auto max-w-2xl px-5 py-8">
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="mb-5 flex items-center justify-between gap-3">
+              <div className="mb-5">
                 <div className="flex items-center gap-3">
                   <div className={`grid h-10 w-10 place-items-center rounded-lg ${mode === 'person' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
                     {mode === 'person' ? <User className="h-5 w-5" /> : <Car className="h-5 w-5" />}
@@ -367,7 +367,9 @@ export default function AccessQrStation({ mode = 'person' }) {
                     </p>
                   </div>
                 </div>
-                <ScanModeToggle mode={scanMode} onChange={setScanMode} />
+                <div className="mt-3">
+                  <ScanModeToggle mode={scanMode} onChange={setScanMode} />
+                </div>
               </div>
 
               {(eventStatus === 'upcoming' || eventStatus === 'ended') ? (
