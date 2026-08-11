@@ -88,6 +88,7 @@ export default function PdaId() {
                   <tr>
                     <th className="px-4 py-3">Evento</th>
                     <th className="px-4 py-3">Zona asignada</th>
+                    <th className="px-4 py-3">Estacionamiento</th>
                     <th className="px-4 py-3">Modo</th>
                     <th className="px-4 py-3">Estado</th>
                   </tr>
@@ -100,6 +101,7 @@ export default function PdaId() {
                       <tr key={s.id} className="hover:bg-slate-50">
                         <td className="px-4 py-3 font-semibold text-slate-900">{s.event_name || '—'}</td>
                         <td className="px-4 py-3 text-slate-600">{s.assigned_zone || '—'}</td>
+                        <td className="px-4 py-3 text-slate-600">{(s.assigned_sectors || []).length > 0 ? s.assigned_sectors.join(', ') : '—'}</td>
                         <td className="px-4 py-3 text-slate-600">{s.mode === 'vehicle' ? 'Vehicular' : 'Personal'}</td>
                         <td className="px-4 py-3">
                           {online ? (

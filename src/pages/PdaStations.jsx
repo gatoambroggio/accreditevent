@@ -22,6 +22,7 @@ export default function PdaStations() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
+  const [saveError, setSaveError] = useState('');
   const { zones } = useZones();
   const { sectors: parkingSectors } = useParkingSectors();
 
@@ -49,8 +50,8 @@ export default function PdaStations() {
 
   const now = Date.now();
 
-  const openNew = () => setEditing({ station_number: '', label: '', assigned_event_id: '', zones: [], assigned_sectors: [] });
-  const openEdit = (s) => setEditing({ id: s.id, station_number: s.station_number, label: s.label || '', assigned_event_id: s.assigned_event_id || '', zones: s.assigned_zone ? s.assigned_zone.split(',').map((z) => z.trim()).filter(Boolean) : [], assigned_sectors: s.assigned_sectors || [] });
+  const openNew = () => { setSaveError(''); setEditing({ station_number: '', label: '', assigned_event_id: '', zones: [], assigned_sectors: [] }); };
+  const openEdit = (s) => { setSaveError(''); setEditing({ id: s.id, station_number: s.station_number, label: s.label || '', assigned_event_id: s.assigned_event_id || '', zones: s.assigned_zone ? s.assigned_zone.split(',').map((z) => z.trim()).filter(Boolean) : [], assigned_sectors: s.assigned_sectors || [] }); };
 
   const saveEdit = async () => {
     if (!editing || !editing.station_number) return;
@@ -65,6 +66,7 @@ export default function PdaStations() {
       event_name: evt?.name || '',
       company: evt?.company || '',
     };
+    setSaveError('');
     try {
       if (editing.id) {
         await base44.entities.PdaStation.update(editing.id, payload);
@@ -73,7 +75,9 @@ export default function PdaStations() {
       }
       setEditing(null);
       load();
-    } catch {}
+    } catch (err) {
+      setSaveError(err?.message || 'No se pudo guardar. Verificá permisos.');
+    }
   };
 
   const remove = async (id) => {
@@ -193,7 +197,8 @@ export default function PdaStations() {
             <div className="space-y-3">
               <div>
                 <label className="mb-1 block text-xs font-semibold text-slate-600">Número de estación / PDA</label>
-                <input type="text" inputMode="numeric" value={editing.station_number} onChange={(e) => setEditing({ ...editing, station_number: e.target.value.trim() })} disabled={!!editing.id} style={{ textTransform: 'none' }} placeholder="Ej: 1" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-900 outline-none focus:border-emerald-500 disabled:bg-slate-50" />
+                <input type="text" inputMode="numeric" value={editing.station_number} onChange={(e) => setEditing({ ...editing, station_number: e.target.value.trim() })} style={{ textTransform: 'none' }} placeholder="Ej: 1" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-900 outline-none focus:border-emerald-500" />
+                <p className="mt-1 text-xs text-slate-400">Este número es el que el operador debe cargar en el módulo PDA ID del dispositivo para vincularlo. Podés editarlo cuando quieras.</p>
               </div>
               <div>
                 <label className="mb-1 block text-xs font-semibold text-slate-600">Nombre descriptivo</label>
@@ -236,6 +241,9 @@ export default function PdaStations() {
                 )}
               </div>
             </div>
+            {saveError && (
+              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{saveError}</div>
+            )}
             <div className="mt-5 flex justify-end gap-2">
               <button onClick={() => setEditing(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
               <button onClick={saveEdit} disabled={!editing.station_number} className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-50">Guardar</button>
