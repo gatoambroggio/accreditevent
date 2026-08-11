@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Loader2, RefreshCw, Smartphone, Wifi, WifiOff, CloudUpload, Pencil, Trash2, X, Plus } from 'lucide-react';
 import PageHeader from '@/components/ui/page-header';
+import { useZones } from '@/lib/useZones';
+import { useParkingSectors } from '@/lib/useParkingSectors';
 
 const ONLINE_THRESHOLD_MS = 90 * 1000;
 
@@ -20,6 +22,8 @@ export default function PdaStations() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
+  const { zones } = useZones();
+  const { sectors: parkingSectors } = useParkingSectors();
 
   const load = useCallback(async () => {
     try {
@@ -45,8 +49,8 @@ export default function PdaStations() {
 
   const now = Date.now();
 
-  const openNew = () => setEditing({ station_number: '', label: '', assigned_event_id: '', assigned_zone: '' });
-  const openEdit = (s) => setEditing({ id: s.id, station_number: s.station_number, label: s.label || '', assigned_event_id: s.assigned_event_id || '', assigned_zone: s.assigned_zone || '' });
+  const openNew = () => setEditing({ station_number: '', label: '', assigned_event_id: '', zones: [], assigned_sectors: [] });
+  const openEdit = (s) => setEditing({ id: s.id, station_number: s.station_number, label: s.label || '', assigned_event_id: s.assigned_event_id || '', zones: s.assigned_zone ? s.assigned_zone.split(',').map((z) => z.trim()).filter(Boolean) : [], assigned_sectors: s.assigned_sectors || [] });
 
   const saveEdit = async () => {
     if (!editing || !editing.station_number) return;
@@ -55,7 +59,8 @@ export default function PdaStations() {
       station_number: editing.station_number,
       label: editing.label,
       assigned_event_id: editing.assigned_event_id || '',
-      assigned_zone: editing.assigned_zone,
+      assigned_zone: (editing.zones || []).join(', '),
+      assigned_sectors: editing.assigned_sectors || [],
       event_id: editing.assigned_event_id || '',
       event_name: evt?.name || '',
       company: evt?.company || '',
@@ -132,7 +137,12 @@ export default function PdaStations() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-slate-600">{s.event_name || (s.assigned_event_id ? 'Asignado' : '—')}</td>
-                    <td className="px-4 py-3 text-slate-600">{s.assigned_zone || '—'}</td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {s.assigned_zone || '—'}
+                      {(s.assigned_sectors || []).length > 0 && (
+                        <div className="mt-0.5 text-xs text-amber-600">Estacionamiento: {s.assigned_sectors.join(', ')}</div>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-slate-600">{s.operator_name || '—'}</td>
                     <td className="px-4 py-3">
                       {online ? (
@@ -198,8 +208,32 @@ export default function PdaStations() {
                 <p className="mt-1 text-xs text-slate-400">La PDA tomará este evento automáticamente al iniciar el control.</p>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-slate-600">Zona de acceso asignada</label>
-                <input type="text" value={editing.assigned_zone} onChange={(e) => setEditing({ ...editing, assigned_zone: e.target.value })} style={{ textTransform: 'none' }} placeholder="Ej: general, backstage" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-500" />
+                <label className="mb-1.5 block text-xs font-semibold text-slate-600">Zona(s) de acceso asignada(s)</label>
+                <p className="mb-2 text-xs text-slate-400">Seleccioná una o varias. La PDA las tomará automáticamente al iniciar.</p>
+                <div className="flex flex-wrap gap-2">
+                  {zones.map((z) => {
+                    const active = (editing.zones || []).includes(z.value);
+                    return (
+                      <button key={z.value} type="button" onClick={() => setEditing({ ...editing, zones: active ? (editing.zones || []).filter((v) => v !== z.value) : [...(editing.zones || []), z.value] })} className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{z.label}</button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-slate-600">Estacionamiento(s) asignado(s)</label>
+                <p className="mb-2 text-xs text-slate-400">Sectores de estacionamiento que controlará esta PDA (credenciales vehiculares).</p>
+                {parkingSectors.length === 0 ? (
+                  <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">No hay sectores configurados.</div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {parkingSectors.map((s) => {
+                      const active = (editing.assigned_sectors || []).includes(s.value);
+                      return (
+                        <button key={s.value} type="button" onClick={() => setEditing({ ...editing, assigned_sectors: active ? (editing.assigned_sectors || []).filter((v) => v !== s.value) : [...(editing.assigned_sectors || []), s.value] })} className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${active ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{s.label}</button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
             <div className="mt-5 flex justify-end gap-2">
