@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { Loader2, CheckCircle2, XCircle, Calendar, Clock, AlertTriangle } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Calendar, Clock, AlertTriangle, Lock } from 'lucide-react';
 import FaceCapture from '@/components/FaceCapture';
+import PdaPinPrompt from '@/components/PdaPinPrompt';
 import { findBestMatch } from '@/lib/faceRecognition';
 import { canAccessAnyZone } from '@/lib/accessZones';
 import { useZones } from '@/lib/useZones';
@@ -20,6 +21,8 @@ export default function AccessStation() {
   const [cycle, setCycle] = useState(0);
   const [verifying, setVerifying] = useState(false);
   const [result, setResult] = useState(null);
+  const [unlocked, setUnlocked] = useState(false);
+  const [pinOpen, setPinOpen] = useState(false);
   const { zones } = useZones();
   const { pdaNumber } = usePdaHeartbeat({
     enabled: phase === 'active',
@@ -49,7 +52,7 @@ export default function AccessStation() {
         const withEvent = mine.find((s) => s.assigned_event_id && events.some((e) => e.id === s.assigned_event_id));
         if (withEvent) {
           if (!selectedEventId) setSelectedEventId(withEvent.assigned_event_id);
-          if (withEvent.assigned_zone && selectedZones.length === 1 && selectedZones[0] === 'general') {
+          if (withEvent.assigned_zone) {
             const zs = withEvent.assigned_zone.split(',').map((z) => z.trim()).filter(Boolean);
             if (zs.length > 0) setSelectedZones(zs);
           }
@@ -69,7 +72,7 @@ export default function AccessStation() {
         const mine = await base44.entities.PdaStation.filter({ station_number: pdaNumber }, '-created_date', 20);
         const st = mine.find((s) => s.assigned_event_id) || mine[0];
         if (!st) return;
-        if (st.assigned_zone) {
+        if (!unlocked && st.assigned_zone) {
           const zs = st.assigned_zone.split(',').map((z) => z.trim()).filter(Boolean);
           if (zs.length > 0) setSelectedZones(zs);
         }
@@ -79,7 +82,15 @@ export default function AccessStation() {
     const id = setInterval(sync, 10000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pdaNumber, phase]);
+  }, [pdaNumber, phase, unlocked]);
+
+  const persistPdaConfig = async (patch) => {
+    if (!pdaNumber) return;
+    try {
+      const mine = await base44.entities.PdaStation.filter({ station_number: pdaNumber }, '-created_date', 5);
+      if (mine?.[0]?.id) await base44.entities.PdaStation.update(mine[0].id, patch);
+    } catch {}
+  };
 
   const startStation = () => {
     const evt = events.find((e) => e.id === selectedEventId);
@@ -376,22 +387,29 @@ export default function AccessStation() {
                   })}
                 </div>
                 <div className="mt-5">
-                  <label className="mb-1.5 block text-xs font-semibold text-slate-600">Zona(s) de control</label>
-                  <p className="mb-2 text-xs text-slate-400">Seleccioná una o varias. Se permite el ingreso si la persona tiene acceso a alguna de las seleccionadas.</p>
-                  <div className="flex flex-wrap gap-2">
-                    {zones.map((z) => {
-                      const active = selectedZones.includes(z.value);
-                      return (
-                        <button
-                          key={z.value}
-                          onClick={() => setSelectedZones((prev) => active ? prev.filter((v) => v !== z.value) : [...prev, z.value])}
-                          className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-                        >
-                          {z.label}
-                        </button>
-                      );
-                    })}
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <label className="text-xs font-semibold text-slate-600">Zona(s) de control</label>
+                    <button type="button" onClick={() => setPinOpen(true)} className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:underline">
+                      <Lock className="h-3.5 w-3.5" /> Modificar con clave
+                    </button>
                   </div>
+                  <p className="mb-2 text-xs text-slate-400">Asignadas desde el panel Estaciones PDA. Para cambiarlas desde la PDA necesitás la clave de administrador.</p>
+                  {unlocked ? (
+                    <div className="flex flex-wrap gap-2">
+                      {zones.map((z) => {
+                        const active = selectedZones.includes(z.value);
+                        return (
+                          <button key={z.value} onClick={() => setSelectedZones((prev) => { const next = active ? prev.filter((v) => v !== z.value) : [...prev, z.value]; persistPdaConfig({ assigned_zone: next.join(', ') }); return next; })} className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{z.label}</button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {selectedZones.length === 0 ? <span className="text-xs text-slate-400">Sin zonas asignadas.</span> : selectedZones.map((zv) => (
+                        <span key={zv} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">{zones.find((z) => z.value === zv)?.label || zv}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {pdaNumber ? (
                   <div className="mt-5 flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
@@ -529,6 +547,8 @@ export default function AccessStation() {
           )}
         </div>
       )}
+
+      <PdaPinPrompt open={pinOpen} onClose={() => setPinOpen(false)} pdaNumber={pdaNumber} onSuccess={() => { setUnlocked(true); setPinOpen(false); }} />
     </div>
   );
 }

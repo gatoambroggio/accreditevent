@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Loader2, RefreshCw, Smartphone, Wifi, WifiOff, CloudUpload, Pencil, Trash2, X, Plus, Battery, BatteryFull, BatteryMedium, BatteryLow } from 'lucide-react';
+import { Loader2, RefreshCw, Smartphone, Wifi, WifiOff, CloudUpload, Pencil, Trash2, X, Plus, Battery, BatteryFull, BatteryMedium, BatteryLow, AlertTriangle } from 'lucide-react';
 import PageHeader from '@/components/ui/page-header';
 import { useZones } from '@/lib/useZones';
 import { useParkingSectors } from '@/lib/useParkingSectors';
@@ -23,6 +23,7 @@ export default function PdaStations() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
   const [saveError, setSaveError] = useState('');
+  const [offlineDismissed, setOfflineDismissed] = useState(false);
   const { zones } = useZones();
   const { sectors: parkingSectors } = useParkingSectors();
 
@@ -49,8 +50,19 @@ export default function PdaStations() {
   }, [load, loadEvents]);
 
   const now = Date.now();
+  const offlineStations = stations.filter((s) => {
+    if (!s.last_seen) return false;
+    return (now - new Date(s.last_seen).getTime()) >= ONLINE_THRESHOLD_MS;
+  });
+  const showOfflinePopup = offlineStations.length > 0 && !offlineDismissed;
+  useEffect(() => { if (offlineStations.length === 0) setOfflineDismissed(false); }, [offlineStations.length]);
 
-  const openNew = () => { setSaveError(''); setEditing({ station_number: '', label: '', assigned_event_id: '', zones: [], assigned_sectors: [], admin_pin: '1234' }); };
+  const openNew = () => {
+    setSaveError('');
+    const nums = stations.map((s) => parseInt(s.station_number, 10)).filter((n) => !isNaN(n));
+    const next = nums.length > 0 ? String(Math.max(...nums) + 1) : '1';
+    setEditing({ station_number: next, label: '', assigned_event_id: '', zones: [], assigned_sectors: [], admin_pin: '1234' });
+  };
   const openEdit = (s) => { setSaveError(''); setEditing({ id: s.id, station_number: s.station_number, label: s.label || '', assigned_event_id: s.assigned_event_id || '', zones: s.assigned_zone ? s.assigned_zone.split(',').map((z) => z.trim()).filter(Boolean) : [], assigned_sectors: s.assigned_sectors || [], admin_pin: s.admin_pin || '1234' }); };
 
   const saveEdit = async () => {
@@ -209,6 +221,30 @@ export default function PdaStations() {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {showOfflinePopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="mb-3 flex items-center gap-2">
+              <AlertTriangle className="h-6 w-6 text-red-600" />
+              <h3 className="text-lg font-bold text-slate-900">PDAs offline</h3>
+            </div>
+            <p className="mb-4 text-sm text-slate-500">Las siguientes estaciones PDA perdieron conexión (sin heartbeat reciente):</p>
+            <ul className="mb-4 max-h-60 space-y-1.5 overflow-y-auto">
+              {offlineStations.map((s) => (
+                <li key={s.id} className="flex items-center justify-between rounded-lg bg-red-50 px-3 py-2 text-sm">
+                  <span className="font-semibold text-slate-900">PDA #{s.station_number}{s.label ? ` · ${s.label}` : ''}</span>
+                  <span className="text-xs font-semibold text-red-600">hace {Math.max(1, Math.round((now - new Date(s.last_seen).getTime()) / 60000))} min</span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setOfflineDismissed(true)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cerrar</button>
+              <button onClick={() => setOfflineDismissed(true)} className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800">Entendido</button>
+            </div>
+          </div>
         </div>
       )}
 

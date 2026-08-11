@@ -12,8 +12,10 @@ import {
   ShieldCheck,
   X,
   ExternalLink,
+  Lock,
 } from 'lucide-react';
 import FaceCapture from '@/components/FaceCapture';
+import PdaPinPrompt from '@/components/PdaPinPrompt';
 import ScanModeToggle from '@/components/scan/ScanModeToggle';
 import { useScanMode } from '@/components/scan/useScanMode';
 import { compareDescriptors, MATCH_THRESHOLD } from '@/lib/faceRecognition';
@@ -34,6 +36,8 @@ export default function AccessControl({ standalone = false }) {
   const [result, setResult] = useState(null);
   const [recent, setRecent] = useState([]);
   const [showCamera, setShowCamera] = useState(false);
+  const [unlocked, setUnlocked] = useState(false);
+  const [pinOpen, setPinOpen] = useState(false);
   const [scanMode, setScanMode] = useScanMode();
   const badgeRef = useRef(null);
   const { zones } = useZones();
@@ -51,6 +55,14 @@ export default function AccessControl({ standalone = false }) {
     try {
       const data = await base44.entities.Event.filter({ status: 'active' }, '-created_date', 50);
       setEvents(data);
+    } catch {}
+  };
+
+  const persistPdaConfig = async (patch) => {
+    if (!pdaNumber) return;
+    try {
+      const mine = await base44.entities.PdaStation.filter({ station_number: pdaNumber }, '-created_date', 5);
+      if (mine?.[0]?.id) await base44.entities.PdaStation.update(mine[0].id, patch);
     } catch {}
   };
 
@@ -84,6 +96,25 @@ export default function AccessControl({ standalone = false }) {
       badgeRef.current.focus();
     }
   }, [standalone, scanMode, found, searching, verifying, result]);
+
+  // La PDA (modo standalone) toma las zonas desde el panel Estaciones PDA.
+  // No tiene autoridad para cambiarlas salvo con clave de administrador.
+  useEffect(() => {
+    if (!standalone || !pdaNumber) return;
+    const sync = async () => {
+      try {
+        const mine = await base44.entities.PdaStation.filter({ station_number: pdaNumber }, '-created_date', 5);
+        const st = mine?.[0];
+        if (st?.assigned_zone && !unlocked) {
+          const zs = st.assigned_zone.split(',').map((z) => z.trim()).filter(Boolean);
+          if (zs.length > 0) setSelectedZones(zs);
+        }
+      } catch {}
+    };
+    sync();
+    const id = setInterval(sync, 10000);
+    return () => clearInterval(id);
+  }, [standalone, pdaNumber, unlocked]);
 
   const handleSearch = async (e) => {
     e?.preventDefault();
@@ -423,23 +454,31 @@ export default function AccessControl({ standalone = false }) {
 
             {/* Zone selector */}
             <div className="mb-5">
-              <label className="mb-1.5 block text-xs font-semibold text-slate-600">Zona(s) de control</label>
-              <p className="mb-2 text-xs text-slate-400">Seleccioná una o varias. Se permite el ingreso si la persona tiene acceso a alguna de las seleccionadas.</p>
-              <div className="flex flex-wrap gap-2">
-                {zones.map((z) => {
-                  const active = selectedZones.includes(z.value);
-                  return (
-                    <button
-                      key={z.value}
-                      type="button"
-                      onClick={() => setSelectedZones((prev) => active ? prev.filter((v) => v !== z.value) : [...prev, z.value])}
-                      className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-                    >
-                      {z.label}
-                    </button>
-                  );
-                })}
+              <div className="mb-1.5 flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-600">Zona(s) de control</label>
+                {standalone && (
+                  <button type="button" onClick={() => setPinOpen(true)} className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:underline">
+                    <Lock className="h-3.5 w-3.5" /> Modificar con clave
+                  </button>
+                )}
               </div>
+              <p className="mb-2 text-xs text-slate-400">{standalone ? 'Asignadas desde el panel Estaciones PDA. Para cambiarlas necesitás la clave de administrador.' : 'Seleccioná una o varias. Se permite el ingreso si la persona tiene acceso a alguna de las seleccionadas.'}</p>
+              {standalone && !unlocked ? (
+                <div className="flex flex-wrap gap-2">
+                  {selectedZones.length === 0 ? <span className="text-xs text-slate-400">Sin zonas asignadas.</span> : selectedZones.map((zv) => (
+                    <span key={zv} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">{zones.find((z) => z.value === zv)?.label || zv}</span>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {zones.map((z) => {
+                    const active = selectedZones.includes(z.value);
+                    return (
+                      <button key={z.value} type="button" onClick={() => setSelectedZones((prev) => { const next = active ? prev.filter((v) => v !== z.value) : [...prev, z.value]; if (standalone) persistPdaConfig({ assigned_zone: next.join(', ') }); return next; })} className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{z.label}</button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Badge search */}
@@ -599,6 +638,8 @@ export default function AccessControl({ standalone = false }) {
           </div>
         </div>
       )}
+
+      <PdaPinPrompt open={pinOpen} onClose={() => setPinOpen(false)} pdaNumber={pdaNumber} onSuccess={() => { setUnlocked(true); setPinOpen(false); }} />
     </div>
   );
 }
