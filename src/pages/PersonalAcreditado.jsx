@@ -33,6 +33,7 @@ export default function PersonalAcreditado() {
   const [printingVehicular, setPrintingVehicular] = useState(null);
   const [vehicularAccredId, setVehicularAccredId] = useState(null);
   const [vehiclePick, setVehiclePick] = useState(null);
+  const [vehicles, setVehicles] = useState([]);
   const { user } = useAuth();
   const canManageRecords = canManage(user);
   const { sectors } = useParkingSectors();
@@ -40,17 +41,19 @@ export default function PersonalAcreditado() {
   useEffect(() => {
     (async () => {
       try {
-        const [evs, accs, ps, sts] = await Promise.all([
+        const [evs, accs, ps, sts, vs] = await Promise.all([
           base44.entities.Event.list('-created_date', 200),
           base44.entities.Accreditation.list('-created_date', 5000),
           base44.entities.Person.list('-created_date', 5000),
           base44.entities.SystemSetting.list('-created_date', 1),
+          base44.entities.Vehicle.list('-created_date', 5000),
         ]);
         setEvents(evs);
         // Personal acreditado = acreditaciones activas/autorizadas (no bloqueadas ni revocadas)
         setAccreditations(accs);
         setPeople(ps);
         setSettings(sts[0] || null);
+        setVehicles(vs);
       } catch {
       } finally {
         setLoading(false);
@@ -63,6 +66,8 @@ export default function PersonalAcreditado() {
     people.forEach((p) => { map[p.id] = p; });
     return map;
   }, [people]);
+
+  const vehiclePersonIds = useMemo(() => new Set(vehicles.map((v) => v.person_id).filter(Boolean)), [vehicles]);
 
   const phaseLabel = (ph) => {
     if (!Array.isArray(ph) || ph.length === 0) return '—';
@@ -130,23 +135,19 @@ export default function PersonalAcreditado() {
     } catch {}
   };
 
-  const handlePrintVehicular = async (a) => {
-    try {
-      const vehs = await base44.entities.Vehicle.filter({ person_id: a.person_id }, '-created_date', 50);
-      const assigned = vehs.filter((v) => (v.event_ids || []).includes(a.event_id));
-      const list = assigned.length > 0 ? assigned : vehs;
-      if (list.length === 0) {
-        alert('La persona no tiene vehículos asignados.');
-        return;
-      }
-      if (list.length === 1) {
-        setVehicularAccredId(a.id);
-        setPrintingVehicular(list[0]);
-      } else {
-        setVehiclePick({ accreditation: a, vehicles: list });
-      }
-    } catch (e) {
-      alert('No se pudo cargar el vehículo: ' + (e?.message || e));
+  const handlePrintVehicular = (a) => {
+    const vehs = vehicles.filter((v) => v.person_id === a.person_id);
+    const assigned = vehs.filter((v) => (v.event_ids || []).includes(a.event_id));
+    const list = assigned.length > 0 ? assigned : vehs;
+    if (list.length === 0) {
+      alert('La persona no tiene vehículos asignados.');
+      return;
+    }
+    if (list.length === 1) {
+      setVehicularAccredId(a.id);
+      setPrintingVehicular(list[0]);
+    } else {
+      setVehiclePick({ accreditation: a, vehicles: list });
     }
   };
 
@@ -273,7 +274,7 @@ export default function PersonalAcreditado() {
                         </span>
                         {a.delivered_vehicular ? 'Entregada' : 'Pendiente'} · Vehicular
                       </span>
-                      {canManageRecords && (
+                      {canManageRecords && vehiclePersonIds.has(a.person_id) && (
                         <button
                           onClick={() => handlePrintVehicular(a)}
                           title="Imprimir credencial vehicular"
