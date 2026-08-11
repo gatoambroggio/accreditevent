@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import {
   Camera,
@@ -19,6 +20,7 @@ import { compareDescriptors, MATCH_THRESHOLD } from '@/lib/faceRecognition';
 import { canAccessAnyZone } from '@/lib/accessZones';
 import { useZones } from '@/lib/useZones';
 import { speakResult } from '@/lib/accessUtils';
+import { usePdaHeartbeat } from '@/hooks/usePdaRegistration';
 import { formatTime } from '@/lib/formatDate';
 
 export default function AccessControl({ standalone = false }) {
@@ -35,6 +37,15 @@ export default function AccessControl({ standalone = false }) {
   const [scanMode, setScanMode] = useScanMode();
   const badgeRef = useRef(null);
   const { zones } = useZones();
+  const selectedEvent = events.find((e) => e.id === eventFilter) || null;
+  const { pdaNumber } = usePdaHeartbeat({
+    enabled: standalone && !!selectedEvent,
+    event: selectedEvent,
+    mode: 'person',
+    zones: selectedZones,
+    sectors: [],
+    pendingCount: 0,
+  });
 
   const loadEvents = async () => {
     try {
@@ -399,6 +410,16 @@ export default function AccessControl({ standalone = false }) {
                 {events.map((e) => (<option key={e.id} value={e.id}>{e.name}</option>))}
               </select>
             </div>
+
+            {standalone && (
+              <div className="mb-5 flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                <div>
+                  <p className="text-xs font-semibold text-slate-600">PDA de este dispositivo</p>
+                  <p className="text-sm font-bold text-slate-900">{pdaNumber ? `Estación #${pdaNumber}` : 'Sin asignar'}</p>
+                </div>
+                <Link to="/pda-id" className="text-xs font-bold text-emerald-700 hover:underline">{pdaNumber ? 'Cambiar' : 'Configurar'}</Link>
+              </div>
+            )}
 
             {/* Zone selector */}
             <div className="mb-5">

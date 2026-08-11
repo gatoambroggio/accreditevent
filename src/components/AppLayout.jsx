@@ -58,6 +58,7 @@ const NAV_ITEMS = [
   { path: '/dni-scan', label: 'Escaneo de DNI', icon: ScanLine, minLevel: 0 },
   // Control de acceso
   { path: '/access-control', label: 'Control de acceso', icon: DoorOpen, minLevel: 0 },
+  { path: '/pda-id', label: 'PDA ID', icon: Smartphone, minLevel: 0 },
   { path: '/emergency-scan', label: 'Escaneo de emergencia', icon: AlertTriangle, minLevel: 0 },
   { path: '/access-monitor', label: 'Monitor en vivo', icon: Radio, minLevel: 0 },
   { path: '/pda-stations', label: 'Estaciones PDA', icon: Smartphone, minLevel: 1, roles: ['productora', 'admin', 'superadmin'] },

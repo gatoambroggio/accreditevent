@@ -11,6 +11,7 @@ import HardwareScannerInput from '@/components/scan/HardwareScannerInput';
 import { useScanMode } from '@/components/scan/useScanMode';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
+import { usePdaHeartbeat } from '@/hooks/usePdaRegistration';
 import { saveEventData, getEventData, getCacheAgeMs, queueAccessLog, setCachedVerifier, getCachedVerifier } from '@/lib/offlineAccess';
 import { validatePersonAccred, validateVehicleObj } from '@/lib/offlineValidation';
 
@@ -30,12 +31,6 @@ export default function AccessQrStation({ mode = 'person' }) {
   const [verifying, setVerifying] = useState(false);
   const [result, setResult] = useState(null);
   const [scanMode, setScanMode] = useScanMode();
-  const [stationNumber, setStationNumber] = useState(() => {
-    try { return localStorage.getItem('accreditevent.station_number') || ''; } catch { return ''; }
-  });
-  const pdaIdRef = useRef(null);
-  const pendingCountRef = useRef(0);
-  pendingCountRef.current = pendingCount;
   const [downloading, setDownloading] = useState(false);
   const [cacheAge, setCacheAge] = useState(null);
   const [accreditations, setAccreditations] = useState([]);
@@ -47,6 +42,15 @@ export default function AccessQrStation({ mode = 'person' }) {
   const { pendingCount, syncing, refresh: refreshPending } = useOfflineSync(online);
   // Modo offline AUTOMÁTICO: se activa solo cuando no hay conexión.
   const effectiveOffline = !online;
+  // Registro y heartbeat de la PDA (número seteado una sola vez en el módulo PDA ID).
+  const { pdaNumber } = usePdaHeartbeat({
+    enabled: phase === 'active',
+    event: selectedEvent,
+    mode,
+    zones: selectedZones,
+    sectors: selectedSectors,
+    pendingCount,
+  });
 
   useEffect(() => {
     (async () => {
@@ -74,19 +78,26 @@ export default function AccessQrStation({ mode = 'person' }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online, selectedEvent]);
 
-  // Persistir número de estación seleccionado para esta PDA.
+  // Pre-selección automática de evento y zona desde la asignación remota del
+  // administrador (panel Estaciones PDA). Sólo pre-carga si el operador aún no
+  // eligió manualmente.
   useEffect(() => {
-    try { localStorage.setItem('accreditevent.station_number', stationNumber); } catch {}
-  }, [stationNumber]);
-
-  // Heartbeat: reporta actividad de la PDA cada 45s mientras el control está activo.
-  useEffect(() => {
-    if (phase !== 'active') return;
-    heartbeatPda();
-    const id = setInterval(heartbeatPda, 45000);
-    return () => clearInterval(id);
+    if (!pdaNumber || events.length === 0) return;
+    (async () => {
+      try {
+        const mine = await base44.entities.PdaStation.filter({ station_number: pdaNumber }, '-created_date', 20);
+        const withEvent = mine.find((s) => s.assigned_event_id && events.some((e) => e.id === s.assigned_event_id));
+        if (withEvent) {
+          if (!selectedEventId) setSelectedEventId(withEvent.assigned_event_id);
+          if (withEvent.assigned_zone && selectedZones.length === 1 && selectedZones[0] === 'general') {
+            const zs = withEvent.assigned_zone.split(',').map((z) => z.trim()).filter(Boolean);
+            if (zs.length > 0) setSelectedZones(zs);
+          }
+        }
+      } catch {}
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, selectedEvent]);
+  }, [pdaNumber, events]);
 
   const [downloadError, setDownloadError] = useState('');
 
@@ -133,45 +144,6 @@ export default function AccessQrStation({ mode = 'person' }) {
     setDownloading(false);
   };
 
-  const registerPda = async (evt) => {
-    if (!stationNumber) return;
-    const verifier = getCachedVerifier();
-    const payload = {
-      station_number: stationNumber,
-      event_id: evt.id,
-      event_name: evt.name,
-      company: evt.company || '',
-      operator_name: verifier || '',
-      mode,
-      assigned_zone: mode === 'person' ? selectedZones.join(', ') : selectedSectors.join(', '),
-      assigned_sectors: selectedSectors,
-      last_seen: new Date().toISOString(),
-      pending_sync: pendingCountRef.current || 0,
-    };
-    try {
-      const existing = await base44.entities.PdaStation.filter({ station_number: stationNumber, event_id: evt.id }, '-created_date', 5);
-      if (existing && existing.length > 0) {
-        const id = existing[0].id;
-        await base44.entities.PdaStation.update(id, payload);
-        pdaIdRef.current = id;
-      } else {
-        const created = await base44.entities.PdaStation.create(payload);
-        pdaIdRef.current = created?.id || null;
-      }
-    } catch {}
-  };
-
-  const heartbeatPda = async () => {
-    const id = pdaIdRef.current;
-    if (!id) return;
-    try {
-      await base44.entities.PdaStation.update(id, {
-        last_seen: new Date().toISOString(),
-        pending_sync: pendingCountRef.current || 0,
-      });
-    } catch {}
-  };
-
   const startStation = () => {
     const evt = events.find((e) => e.id === selectedEventId);
     if (!evt) return;
@@ -185,7 +157,7 @@ export default function AccessQrStation({ mode = 'person' }) {
     setAccreditations(cache?.accreditations || []);
     setVehicles(cache?.vehicles || []);
     setCacheAge(getCacheAgeMs(evt.id));
-    registerPda(evt);
+    // El registro y heartbeat de la PDA los maneja usePdaHeartbeat.
     // La descarga inicial la dispara el useEffect al setear selectedEvent.
   };
 
@@ -466,22 +438,24 @@ export default function AccessQrStation({ mode = 'person' }) {
                   )}
                 </div>
 
-                <div className="mt-5">
-                  <label className="mb-1.5 block text-xs font-semibold text-slate-600">Número de estación / PDA</label>
-                  <p className="mb-2 text-xs text-slate-400">Identificá esta PDA con un número. Se recuerda en este dispositivo y se reporta al panel de monitoreo.</p>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={stationNumber}
-                    onChange={(e) => setStationNumber(e.target.value.trim())}
-                    placeholder="Ej: 1"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-                  />
-                </div>
+                {pdaNumber ? (
+                  <div className="mt-5 flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                    <div>
+                      <p className="text-xs font-semibold text-slate-600">PDA de este dispositivo</p>
+                      <p className="text-sm font-bold text-slate-900">Estación #{pdaNumber}</p>
+                    </div>
+                    <Link to="/pda-id" className="text-xs font-bold text-emerald-700 hover:underline">Cambiar</Link>
+                  </div>
+                ) : (
+                  <div className="mt-5 flex items-center justify-between rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5">
+                    <p className="text-xs font-semibold text-amber-700">Configurá el número de esta PDA antes de iniciar.</p>
+                    <Link to="/pda-id" className="text-xs font-bold text-amber-800 hover:underline">Ir a PDA ID</Link>
+                  </div>
+                )}
 
                 <button
                   onClick={startStation}
-                  disabled={!selectedEventId || !stationNumber || (mode === 'person' && selectedZones.length === 0)}
+                  disabled={!selectedEventId || !pdaNumber || (mode === 'person' && selectedZones.length === 0)}
                   className="mt-4 w-full rounded-lg bg-emerald-700 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50"
                 >
                   Iniciar control de acceso

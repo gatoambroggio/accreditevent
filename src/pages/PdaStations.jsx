@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Loader2, RefreshCw, Smartphone, Wifi, WifiOff, CloudUpload, Pencil, Trash2, X } from 'lucide-react';
+import { Loader2, RefreshCw, Smartphone, Wifi, WifiOff, CloudUpload, Pencil, Trash2, X, Plus } from 'lucide-react';
 import PageHeader from '@/components/ui/page-header';
 
 const ONLINE_THRESHOLD_MS = 90 * 1000;
@@ -17,6 +17,7 @@ function formatDuration(ms) {
 
 export default function PdaStations() {
   const [stations, setStations] = useState([]);
+  const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
 
@@ -28,21 +29,43 @@ export default function PdaStations() {
     setLoading(false);
   }, []);
 
+  const loadEvents = useCallback(async () => {
+    try {
+      const data = await base44.entities.Event.filter({ status: 'active' }, '-start_at', 100);
+      setEvents(data || []);
+    } catch {}
+  }, []);
+
   useEffect(() => {
     load();
+    loadEvents();
     const id = setInterval(load, 15000);
     return () => clearInterval(id);
-  }, [load]);
+  }, [load, loadEvents]);
 
   const now = Date.now();
 
+  const openNew = () => setEditing({ station_number: '', label: '', assigned_event_id: '', assigned_zone: '' });
+  const openEdit = (s) => setEditing({ id: s.id, station_number: s.station_number, label: s.label || '', assigned_event_id: s.assigned_event_id || '', assigned_zone: s.assigned_zone || '' });
+
   const saveEdit = async () => {
-    if (!editing) return;
+    if (!editing || !editing.station_number) return;
+    const evt = events.find((e) => e.id === editing.assigned_event_id);
+    const payload = {
+      station_number: editing.station_number,
+      label: editing.label,
+      assigned_event_id: editing.assigned_event_id || '',
+      assigned_zone: editing.assigned_zone,
+      event_id: editing.assigned_event_id || '',
+      event_name: evt?.name || '',
+      company: evt?.company || '',
+    };
     try {
-      await base44.entities.PdaStation.update(editing.id, {
-        label: editing.label,
-        assigned_zone: editing.assigned_zone,
-      });
+      if (editing.id) {
+        await base44.entities.PdaStation.update(editing.id, payload);
+      } else {
+        await base44.entities.PdaStation.create(payload);
+      }
       setEditing(null);
       load();
     } catch {}
@@ -56,13 +79,18 @@ export default function PdaStations() {
   return (
     <div>
       <PageHeader kicker="Control de acceso" title="Estaciones PDA">
-        <button onClick={load} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">
-          <RefreshCw className="h-4 w-4" /> Actualizar
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={openNew} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-800">
+            <Plus className="h-4 w-4" /> Nueva estación
+          </button>
+          <button onClick={load} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+            <RefreshCw className="h-4 w-4" /> Actualizar
+          </button>
+        </div>
       </PageHeader>
 
       <p className="mb-4 text-sm text-slate-500">
-        Estado en vivo de las PDAs conectadas. Una PDA aparece <span className="font-semibold text-emerald-600">en línea</span> si reportó actividad en los últimos 90 segundos. Se actualiza automáticamente cada 15 segundos.
+        Estado en vivo de las PDAs conectadas. Desde acá podés asignarle a cada PDA el <span className="font-semibold">evento</span> y la <span className="font-semibold">zona de acceso</span> que controlará: la PDA los tomará automáticamente al iniciar. Una PDA aparece <span className="font-semibold text-emerald-600">en línea</span> si reportó actividad en los últimos 90 segundos. Se actualiza cada 15 segundos.
       </p>
 
       {loading ? (
@@ -71,7 +99,7 @@ export default function PdaStations() {
         <div className="rounded-xl bg-slate-50 px-4 py-12 text-center">
           <Smartphone className="mx-auto h-10 w-10 text-slate-300" />
           <p className="mt-3 text-sm font-semibold text-slate-600">No hay estaciones PDA registradas</p>
-          <p className="mt-1 text-xs text-slate-400">Cuando un operador inicie un control de acceso desde una PDA, aparecerá acá automáticamente.</p>
+          <p className="mt-1 text-xs text-slate-400">Creá una estación con "Nueva estación" para pre-asignarle un evento y zona, o esperá a que un operador inicie un control desde su PDA.</p>
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -103,7 +131,7 @@ export default function PdaStations() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{s.event_name || '—'}</td>
+                    <td className="px-4 py-3 text-slate-600">{s.event_name || (s.assigned_event_id ? 'Asignado' : '—')}</td>
                     <td className="px-4 py-3 text-slate-600">{s.assigned_zone || '—'}</td>
                     <td className="px-4 py-3 text-slate-600">{s.operator_name || '—'}</td>
                     <td className="px-4 py-3">
@@ -111,9 +139,13 @@ export default function PdaStations() {
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">
                           <Wifi className="h-3.5 w-3.5" /> En línea
                         </span>
-                      ) : (
+                      ) : lastSeenMs != null ? (
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 ring-1 ring-inset ring-red-200">
                           <WifiOff className="h-3.5 w-3.5" /> Offline
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-500 ring-1 ring-inset ring-slate-200">
+                          <Smartphone className="h-3.5 w-3.5" /> Sin conectar
                         </span>
                       )}
                     </td>
@@ -130,7 +162,7 @@ export default function PdaStations() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button onClick={() => setEditing({ ...s })} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><Pencil className="h-4 w-4" /></button>
+                      <button onClick={() => openEdit(s)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><Pencil className="h-4 w-4" /></button>
                       <button onClick={() => remove(s.id)} className="ml-1 rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
                     </td>
                   </tr>
@@ -145,22 +177,34 @@ export default function PdaStations() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm" onClick={() => setEditing(null)}>
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-slate-900">Editar estación {editing.station_number}</h3>
+              <h3 className="text-lg font-bold text-slate-900">{editing.id ? `Editar estación ${editing.station_number}` : 'Nueva estación PDA'}</h3>
               <button onClick={() => setEditing(null)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-3">
               <div>
-                <label className="mb-1 block text-xs font-semibold text-slate-600">Nombre descriptivo</label>
-                <input type="text" value={editing.label || ''} onChange={(e) => setEditing({ ...editing, label: e.target.value })} style={{ textTransform: 'none' }} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-500" />
+                <label className="mb-1 block text-xs font-semibold text-slate-600">Número de estación / PDA</label>
+                <input type="text" inputMode="numeric" value={editing.station_number} onChange={(e) => setEditing({ ...editing, station_number: e.target.value.trim() })} disabled={!!editing.id} style={{ textTransform: 'none' }} placeholder="Ej: 1" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-900 outline-none focus:border-emerald-500 disabled:bg-slate-50" />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-slate-600">Zona asignada</label>
-                <input type="text" value={editing.assigned_zone || ''} onChange={(e) => setEditing({ ...editing, assigned_zone: e.target.value })} placeholder="Ej: general, backstage" style={{ textTransform: 'none' }} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-500" />
+                <label className="mb-1 block text-xs font-semibold text-slate-600">Nombre descriptivo</label>
+                <input type="text" value={editing.label} onChange={(e) => setEditing({ ...editing, label: e.target.value })} style={{ textTransform: 'none' }} placeholder="Ej: Puerta principal" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-500" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-600">Evento asignado</label>
+                <select value={editing.assigned_event_id} onChange={(e) => setEditing({ ...editing, assigned_event_id: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-500">
+                  <option value="">Sin asignar</option>
+                  {events.map((e) => (<option key={e.id} value={e.id}>{e.name}</option>))}
+                </select>
+                <p className="mt-1 text-xs text-slate-400">La PDA tomará este evento automáticamente al iniciar el control.</p>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-600">Zona de acceso asignada</label>
+                <input type="text" value={editing.assigned_zone} onChange={(e) => setEditing({ ...editing, assigned_zone: e.target.value })} style={{ textTransform: 'none' }} placeholder="Ej: general, backstage" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-500" />
               </div>
             </div>
             <div className="mt-5 flex justify-end gap-2">
               <button onClick={() => setEditing(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
-              <button onClick={saveEdit} className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800">Guardar</button>
+              <button onClick={saveEdit} disabled={!editing.station_number} className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-50">Guardar</button>
             </div>
           </div>
         </div>
