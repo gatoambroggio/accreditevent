@@ -31,7 +31,7 @@ export function isWithinEventPhases(event, eventPhases, date = new Date()) {
   return eventPhases.some((phase) => {
     // Días individuales de show (dia_1 .. dia_6): cada día es el día calendario
     // correspondiente a (N-1) días después del inicio del show.
-    if (phase.startsWith('dia_') && showStart) {
+    if (phase.startsWith('dia_') && phase !== 'dia_evento' && showStart) {
       const n = parseInt(phase.slice(4), 10);
       if (!n || n < 1 || n > 6) return false;
       const dayStart = new Date(showStart);

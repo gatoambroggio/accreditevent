@@ -188,6 +188,9 @@ export default function AccessQrStation({ mode = 'person' }) {
       // Fallback online directo si no se encontró en listado (superaba límite o RLS por evento asignado)
       if (!accred && !vehicle && !effectiveOffline) {
         accred = await fallbackGetAccred(code);
+        if (!accred) {
+          try { const dv = await base44.entities.Vehicle.get(code); if (dv && (dv.event_ids || []).includes(selectedEvent.id)) vehicle = dv; } catch {}
+        }
       }
 
       if (accred) {
