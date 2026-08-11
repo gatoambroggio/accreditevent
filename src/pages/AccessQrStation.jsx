@@ -22,6 +22,10 @@ export default function AccessQrStation({ mode = 'person' }) {
   const [cycle, setCycle] = useState(0);
   const [verifying, setVerifying] = useState(false);
   const [result, setResult] = useState(null);
+  // Flujo unificado persona + vehículo (mode='person')
+  const [personResult, setPersonResult] = useState(null);
+  const [vehicleResult, setVehicleResult] = useState(null);
+  const [awaitingVehicle, setAwaitingVehicle] = useState(false);
   const [scanMode, setScanMode] = useScanMode();
   const qrCooldown = useRef(false);
   const { zones } = useZones();
@@ -45,6 +49,13 @@ export default function AccessQrStation({ mode = 'person' }) {
     setCycle((c) => c + 1);
   };
 
+  const resetFlow = () => {
+    setPersonResult(null);
+    setVehicleResult(null);
+    setAwaitingVehicle(false);
+    setCycle((c) => c + 1);
+  };
+
   const backToSelect = () => {
     setPhase('select');
     setSelectedEvent(null);
@@ -52,24 +63,47 @@ export default function AccessQrStation({ mode = 'person' }) {
     setSelectedZones(['general']);
     setSelectedSectors([]);
     setResult(null);
+    setPersonResult(null);
+    setVehicleResult(null);
+    setAwaitingVehicle(false);
     setVerifying(false);
   };
 
-  const backToMode = () => {
-    setPhase('select');
+  const validateVehicleForPerson = async (code, logAccess) => {
+    let vehicle = null;
+    try { vehicle = await base44.entities.Vehicle.get(code); } catch {}
+    if (!vehicle) {
+      await logAccess('denied', { resource_type: 'vehicle', badge_code: code });
+      return { ok: false, type: 'vehicle', message: 'Vehículo no registrado.' };
+    }
+    const isAssigned = vehicle.event_ids?.includes(selectedEvent.id);
+    if (!isAssigned) {
+      await logAccess('denied', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, resource_type: 'vehicle', zone: selectedSectors.join(', ') });
+      return { ok: false, person_name: vehicle.person_name, type: 'vehicle', vehicle, message: 'Vehículo no asignado a este evento.' };
+    }
+    if (vehicle.status !== 'approved') {
+      await logAccess('denied', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, resource_type: 'vehicle', zone: selectedSectors.join(', ') });
+      return { ok: false, person_name: vehicle.person_name, type: 'vehicle', vehicle, message: 'Vehículo no autorizado. El estado no es aprobado.' };
+    }
+    const sectorLabel = parkingSectors.find((s) => s.value === vehicle.parking_sector)?.label || vehicle.parking_sector || 'Sin sector';
+    if (selectedSectors.length > 0 && vehicle.parking_sector && !selectedSectors.includes(vehicle.parking_sector)) {
+      await logAccess('denied', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, resource_type: 'vehicle', zone: selectedSectors.join(', ') });
+      return { ok: false, person_name: vehicle.person_name, type: 'vehicle', vehicle, message: `Sector de estacionamiento no permitido: ${sectorLabel}.` };
+    }
+    await logAccess('granted', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, resource_type: 'vehicle', zone: selectedSectors.join(', ') });
+    return { ok: true, person_name: vehicle.person_name, type: 'vehicle', vehicle };
   };
 
   const handleQrDetected = async (code) => {
-    if (qrCooldown.current || verifying || result) return;
+    const finalShowing = mode === 'vehicle' ? !!result : (!!personResult && !awaitingVehicle);
+    if (qrCooldown.current || verifying || finalShowing) return;
     qrCooldown.current = true;
     setVerifying(true);
-    setResult(null);
     try {
       const me = await base44.auth.me();
       const verifier = me?.full_name || me?.email || 'Sistema';
-      const zoneLabel = selectedZones.map((z) => zones.find((zz) => zz.value === z)?.label || z).join(', ');
 
-      const logAccess = async (result, opts = {}) => {
+      const logAccess = async (res, opts = {}) => {
         await base44.entities.AccessLog.create({
           accreditation_id: opts.id || 'unknown',
           person_name: opts.person_name || 'Desconocido',
@@ -79,99 +113,139 @@ export default function AccessQrStation({ mode = 'person' }) {
           company: opts.company || selectedEvent.company,
           verified_by: verifier,
           method: 'manual',
-          resource_type: mode,
+          resource_type: opts.resource_type || mode,
           zone: opts.zone || selectedZones.join(', '),
-          result,
+          result: res,
           access_level: opts.access_level || '',
         });
       };
 
-      if (mode === 'person') {
-        const accreditations = await base44.entities.Accreditation.filter(
-          { status: 'active', event_id: selectedEvent.id },
-          '-created_date',
-          500
-        );
-        const accred = accreditations.find((a) => a.id === code);
-
-        if (!accred) {
+      // --- Modo vehículo (ruta /control-vehicular): validación simple ---
+      if (mode === 'vehicle') {
+        let vehicle = null;
+        try { vehicle = await base44.entities.Vehicle.get(code); } catch {}
+        if (!vehicle) {
           await logAccess('denied');
-          setResult({ ok: false, type: 'person', message: 'Credencial no válida para este evento.' });
+          setResult({ ok: false, type: 'vehicle', message: 'Vehículo no registrado.' });
           return;
         }
-
-        if (!canAccessAnyZone(accred.access_level, selectedZones)) {
-          await logAccess('denied', { id: accred.id, person_name: accred.person_name, badge_code: accred.badge_code, company: accred.company, access_level: accred.access_level });
-          setResult({ ok: false, person_name: accred.person_name, type: 'person', message: `Acceso restringido para la zona: ${zoneLabel}.` });
+        const isAssigned = vehicle.event_ids?.includes(selectedEvent.id);
+        if (!isAssigned) {
+          await logAccess('denied', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate });
+          setResult({ ok: false, person_name: vehicle.person_name, type: 'vehicle', vehicle, message: 'Vehículo no asignado a este evento.' });
           return;
         }
-
-        if (!isWithinEventPhases(selectedEvent, accred.event_phases)) {
-          await logAccess('denied', { id: accred.id, person_name: accred.person_name, badge_code: accred.badge_code, company: accred.company, access_level: accred.access_level });
-          setResult({ ok: false, person_name: accred.person_name, type: 'person', message: 'Acceso fuera del rango de fechas autorizado.' });
+        if (vehicle.status !== 'approved') {
+          await logAccess('denied', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, zone: selectedSectors.join(', ') });
+          setResult({ ok: false, person_name: vehicle.person_name, type: 'vehicle', vehicle, message: 'Vehículo no autorizado. El estado no es aprobado.' });
           return;
         }
-
-        await logAccess('granted', { id: accred.id, person_name: accred.person_name, badge_code: accred.badge_code, company: accred.company, access_level: accred.access_level });
-        setResult({ ok: true, person_name: accred.person_name, type: 'person', accred });
+        const sectorLabel = parkingSectors.find((s) => s.value === vehicle.parking_sector)?.label || vehicle.parking_sector || 'Sin sector';
+        if (selectedSectors.length > 0 && vehicle.parking_sector && !selectedSectors.includes(vehicle.parking_sector)) {
+          await logAccess('denied', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, zone: selectedSectors.join(', ') });
+          setResult({ ok: false, person_name: vehicle.person_name, type: 'vehicle', vehicle, message: `Sector de estacionamiento no permitido: ${sectorLabel}.` });
+          return;
+        }
+        await logAccess('granted', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, zone: selectedSectors.join(', ') });
+        setResult({ ok: true, person_name: vehicle.person_name, type: 'vehicle', vehicle });
         return;
       }
 
-      // --- Vehicle validation ---
-      let vehicle = null;
-      try {
-        vehicle = await base44.entities.Vehicle.get(code);
-      } catch {}
+      // --- Modo persona: flujo unificado persona + vehículo ---
+      const zoneLabel = selectedZones.map((z) => zones.find((zz) => zz.value === z)?.label || z).join(', ');
 
-      if (!vehicle) {
+      // Paso 2: escaneo del vehículo
+      if (awaitingVehicle) {
+        const vRes = await validateVehicleForPerson(code, logAccess);
+        setVehicleResult(vRes);
+        setAwaitingVehicle(false);
+        return;
+      }
+
+      // Paso 1: validación de persona
+      const accreditations = await base44.entities.Accreditation.filter(
+        { status: 'active', event_id: selectedEvent.id },
+        '-created_date',
+        500
+      );
+      const accred = accreditations.find((a) => a.id === code);
+
+      if (!accred) {
         await logAccess('denied');
-        setResult({ ok: false, type: 'vehicle', message: 'Vehículo no registrado.' });
+        setVehicleResult(null);
+        setAwaitingVehicle(false);
+        setPersonResult({ ok: false, person_name: '', accred: null, message: 'Credencial no válida para este evento.' });
         return;
       }
-
-      const isAssigned = vehicle.event_ids?.includes(selectedEvent.id);
-
-      if (!isAssigned) {
-        await logAccess('denied', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate });
-        setResult({ ok: false, person_name: vehicle.person_name, type: 'vehicle', vehicle, message: 'Vehículo no asignado a este evento.' });
+      if (!canAccessAnyZone(accred.access_level, selectedZones)) {
+        await logAccess('denied', { id: accred.id, person_name: accred.person_name, badge_code: accred.badge_code, company: accred.company, access_level: accred.access_level });
+        setVehicleResult(null);
+        setAwaitingVehicle(false);
+        setPersonResult({ ok: false, person_name: accred.person_name, accred, message: `Acceso restringido para la zona: ${zoneLabel}.` });
         return;
       }
-
-      if (vehicle.status !== 'approved') {
-        await logAccess('denied', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, zone: selectedSectors.join(', ') });
-        setResult({ ok: false, person_name: vehicle.person_name, type: 'vehicle', vehicle, message: 'Vehículo no autorizado. El estado no es aprobado.' });
+      if (!isWithinEventPhases(selectedEvent, accred.event_phases)) {
+        await logAccess('denied', { id: accred.id, person_name: accred.person_name, badge_code: accred.badge_code, company: accred.company, access_level: accred.access_level });
+        setVehicleResult(null);
+        setAwaitingVehicle(false);
+        setPersonResult({ ok: false, person_name: accred.person_name, accred, message: 'Acceso fuera del rango de fechas autorizado.' });
         return;
       }
-
-      const sectorLabel = parkingSectors.find((s) => s.value === vehicle.parking_sector)?.label || vehicle.parking_sector || 'Sin sector';
-
-      if (selectedSectors.length > 0 && vehicle.parking_sector && !selectedSectors.includes(vehicle.parking_sector)) {
-        await logAccess('denied', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, zone: selectedSectors.join(', ') });
-        setResult({ ok: false, person_name: vehicle.person_name, type: 'vehicle', vehicle, message: `Sector de estacionamiento no permitido: ${sectorLabel}.` });
-        return;
-      }
-
-      await logAccess('granted', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, zone: selectedSectors.join(', ') });
-      setResult({ ok: true, person_name: vehicle.person_name, type: 'vehicle', vehicle });
+      await logAccess('granted', { id: accred.id, person_name: accred.person_name, badge_code: accred.badge_code, company: accred.company, access_level: accred.access_level });
+      setVehicleResult(null);
+      setPersonResult({ ok: true, person_name: accred.person_name, accred });
+      setAwaitingVehicle(true);
     } catch (err) {
-      setResult({ ok: false, message: err.message || 'Error en la verificación.' });
+      if (mode === 'vehicle') {
+        setResult({ ok: false, message: err.message || 'Error en la verificación.' });
+      } else {
+        setVehicleResult(null);
+        setAwaitingVehicle(false);
+        setPersonResult({ ok: false, message: err.message || 'Error en la verificación.' });
+      }
     } finally {
       setVerifying(false);
-      setTimeout(() => { qrCooldown.current = false; }, 3000);
+      setTimeout(() => { qrCooldown.current = false; }, 1200);
     }
   };
 
+  const skipVehicle = () => {
+    setAwaitingVehicle(false);
+    setVehicleResult(null);
+  };
+
+  // Auto-clear: modo vehículo
   useEffect(() => {
-    if (!result) return;
-    speakResult(result.ok);
-    const timer = setTimeout(() => {
-      setResult(null);
-      setCycle((c) => c + 1);
-    }, 2500);
-    return () => clearTimeout(timer);
-  }, [result]);
+    if (mode === 'vehicle' && result) {
+      speakResult(result.ok);
+      const timer = setTimeout(() => {
+        setResult(null);
+        setCycle((c) => c + 1);
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [mode, result]);
+
+  // Auto-clear: modo persona (resultado final combinado)
+  useEffect(() => {
+    if (mode === 'person' && personResult && !awaitingVehicle) {
+      const overallOk = personResult.ok && (vehicleResult ? vehicleResult.ok : true);
+      speakResult(overallOk);
+      const timer = setTimeout(() => {
+        setPersonResult(null);
+        setVehicleResult(null);
+        setAwaitingVehicle(false);
+        setCycle((c) => c + 1);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [mode, personResult, awaitingVehicle, vehicleResult]);
 
   const eventStatus = selectedEvent ? getEventStatus(selectedEvent) : null;
+  const finalShowing = mode === 'vehicle' ? !!result : (!!personResult && !awaitingVehicle);
+  const isPaused = verifying || finalShowing;
+  const hwDisabled = verifying || finalShowing;
+  const personOverallOk = personResult && personResult.ok && (vehicleResult ? vehicleResult.ok : true);
 
   return (
     <div className="min-h-screen bg-[hsl(120_14%_97%)]">
@@ -210,7 +284,11 @@ export default function AccessQrStation({ mode = 'person' }) {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-slate-900">Control de acceso por QR</h2>
-                <p className="text-sm text-slate-500">Elegí el tipo de acceso y el evento para iniciar.</p>
+                <p className="text-sm text-slate-500">
+                  {mode === 'person'
+                    ? 'Elegí el evento y la zona. Se valida la persona y luego el QR del vehículo.'
+                    : 'Elegí el evento y el sector para iniciar.'}
+                </p>
               </div>
             </div>
 
@@ -362,7 +440,7 @@ export default function AccessQrStation({ mode = 'person' }) {
                       {scanMode === 'scanner'
                         ? 'Escaneá el código con el lector de la PDA para validar el ingreso.'
                         : mode === 'person'
-                          ? 'Enfocá el QR de la credencial para validar el ingreso.'
+                          ? 'Enfocá el QR de la credencial de la persona y luego el del vehículo.'
                           : 'Enfocá el QR de la credencial vehicular para validar el ingreso.'}
                     </p>
                   </div>
@@ -392,20 +470,32 @@ export default function AccessQrStation({ mode = 'person' }) {
                   <Loader2 className="h-10 w-10 animate-spin text-emerald-600" />
                   <span className="mt-3 text-sm text-slate-500">Verificando…</span>
                 </div>
-              ) : !result ? (
-                scanMode === 'scanner' ? (
-                  <HardwareScannerInput onScan={handleQrDetected} disabled={verifying} />
-                ) : (
-                  <QrScanner key={cycle} onDetected={handleQrDetected} paused={!!result || verifying} />
-                )
-              ) : null}
+              ) : (
+                <>
+                  {mode === 'person' && awaitingVehicle && (
+                    <div className="mb-4 rounded-xl border-2 border-emerald-300 bg-emerald-50 p-3 text-center">
+                      <p className="text-sm font-bold text-emerald-800">
+                        ✓ {personResult?.person_name} — Escanee el QR del vehículo
+                      </p>
+                      <button onClick={skipVehicle} className="mt-2 text-xs font-semibold text-emerald-700 underline">
+                        Omitir vehículo
+                      </button>
+                    </div>
+                  )}
+                  {scanMode === 'scanner' ? (
+                    <HardwareScannerInput onScan={handleQrDetected} disabled={hwDisabled} />
+                  ) : (
+                    <QrScanner key={cycle} onDetected={handleQrDetected} paused={isPaused} />
+                  )}
+                </>
+              )}
             </div>
           </div>
         </>
       )}
 
-      {/* Full-screen result overlay */}
-      {result && (
+      {/* Full-screen result overlay — modo vehículo */}
+      {mode === 'vehicle' && result && (
         <div
           className={`fixed inset-0 z-[60] flex flex-col items-center justify-center ${result.ok ? 'bg-emerald-600' : 'bg-red-600'}`}
           onClick={() => { setResult(null); setCycle((c) => c + 1); }}
@@ -418,12 +508,9 @@ export default function AccessQrStation({ mode = 'person' }) {
           <p className="mt-6 text-5xl font-extrabold tracking-tight text-white sm:text-6xl">
             {result.ok ? 'ACEPTADO' : 'DENEGADO'}
           </p>
-          {result.type && (
-            <div className="mt-4 flex items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-sm font-semibold text-white">
-              {result.type === 'vehicle' ? <Car className="h-4 w-4" /> : <User className="h-4 w-4" />}
-              {result.type === 'vehicle' ? 'Vehículo' : 'Persona'}
-            </div>
-          )}
+          <div className="mt-4 flex items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-sm font-semibold text-white">
+            <Car className="h-4 w-4" /> Vehículo
+          </div>
           {result.vehicle && (
             <p className="mt-2 text-xl font-bold text-white">
               {result.vehicle.plate} · {result.vehicle.brand} {result.vehicle.model}
@@ -434,6 +521,54 @@ export default function AccessQrStation({ mode = 'person' }) {
           )}
           {!result.ok && result.message && (
             <p className="mt-1 max-w-md px-6 text-center text-sm text-white/70">{result.message}</p>
+          )}
+        </div>
+      )}
+
+      {/* Full-screen result overlay — modo persona (persona + vehículo) */}
+      {mode === 'person' && personResult && !awaitingVehicle && (
+        <div
+          className={`fixed inset-0 z-[60] flex flex-col items-center justify-center ${personOverallOk ? 'bg-emerald-600' : 'bg-red-600'}`}
+          onClick={resetFlow}
+        >
+          {personOverallOk ? (
+            <CheckCircle2 className="h-28 w-28 text-white" strokeWidth={1.5} />
+          ) : (
+            <XCircle className="h-28 w-28 text-white" strokeWidth={1.5} />
+          )}
+          <p className="mt-4 text-5xl font-extrabold tracking-tight text-white sm:text-6xl">
+            {personOverallOk ? 'ACEPTADO' : 'DENEGADO'}
+          </p>
+
+          {/* Persona */}
+          <div className="mt-5 flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-semibold text-white">
+            <User className="h-4 w-4" />
+            <span>{personResult.person_name || 'Persona'}</span>
+            {personResult.ok ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+          </div>
+          {!personResult.ok && personResult.message && (
+            <p className="mt-2 max-w-md px-6 text-center text-sm text-white/70">{personResult.message}</p>
+          )}
+
+          {/* Vehículo */}
+          {vehicleResult ? (
+            <>
+              <div className="mt-3 flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-semibold text-white">
+                <Car className="h-4 w-4" />
+                <span>{vehicleResult.vehicle?.plate} · {vehicleResult.vehicle?.brand} {vehicleResult.vehicle?.model}</span>
+                {vehicleResult.ok ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+              </div>
+              {vehicleResult.ok && vehicleResult.vehicle?.parking_sector && (
+                <p className="mt-2 rounded-full bg-white/15 px-4 py-1.5 text-sm font-semibold text-white">
+                  Estacionamiento: {parkingSectors.find((s) => s.value === vehicleResult.vehicle.parking_sector)?.label || vehicleResult.vehicle.parking_sector}
+                </p>
+              )}
+              {!vehicleResult.ok && vehicleResult.message && (
+                <p className="mt-1 max-w-md px-6 text-center text-sm text-white/70">{vehicleResult.message}</p>
+              )}
+            </>
+          ) : (
+            <p className="mt-3 text-sm text-white/60">Sin vehículo</p>
           )}
         </div>
       )}

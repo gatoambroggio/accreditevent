@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { getUserCompany } from '@/lib/userCompany';
-import { Download, Car, CarFront, Check, XCircle } from 'lucide-react';
+import { Download, Car, CarFront, Check, XCircle, MapPin, User, X } from 'lucide-react';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
 import FilterSelect from '@/components/ui/filter-select';
@@ -10,6 +10,7 @@ import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
 import StatusBadge from '@/components/StatusBadge';
 import { exportToExcel } from '@/lib/exportUtils';
 import { parseServerDate } from '@/lib/formatDate';
+import { useParkingSectors } from '@/lib/useParkingSectors';
 
 export default function RegisteredVehicles() {
   const { user } = useAuth();
@@ -20,6 +21,8 @@ export default function RegisteredVehicles() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [eventFilter, setEventFilter] = useState('');
+  const [detailVehicle, setDetailVehicle] = useState(null);
+  const { sectors } = useParkingSectors();
 
   useEffect(() => {
     (async () => {
@@ -160,7 +163,14 @@ export default function RegisteredVehicles() {
         <tbody>
           {filtered.map((v) => (
             <Tr key={v.id}>
-              <Td className="text-sm font-semibold text-slate-900">{v.person_name || '—'}</Td>
+              <Td>
+                <button
+                  onClick={() => setDetailVehicle(v)}
+                  className="text-left text-sm font-semibold text-slate-900 transition hover:text-emerald-700 hover:underline"
+                >
+                  {v.person_name || '—'}
+                </button>
+              </Td>
               <Td className="text-sm text-slate-600">{v.brand} {v.model}</Td>
               <Td><code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700">{v.plate || '—'}</code></Td>
               <Td className="text-sm text-slate-600">{v.color || '—'}</Td>
@@ -190,6 +200,87 @@ export default function RegisteredVehicles() {
           ))}
         </tbody>
       </DataTable>
+
+      {detailVehicle && (
+        <VehicleEntryModal
+          vehicle={detailVehicle}
+          events={events}
+          sectors={sectors}
+          onClose={() => setDetailVehicle(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function VehicleEntryModal({ vehicle, events, sectors, onClose }) {
+  const sectorLabel = sectors.find((s) => s.value === vehicle.parking_sector)?.label || vehicle.parking_sector || 'Sin sector asignado';
+  const activeEventIds = new Set(events.filter((e) => e.status === 'active').map((e) => e.id));
+  const assignedActive = (vehicle.event_ids || []).some((id) => activeEventIds.has(id));
+  const assignedEventNames = (vehicle.event_names || []).join(', ') || (vehicle.event_ids || []).map((id) => events.find((e) => e.id === id)?.name).filter(Boolean).join(', ');
+
+  let canEnter = true;
+  let reason = '';
+  if (vehicle.status !== 'approved') { canEnter = false; reason = 'El vehículo no está aprobado.'; }
+  else if (!assignedActive) { canEnter = false; reason = 'No está asignado a un evento activo.'; }
+  else if (!vehicle.parking_sector) { canEnter = false; reason = 'No tiene sector de estacionamiento asignado.'; }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-wider text-emerald-600">Vehículo</p>
+            <h2 className="text-xl font-bold text-slate-900">{vehicle.brand} {vehicle.model}</h2>
+            <p className="text-sm text-slate-500">Patente: <span className="font-mono font-bold">{vehicle.plate || '—'}</span></p>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-2.5">
+          <div className="flex items-center gap-2 text-sm">
+            <User className="h-4 w-4 text-slate-400" />
+            <span className="text-slate-500">Titular:</span>
+            <span className="font-semibold text-slate-900">{vehicle.person_name || '—'}</span>
+          </div>
+          {vehicle.color && (
+            <div className="flex items-center gap-2 text-sm">
+              <Car className="h-4 w-4 text-slate-400" />
+              <span className="text-slate-500">Color:</span>
+              <span className="font-semibold text-slate-900">{vehicle.color}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-2 text-sm">
+            <MapPin className="h-4 w-4 text-slate-400" />
+            <span className="text-slate-500">Sector:</span>
+            <span className="font-semibold text-slate-900">{sectorLabel}</span>
+          </div>
+          {assignedEventNames && (
+            <div className="flex items-center gap-2 text-sm">
+              <CarFront className="h-4 w-4 text-slate-400" />
+              <span className="text-slate-500">Eventos:</span>
+              <span className="font-semibold text-slate-900">{assignedEventNames}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-slate-500">Estado:</span>
+            <StatusBadge status={vehicle.status} />
+          </div>
+        </div>
+
+        <div className={`mt-5 flex items-center gap-3 rounded-xl border p-4 ${canEnter ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}>
+          {canEnter ? <Check className="h-6 w-6 shrink-0 text-emerald-600" /> : <XCircle className="h-6 w-6 shrink-0 text-red-600" />}
+          <div>
+            <p className={`text-sm font-bold ${canEnter ? 'text-emerald-800' : 'text-red-800'}`}>
+              {canEnter ? 'Puede ingresar al sector' : 'No puede ingresar'}
+            </p>
+            {!canEnter && <p className="text-xs text-red-700">{reason}</p>}
+            {canEnter && <p className="text-xs text-emerald-700">Estacionamiento habilitado: {sectorLabel}</p>}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
