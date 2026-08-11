@@ -118,6 +118,18 @@
           ]
         },
         {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "operador"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
           "user_condition": {
             "role": "superadmin"
           }
@@ -190,6 +202,18 @@
             {
               "user_condition": {
                 "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "operador"
               }
             },
             {
