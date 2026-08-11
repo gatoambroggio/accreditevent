@@ -39,7 +39,7 @@ export default function PdaId() {
     <div>
       <PageHeader kicker="Control de acceso" title="PDA ID" />
       <p className="mb-5 text-sm text-slate-500">
-        Este número identifica a la PDA en este dispositivo para <span className="font-semibold">todos</span> los controles de acceso (QR personas, QR vehículos y validación manual). Se setea una sola vez y se recuerda en este dispositivo.
+        Este número identifica a la PDA en este dispositivo para <span className="font-semibold">todos</span> los controles de acceso (facial, QR personas, QR vehículos y validación manual). Se setea una sola vez y se recuerda en este dispositivo.
       </p>
 
       <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -123,6 +123,7 @@ export default function PdaId() {
       )}
 
       <div className="mt-6 flex flex-wrap gap-2">
+        <Link to="/control-acceso" className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Control facial</Link>
         <Link to="/control-qr" className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Control QR personas</Link>
         <Link to="/control-vehicular" className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Control vehicular</Link>
         <Link to="/control-manual" className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Validación manual</Link>
