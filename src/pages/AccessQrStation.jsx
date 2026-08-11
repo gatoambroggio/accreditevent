@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { Loader2, CheckCircle2, XCircle, Calendar, Clock, AlertTriangle, Car, User, WifiOff, RefreshCw, CloudUpload } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Calendar, Clock, AlertTriangle, Car, User, WifiOff, RefreshCw, CloudUpload, Lock } from 'lucide-react';
 import QrScanner from '@/components/QrScanner';
 import { useZones } from '@/lib/useZones';
 import { useParkingSectors } from '@/lib/useParkingSectors';
@@ -14,6 +14,7 @@ import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { usePdaHeartbeat } from '@/hooks/usePdaRegistration';
 import { saveEventData, getEventData, getCacheAgeMs, queueAccessLog, setCachedVerifier, getCachedVerifier } from '@/lib/offlineAccess';
 import { validatePersonAccred, validateVehicleObj } from '@/lib/offlineValidation';
+import PdaPinPrompt from '@/components/PdaPinPrompt';
 
 const PERSON_LIMIT = 3000;
 const VEHICLE_LIMIT = 3000;
@@ -35,13 +36,20 @@ export default function AccessQrStation({ mode = 'person' }) {
   const [cacheAge, setCacheAge] = useState(null);
   const [accreditations, setAccreditations] = useState([]);
   const [vehicles, setVehicles] = useState([]);
+  const [unlocked, setUnlocked] = useState(false);
+  const [pinOpen, setPinOpen] = useState(false);
   const qrCooldown = useRef(false);
   const { zones } = useZones();
   const { sectors: parkingSectors } = useParkingSectors();
   const online = useOnlineStatus();
   const { pendingCount, syncing, refresh: refreshPending } = useOfflineSync(online);
-  // Modo offline AUTOMÁTICO: se activa solo cuando no hay conexión.
-  const effectiveOffline = !online;
+  // Detección real de conexión: navigator.onLine puede ser true aun sin
+  // internet (wifi sin salida). realOnline se ajusta según el resultado del
+  // último fetch: si la API responde hay red; si falla, pasamos a modo offline
+  // y usamos el caché. Así el modo offline funciona aunque el browser "crea"
+  // que está online.
+  const [realOnline, setRealOnline] = useState(online);
+  const effectiveOffline = !realOnline;
   // Registro y heartbeat de la PDA (número seteado una sola vez en el módulo PDA ID).
   const { pdaNumber } = usePdaHeartbeat({
     enabled: phase === 'active',
@@ -89,10 +97,11 @@ export default function AccessQrStation({ mode = 'person' }) {
         const withEvent = mine.find((s) => s.assigned_event_id && events.some((e) => e.id === s.assigned_event_id));
         if (withEvent) {
           if (!selectedEventId) setSelectedEventId(withEvent.assigned_event_id);
-          if (withEvent.assigned_zone && selectedZones.length === 1 && selectedZones[0] === 'general') {
+          if (withEvent.assigned_zone) {
             const zs = withEvent.assigned_zone.split(',').map((z) => z.trim()).filter(Boolean);
             if (zs.length > 0) setSelectedZones(zs);
           }
+          if (Array.isArray(withEvent.assigned_sectors)) setSelectedSectors(withEvent.assigned_sectors);
         }
       } catch {}
     })();
@@ -109,11 +118,11 @@ export default function AccessQrStation({ mode = 'person' }) {
         const mine = await base44.entities.PdaStation.filter({ station_number: pdaNumber }, '-created_date', 20);
         const st = mine.find((s) => s.assigned_event_id) || mine[0];
         if (!st) return;
-        if (st.assigned_zone) {
+        if (!unlocked && st.assigned_zone) {
           const zs = st.assigned_zone.split(',').map((z) => z.trim()).filter(Boolean);
           if (zs.length > 0) setSelectedZones(zs);
         }
-        if (Array.isArray(st.assigned_sectors)) setSelectedSectors(st.assigned_sectors);
+        if (!unlocked && Array.isArray(st.assigned_sectors)) setSelectedSectors(st.assigned_sectors);
         if (st.assigned_event_id && st.assigned_event_id !== selectedEventId) {
           const evt = events.find((e) => e.id === st.assigned_event_id);
           if (evt) { setSelectedEvent(evt); setSelectedEventId(evt.id); }
@@ -124,7 +133,7 @@ export default function AccessQrStation({ mode = 'person' }) {
     const id = setInterval(sync, 10000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [online, phase, pdaNumber, selectedEventId, events]);
+  }, [online, phase, pdaNumber, selectedEventId, events, unlocked]);
 
   const [downloadError, setDownloadError] = useState('');
 
@@ -134,14 +143,17 @@ export default function AccessQrStation({ mode = 'person' }) {
     // Usamos allSettled para que el guardado de personas no se cancele si la
     // carga de vehículos falla (payload pesado / red inestable).
     const [accRes, vehRes] = await Promise.allSettled([
-      base44.entities.Accreditation.filter({ status: 'active', event_id: evt.id }, '-created_date', PERSON_LIMIT),
+      base44.entities.Accreditation.filter({ status: 'active' }, '-created_date', PERSON_LIMIT),
       base44.entities.Vehicle.list('-created_date', VEHICLE_LIMIT),
     ]);
-    const accs = accRes.status === 'fulfilled' ? (accRes.value || []) : [];
+    // Filtrado del lado del cliente por evento (mismo motivo que vehículos:
+    // garantiza el caché del evento aunque el filter por event_id no devuelva).
+    const accs = (accRes.status === 'fulfilled' ? (accRes.value || []) : []).filter((a) => a.event_id === evt.id);
     const rawVehs = vehRes.status === 'fulfilled' ? (vehRes.value || []) : [];
-    // Filtrado del lado del cliente: event_ids es un array y no todos los backends
-    // soportan filter por array-contains, lo que dejaba el caché de vehículos vacío.
     const vehs = rawVehs.filter((v) => (v.event_ids || []).includes(evt.id));
+    // Detección real de conexión: si la API respondió hay red; si fue
+    // rechazado (wifi sin internet), pasamos a modo offline y usamos caché.
+    setRealOnline(accRes.status === 'fulfilled');
     const prev = getEventData(evt.id);
     const prevAccs = prev?.accreditations || [];
     const prevVehs = prev?.vehicles || [];
@@ -228,6 +240,16 @@ export default function AccessQrStation({ mode = 'person' }) {
     try { return await base44.entities.Accreditation.get(code); } catch { return null; }
   };
 
+  // Persiste un cambio de zonas/sectores hecho desde la PDA (con clave) en la
+  // estación del backend, así queda registrado y se sincroniza con el panel.
+  const persistPdaConfig = async (patch) => {
+    if (!pdaNumber) return;
+    try {
+      const mine = await base44.entities.PdaStation.filter({ station_number: pdaNumber }, '-created_date', 5);
+      if (mine?.[0]?.id) await base44.entities.PdaStation.update(mine[0].id, patch);
+    } catch {}
+  };
+
   const handleQrDetected = async (code) => {
     if (qrCooldown.current || verifying || result) return;
     qrCooldown.current = true;
@@ -287,8 +309,23 @@ export default function AccessQrStation({ mode = 'person' }) {
       // Fallback online directo si no se encontró en listado (superaba límite o RLS por evento asignado)
       if (!accred && !vehicle && !effectiveOffline) {
         accred = await fallbackGetAccred(code);
+        if (accred && accred.event_id !== selectedEvent.id) accred = null;
+        if (accred) {
+          // Cachear para futuras validaciones offline
+          setAccreditations((prev) => prev.some((a) => a.id === accred.id) ? prev : [...prev, accred]);
+          const cache = getEventData(selectedEvent.id);
+          if (cache) saveEventData(selectedEvent.id, { ...cache, accreditations: [...(cache.accreditations || []), accred] });
+        }
         if (!accred) {
-          try { const dv = await base44.entities.Vehicle.get(code); if (dv && (dv.event_ids || []).includes(selectedEvent.id)) vehicle = dv; } catch {}
+          try {
+            const dv = await base44.entities.Vehicle.get(code);
+            if (dv && (dv.event_ids || []).includes(selectedEvent.id)) {
+              vehicle = dv;
+              setVehicles((prev) => prev.some((v) => v.id === dv.id) ? prev : [...prev, dv]);
+              const c2 = getEventData(selectedEvent.id);
+              if (c2) saveEventData(selectedEvent.id, { ...c2, vehicles: [...(c2.vehicles || []), dv] });
+            }
+          } catch {}
         }
       }
 
@@ -424,46 +461,58 @@ export default function AccessQrStation({ mode = 'person' }) {
 
                 {mode === 'person' && (
                   <div className="mt-5">
-                    <label className="mb-1.5 block text-xs font-semibold text-slate-600">Zona(s) de control (personas)</label>
-                    <p className="mb-2 text-xs text-slate-400">Seleccioná una o varias. Se permite el ingreso si la persona tiene acceso a alguna de las seleccionadas.</p>
-                    <div className="flex flex-wrap gap-2">
-                      {zones.map((z) => {
-                        const active = selectedZones.includes(z.value);
-                        return (
-                          <button
-                            key={z.value}
-                            onClick={() => setSelectedZones((prev) => active ? prev.filter((v) => v !== z.value) : [...prev, z.value])}
-                            className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-                          >
-                            {z.label}
-                          </button>
-                        );
-                      })}
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <label className="text-xs font-semibold text-slate-600">Zona(s) de control (personas)</label>
+                      <button type="button" onClick={() => setPinOpen(true)} className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:underline">
+                        <Lock className="h-3.5 w-3.5" /> Modificar con clave
+                      </button>
                     </div>
+                    <p className="mb-2 text-xs text-slate-400">Asignadas desde el panel Estaciones PDA. Para cambiarlas desde la PDA necesitás la clave de administrador.</p>
+                    {unlocked ? (
+                      <div className="flex flex-wrap gap-2">
+                        {zones.map((z) => {
+                          const active = selectedZones.includes(z.value);
+                          return (
+                            <button key={z.value} onClick={() => setSelectedZones((prev) => { const next = active ? prev.filter((v) => v !== z.value) : [...prev, z.value]; persistPdaConfig({ assigned_zone: next.join(', ') }); return next; })} className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${active ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{z.label}</button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedZones.length === 0 ? <span className="text-xs text-slate-400">Sin zonas asignadas.</span> : selectedZones.map((zv) => (
+                          <span key={zv} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">{zones.find((z) => z.value === zv)?.label || zv}</span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 
                 <div className="mt-5">
-                  <label className="mb-1.5 block text-xs font-semibold text-slate-600">Sector(es) de estacionamiento (vehículos)</label>
-                  <p className="mb-2 text-xs text-slate-400">Seleccioná uno o varios. Se valida el sector del vehículo si se escanea una credencial vehicular.</p>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <label className="text-xs font-semibold text-slate-600">Sector(es) de estacionamiento (vehículos)</label>
+                    <button type="button" onClick={() => setPinOpen(true)} className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:underline">
+                      <Lock className="h-3.5 w-3.5" /> Modificar con clave
+                    </button>
+                  </div>
+                  <p className="mb-2 text-xs text-slate-400">Asignados desde el panel Estaciones PDA. Para cambiarlos desde la PDA necesitás la clave de administrador.</p>
                   {parkingSectors.length === 0 ? (
                     <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs text-slate-500">
                       No hay sectores configurados. Se validará solo la asignación al evento.
                     </div>
-                  ) : (
+                  ) : unlocked ? (
                     <div className="flex flex-wrap gap-2">
                       {parkingSectors.map((s) => {
                         const active = selectedSectors.includes(s.value);
                         return (
-                          <button
-                            key={s.value}
-                            onClick={() => setSelectedSectors((prev) => active ? prev.filter((v) => v !== s.value) : [...prev, s.value])}
-                            className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${active ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-                          >
-                            {s.label}
-                          </button>
+                          <button key={s.value} onClick={() => setSelectedSectors((prev) => { const next = active ? prev.filter((v) => v !== s.value) : [...prev, s.value]; persistPdaConfig({ assigned_sectors: next }); return next; })} className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${active ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{s.label}</button>
                         );
                       })}
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {selectedSectors.length === 0 ? <span className="text-xs text-slate-400">Sin sectores asignados.</span> : selectedSectors.map((sv) => (
+                        <span key={sv} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700">{parkingSectors.find((s) => s.value === sv)?.label || sv}</span>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -660,6 +709,8 @@ export default function AccessQrStation({ mode = 'person' }) {
           )}
         </div>
       )}
+
+      <PdaPinPrompt open={pinOpen} onClose={() => setPinOpen(false)} pdaNumber={pdaNumber} onSuccess={() => { setUnlocked(true); setPinOpen(false); }} />
     </div>
   );
 }
