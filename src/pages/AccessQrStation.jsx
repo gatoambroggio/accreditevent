@@ -16,6 +16,7 @@ import { validatePersonAccred, validateVehicleObj } from '@/lib/offlineValidatio
 
 const PERSON_LIMIT = 3000;
 const VEHICLE_LIMIT = 3000;
+const CACHE_REFRESH_MS = 2 * 60 * 1000;
 
 export default function AccessQrStation({ mode = 'person' }) {
   const [phase, setPhase] = useState('select');
@@ -54,6 +55,18 @@ export default function AccessQrStation({ mode = 'person' }) {
       } catch {}
     })();
   }, []);
+
+  // Refresco automático del caché: al (re)conectarse y cada 2 minutos mientras
+  // haya conexión y un evento seleccionado. Sin botones manuales.
+  useEffect(() => {
+    if (!online || !selectedEvent) return;
+    downloadEventData(selectedEvent);
+    const id = setInterval(() => {
+      downloadEventData(selectedEvent);
+    }, CACHE_REFRESH_MS);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [online, selectedEvent]);
 
   const [downloadError, setDownloadError] = useState('');
 
@@ -113,9 +126,7 @@ export default function AccessQrStation({ mode = 'person' }) {
     setAccreditations(cache?.accreditations || []);
     setVehicles(cache?.vehicles || []);
     setCacheAge(getCacheAgeMs(evt.id));
-    if (navigator.onLine) {
-      downloadEventData(evt);
-    }
+    // La descarga inicial la dispara el useEffect al setear selectedEvent.
   };
 
   const resetFlow = () => {
@@ -476,13 +487,6 @@ export default function AccessQrStation({ mode = 'person' }) {
                       <CloudUpload className="h-3.5 w-3.5" /> {syncing ? 'Sincronizando…' : `${pendingCount} registro(s) pendientes`}
                     </span>
                   )}
-                  <button
-                    onClick={() => selectedEvent && downloadEventData(selectedEvent)}
-                    disabled={downloading || effectiveOffline}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    <RefreshCw className="h-3.5 w-3.5" /> Actualizar datos
-                  </button>
                 </div>
                 {downloadError && (
                   <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
