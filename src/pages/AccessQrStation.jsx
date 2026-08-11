@@ -55,19 +55,31 @@ export default function AccessQrStation({ mode = 'person' }) {
     })();
   }, []);
 
+  const [downloadError, setDownloadError] = useState('');
+
   const downloadEventData = async (evt) => {
     setDownloading(true);
-    try {
-      const [accs, allVehs] = await Promise.all([
-        base44.entities.Accreditation.filter({ status: 'active', event_id: evt.id }, '-created_date', PERSON_LIMIT),
-        base44.entities.Vehicle.list('-created_date', VEHICLE_LIMIT),
-      ]);
-      const vehs = (allVehs || []).filter((v) => (v.event_ids || []).includes(evt.id));
-      setAccreditations(accs || []);
-      setVehicles(vehs || []);
-      saveEventData(evt.id, { accreditations: accs || [], vehicles: vehs || [] });
-      setCacheAge(0);
-    } catch {}
+    setDownloadError('');
+    // Usamos allSettled para que el guardado de personas no se cancele si la
+    // carga de vehículos falla (payload pesado / red inestable).
+    const [accRes, vehRes] = await Promise.allSettled([
+      base44.entities.Accreditation.filter({ status: 'active', event_id: evt.id }, '-created_date', PERSON_LIMIT),
+      base44.entities.Vehicle.filter({ event_ids: evt.id }, '-created_date', VEHICLE_LIMIT),
+    ]);
+    const accs = accRes.status === 'fulfilled' ? (accRes.value || []) : [];
+    const vehs = vehRes.status === 'fulfilled' ? (vehRes.value || []) : [];
+    setAccreditations(accs);
+    setVehicles(vehs);
+    // Guardamos lo que se haya podido obtener (aunque un listado falle).
+    saveEventData(evt.id, { accreditations: accs, vehicles: vehs });
+    setCacheAge(0);
+    if (accRes.status === 'rejected' || (accs.length === 0 && accRes.status === 'fulfilled')) {
+      // No se pudieron descargar personas: es crítico. Avisar claramente.
+      const prev = getEventData(evt.id);
+      if (!prev || (prev.accreditations || []).length === 0) {
+        setDownloadError('No se pudieron descargar los datos del evento. Revisá la conexión y volvé a intentar.');
+      }
+    }
     setDownloading(false);
   };
 
@@ -106,21 +118,18 @@ export default function AccessQrStation({ mode = 'person' }) {
     setVehicles([]);
   };
 
-  // Resuelve la lista de acreditaciones según el modo (online usa estado, offline usa caché).
+  // Resuelve la lista de acreditaciones: usa el estado en memoria si tiene datos;
+  // si está vacío (descarga falló o "fake online" sin internet real), cae al caché.
   const resolveAccreditations = () => {
-    if (effectiveOffline) {
-      const cache = getEventData(selectedEvent.id);
-      return cache?.accreditations || [];
-    }
-    return accreditations;
+    if (accreditations.length > 0) return accreditations;
+    const cache = getEventData(selectedEvent.id);
+    return cache?.accreditations || [];
   };
 
   const resolveVehicles = () => {
-    if (effectiveOffline) {
-      const cache = getEventData(selectedEvent.id);
-      return cache?.vehicles || [];
-    }
-    return vehicles;
+    if (vehicles.length > 0) return vehicles;
+    const cache = getEventData(selectedEvent.id);
+    return cache?.vehicles || [];
   };
 
   // Fallback online: obtener acreditación por id directo (por si excede el límite o RLS por evento).
@@ -435,12 +444,12 @@ export default function AccessQrStation({ mode = 'person' }) {
                 <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
                   {effectiveOffline ? (
                     <span className="inline-flex items-center gap-1.5 rounded-lg border border-amber-400 bg-amber-50 px-3 py-1.5 font-semibold text-amber-700">
-                      <WifiOff className="h-3.5 w-3.5" /> Modo offline automático (sin conexión)
+                      <WifiOff className="h-3.5 w-3.5" /> Modo offline (sin conexión) · usando caché
                     </span>
                   ) : downloading ? (
                     <span className="inline-flex items-center gap-1.5 text-slate-500"><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Descargando datos del evento…</span>
                   ) : (
-                    <span className="inline-flex items-center gap-1.5 text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" /> Online · {accreditations.length} personas / {vehicles.length} vehículos cargados</span>
+                    <span className="inline-flex items-center gap-1.5 text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" /> {accreditations.length} personas / {vehicles.length} vehículos en memoria</span>
                   )}
                   {cacheAge != null && (
                     <span className="text-slate-500">Caché: {cacheAge === 0 ? 'actualizada' : `hace ${Math.max(1, Math.round(cacheAge / 60000))} min`}</span>
@@ -450,7 +459,19 @@ export default function AccessQrStation({ mode = 'person' }) {
                       <CloudUpload className="h-3.5 w-3.5" /> {syncing ? 'Sincronizando…' : `${pendingCount} registro(s) pendientes`}
                     </span>
                   )}
+                  <button
+                    onClick={() => selectedEvent && downloadEventData(selectedEvent)}
+                    disabled={downloading || effectiveOffline}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" /> Actualizar datos
+                  </button>
                 </div>
+                {downloadError && (
+                  <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+                    {downloadError}
+                  </div>
+                )}
               </div>
 
               {(eventStatus === 'upcoming' || eventStatus === 'ended') ? (
@@ -468,12 +489,25 @@ export default function AccessQrStation({ mode = 'person' }) {
                     ← Volver a selección de evento
                   </button>
                 </div>
-              ) : effectiveOffline && !getEventData(selectedEvent.id) ? (
+              ) : (resolveAccreditations().length === 0 && resolveVehicles().length === 0) && !downloading ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <WifiOff className="h-12 w-12 text-amber-500" />
-                  <p className="mt-4 text-lg font-bold text-slate-900">Sin datos offline para este evento</p>
-                  <p className="mt-1 max-w-xs text-sm text-slate-500">Conectate a internet y abrí el control al menos una vez para descargar los datos. Luego podés operar sin conexión.</p>
-                  <button onClick={backToSelect} className="mt-6 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+                  <AlertTriangle className="h-12 w-12 text-amber-500" />
+                  <p className="mt-4 text-lg font-bold text-slate-900">Sin datos cargados para este evento</p>
+                  <p className="mt-1 max-w-xs text-sm text-slate-500">
+                    {effectiveOffline
+                      ? 'No hay datos en caché. Conectate a internet y abrí el control al menos una vez para descargarlos.'
+                      : 'No se pudieron descargar los datos. Verificá la conexión y volvé a intentarlo.'}
+                  </p>
+                  {!effectiveOffline && (
+                    <button
+                      onClick={() => selectedEvent && downloadEventData(selectedEvent)}
+                      disabled={downloading}
+                      className="mt-6 inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:opacity-50"
+                    >
+                      <RefreshCw className="h-4 w-4" /> Descargar datos ahora
+                    </button>
+                  )}
+                  <button onClick={backToSelect} className="mt-3 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
                     ← Volver
                   </button>
                 </div>
