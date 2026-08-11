@@ -99,6 +99,33 @@ export default function AccessQrStation({ mode = 'person' }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pdaNumber, events]);
 
+  // Sincronización en vivo de la configuración remota (panel Estaciones PDA):
+  // cada 10 segundos actualiza zonas, sectores y evento desde el backend, así
+  // los cambios del administrador aplican de inmediato en la PDA activa.
+  useEffect(() => {
+    if (!online || phase !== 'active' || !pdaNumber) return;
+    const sync = async () => {
+      try {
+        const mine = await base44.entities.PdaStation.filter({ station_number: pdaNumber }, '-created_date', 20);
+        const st = mine.find((s) => s.assigned_event_id) || mine[0];
+        if (!st) return;
+        if (st.assigned_zone) {
+          const zs = st.assigned_zone.split(',').map((z) => z.trim()).filter(Boolean);
+          if (zs.length > 0) setSelectedZones(zs);
+        }
+        if (Array.isArray(st.assigned_sectors)) setSelectedSectors(st.assigned_sectors);
+        if (st.assigned_event_id && st.assigned_event_id !== selectedEventId) {
+          const evt = events.find((e) => e.id === st.assigned_event_id);
+          if (evt) { setSelectedEvent(evt); setSelectedEventId(evt.id); }
+        }
+      } catch {}
+    };
+    sync();
+    const id = setInterval(sync, 10000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [online, phase, pdaNumber, selectedEventId, events]);
+
   const [downloadError, setDownloadError] = useState('');
 
   const downloadEventData = async (evt) => {
@@ -108,10 +135,13 @@ export default function AccessQrStation({ mode = 'person' }) {
     // carga de vehículos falla (payload pesado / red inestable).
     const [accRes, vehRes] = await Promise.allSettled([
       base44.entities.Accreditation.filter({ status: 'active', event_id: evt.id }, '-created_date', PERSON_LIMIT),
-      base44.entities.Vehicle.filter({ event_ids: evt.id }, '-created_date', VEHICLE_LIMIT),
+      base44.entities.Vehicle.list('-created_date', VEHICLE_LIMIT),
     ]);
     const accs = accRes.status === 'fulfilled' ? (accRes.value || []) : [];
-    const vehs = vehRes.status === 'fulfilled' ? (vehRes.value || []) : [];
+    const rawVehs = vehRes.status === 'fulfilled' ? (vehRes.value || []) : [];
+    // Filtrado del lado del cliente: event_ids es un array y no todos los backends
+    // soportan filter por array-contains, lo que dejaba el caché de vehículos vacío.
+    const vehs = rawVehs.filter((v) => (v.event_ids || []).includes(evt.id));
     const prev = getEventData(evt.id);
     const prevAccs = prev?.accreditations || [];
     const prevVehs = prev?.vehicles || [];
@@ -119,7 +149,7 @@ export default function AccessQrStation({ mode = 'person' }) {
     // Si la descarga de personas falló o vino vacía pero ya hay caché válido,
     // NO pisamos el caché con listas vacías: conservamos el anterior.
     const accreditationsOk = accRes.status === 'fulfilled' && accs.length > 0;
-    const vehiclesOk = vehRes.status === 'fulfilled' && vehs.length > 0;
+    const vehiclesOk = vehRes.status === 'fulfilled';
 
     const finalAccs = accreditationsOk ? accs : prevAccs;
     const finalVehs = vehiclesOk ? vehs : prevVehs;

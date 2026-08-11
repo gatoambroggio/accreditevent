@@ -59,6 +59,28 @@ export default function AccessStation() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pdaNumber, events]);
 
+  // Sincronización en vivo de la configuración remota (panel Estaciones PDA):
+  // cada 10 segundos actualiza las zonas desde el backend mientras la estación
+  // facial está activa, así los cambios del administrador aplican de inmediato.
+  useEffect(() => {
+    if (!pdaNumber || phase !== 'active') return;
+    const sync = async () => {
+      try {
+        const mine = await base44.entities.PdaStation.filter({ station_number: pdaNumber }, '-created_date', 20);
+        const st = mine.find((s) => s.assigned_event_id) || mine[0];
+        if (!st) return;
+        if (st.assigned_zone) {
+          const zs = st.assigned_zone.split(',').map((z) => z.trim()).filter(Boolean);
+          if (zs.length > 0) setSelectedZones(zs);
+        }
+      } catch {}
+    };
+    sync();
+    const id = setInterval(sync, 10000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pdaNumber, phase]);
+
   const startStation = () => {
     const evt = events.find((e) => e.id === selectedEventId);
     if (!evt) return;

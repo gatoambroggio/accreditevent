@@ -66,6 +66,11 @@
       "minimum": 0,
       "maximum": 100,
       "description": "Nivel de bater\u00eda del dispositivo reportado en el heartbeat (0-100). null si no est\u00e1 disponible."
+    },
+    "admin_pin": {
+      "type": "string",
+      "default": "1234",
+      "description": "Clave que el operador debe ingresar en el m\u00f3dulo PDA ID del dispositivo para poder cambiar el n\u00famero de esta PDA. La define el administrador."
     }
   },
   "required": [

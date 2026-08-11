@@ -50,8 +50,8 @@ export default function PdaStations() {
 
   const now = Date.now();
 
-  const openNew = () => { setSaveError(''); setEditing({ station_number: '', label: '', assigned_event_id: '', zones: [], assigned_sectors: [] }); };
-  const openEdit = (s) => { setSaveError(''); setEditing({ id: s.id, station_number: s.station_number, label: s.label || '', assigned_event_id: s.assigned_event_id || '', zones: s.assigned_zone ? s.assigned_zone.split(',').map((z) => z.trim()).filter(Boolean) : [], assigned_sectors: s.assigned_sectors || [] }); };
+  const openNew = () => { setSaveError(''); setEditing({ station_number: '', label: '', assigned_event_id: '', zones: [], assigned_sectors: [], admin_pin: '1234' }); };
+  const openEdit = (s) => { setSaveError(''); setEditing({ id: s.id, station_number: s.station_number, label: s.label || '', assigned_event_id: s.assigned_event_id || '', zones: s.assigned_zone ? s.assigned_zone.split(',').map((z) => z.trim()).filter(Boolean) : [], assigned_sectors: s.assigned_sectors || [], admin_pin: s.admin_pin || '1234' }); };
 
   const saveEdit = async () => {
     if (!editing || !editing.station_number) return;
@@ -78,6 +78,7 @@ export default function PdaStations() {
       event_id: editing.assigned_event_id || '',
       event_name: evt?.name || '',
       company: evt?.company || '',
+      admin_pin: editing.admin_pin || '1234',
     };
     setSaveError('');
     try {
@@ -263,6 +264,11 @@ export default function PdaStations() {
                     })}
                   </div>
                 )}
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-600">Clave para administrar la PDA</label>
+                <input type="text" value={editing.admin_pin || ''} onChange={(e) => setEditing({ ...editing, admin_pin: e.target.value.trim() })} style={{ textTransform: 'none' }} placeholder="1234" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-900 outline-none focus:border-emerald-500" />
+                <p className="mt-1 text-xs text-slate-400">Clave que el operador debe ingresar en el dispositivo (módulo PDA ID) para cambiar el número de esta PDA. Por defecto: 1234.</p>
               </div>
             </div>
             {saveError && (
