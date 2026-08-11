@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import {
   Camera,
@@ -13,6 +13,8 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import FaceCapture from '@/components/FaceCapture';
+import ScanModeToggle from '@/components/scan/ScanModeToggle';
+import { useScanMode } from '@/components/scan/useScanMode';
 import { compareDescriptors, MATCH_THRESHOLD } from '@/lib/faceRecognition';
 import { canAccessAnyZone } from '@/lib/accessZones';
 import { useZones } from '@/lib/useZones';
@@ -30,6 +32,8 @@ export default function AccessControl({ standalone = false }) {
   const [result, setResult] = useState(null);
   const [recent, setRecent] = useState([]);
   const [showCamera, setShowCamera] = useState(false);
+  const [scanMode, setScanMode] = useScanMode();
+  const badgeRef = useRef(null);
   const { zones } = useZones();
 
   const loadEvents = async () => {
@@ -64,6 +68,12 @@ export default function AccessControl({ standalone = false }) {
     }
   }, [standalone, found, showCamera, verifying, result]);
 
+  useEffect(() => {
+    if (standalone && scanMode === 'scanner' && !found && !searching && !verifying && !result && badgeRef.current) {
+      badgeRef.current.focus();
+    }
+  }, [standalone, scanMode, found, searching, verifying, result]);
+
   const handleSearch = async (e) => {
     e?.preventDefault();
     if (!badgeCode.trim()) return;
@@ -71,7 +81,14 @@ export default function AccessControl({ standalone = false }) {
     setResult(null);
     setFound(null);
     try {
-      const items = await base44.entities.Accreditation.filter({ badge_code: badgeCode.trim() }, '-created_date', 5);
+      let items = await base44.entities.Accreditation.filter({ badge_code: badgeCode.trim() }, '-created_date', 5);
+      // El QR de la credencial codifica el id de la acreditación (escáner físico / PDA Zebra)
+      if (items.length === 0) {
+        try {
+          const byId = await base44.entities.Accreditation.get(badgeCode.trim());
+          if (byId) items = [byId];
+        } catch {}
+      }
       if (items.length === 0) {
         const me = await base44.auth.me();
         await base44.entities.AccessLog.create({
@@ -405,16 +422,20 @@ export default function AccessControl({ standalone = false }) {
             </div>
 
             {/* Badge search */}
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <label className="block text-xs font-semibold text-slate-600">Código de credencial</label>
+              {standalone && <ScanModeToggle mode={scanMode} onChange={setScanMode} />}
+            </div>
             <form onSubmit={handleSearch} className="mb-5">
-              <label className="mb-1.5 block text-xs font-semibold text-slate-600">Código de credencial</label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
+                    ref={badgeRef}
                     value={badgeCode}
                     onChange={(e) => setBadgeCode(e.target.value)}
-                    placeholder="Ej: AC-001"
-                    className="w-full rounded-lg border border-slate-200 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                    placeholder={scanMode === 'scanner' ? 'Escaneá con el lector o escribí el código…' : 'Ej: AC-001'}
+                    className={`w-full rounded-lg border py-2.5 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 ${scanMode === 'scanner' ? 'border-emerald-400 bg-emerald-50/30 focus:border-emerald-500' : 'border-slate-200 focus:border-emerald-500'}`}
                   />
                 </div>
                 <button type="submit" disabled={searching || !badgeCode.trim()}

@@ -7,6 +7,9 @@ import { canAccessAnyZone } from '@/lib/accessZones';
 import { useZones } from '@/lib/useZones';
 import { useParkingSectors } from '@/lib/useParkingSectors';
 import { getEventStatus, EVENT_STATUS_INFO, speakResult, isWithinEventPhases } from '@/lib/accessUtils';
+import ScanModeToggle from '@/components/scan/ScanModeToggle';
+import HardwareScannerInput from '@/components/scan/HardwareScannerInput';
+import { useScanMode } from '@/components/scan/useScanMode';
 
 export default function AccessQrStation({ mode = 'person' }) {
   const [phase, setPhase] = useState('select');
@@ -19,6 +22,7 @@ export default function AccessQrStation({ mode = 'person' }) {
   const [cycle, setCycle] = useState(0);
   const [verifying, setVerifying] = useState(false);
   const [result, setResult] = useState(null);
+  const [scanMode, setScanMode] = useScanMode();
   const qrCooldown = useRef(false);
   const { zones } = useZones();
   const { sectors: parkingSectors } = useParkingSectors();
@@ -345,20 +349,25 @@ export default function AccessQrStation({ mode = 'person' }) {
 
           <div className="mx-auto max-w-2xl px-5 py-8">
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="mb-5 flex items-center gap-3">
-                <div className={`grid h-10 w-10 place-items-center rounded-lg ${mode === 'person' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-                  {mode === 'person' ? <User className="h-5 w-5" /> : <Car className="h-5 w-5" />}
+              <div className="mb-5 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className={`grid h-10 w-10 place-items-center rounded-lg ${mode === 'person' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                    {mode === 'person' ? <User className="h-5 w-5" /> : <Car className="h-5 w-5" />}
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900">
+                      {mode === 'person' ? 'Acceso de personas' : 'Acceso vehicular'}
+                    </h2>
+                    <p className="text-sm text-slate-500">
+                      {scanMode === 'scanner'
+                        ? 'Escaneá el código con el lector de la PDA para validar el ingreso.'
+                        : mode === 'person'
+                          ? 'Enfocá el QR de la credencial para validar el ingreso.'
+                          : 'Enfocá el QR de la credencial vehicular para validar el ingreso.'}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-xl font-bold text-slate-900">
-                    {mode === 'person' ? 'Acceso de personas' : 'Acceso vehicular'}
-                  </h2>
-                  <p className="text-sm text-slate-500">
-                    {mode === 'person'
-                      ? 'Enfocá el QR de la credencial para validar el ingreso.'
-                      : 'Enfocá el QR de la credencial vehicular para validar el ingreso.'}
-                  </p>
-                </div>
+                <ScanModeToggle mode={scanMode} onChange={setScanMode} />
               </div>
 
               {(eventStatus === 'upcoming' || eventStatus === 'ended') ? (
@@ -382,7 +391,11 @@ export default function AccessQrStation({ mode = 'person' }) {
                   <span className="mt-3 text-sm text-slate-500">Verificando…</span>
                 </div>
               ) : !result ? (
-                <QrScanner key={cycle} onDetected={handleQrDetected} paused={!!result || verifying} />
+                scanMode === 'scanner' ? (
+                  <HardwareScannerInput onScan={handleQrDetected} disabled={verifying} />
+                ) : (
+                  <QrScanner key={cycle} onDetected={handleQrDetected} paused={!!result || verifying} />
+                )
               ) : null}
             </div>
           </div>

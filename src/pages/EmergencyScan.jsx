@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Loader2, ScanFace, AlertTriangle, Heart, Building2, Phone, ShieldCheck, Droplet, User, AlertCircle, RotateCcw, FileText, Car } from 'lucide-react';
+import { Loader2, ScanFace, ScanLine, AlertTriangle, Heart, Building2, Phone, ShieldCheck, Droplet, User, AlertCircle, RotateCcw, FileText, Car } from 'lucide-react';
 import FaceCapture from '@/components/FaceCapture';
 import PageHeader from '@/components/ui/page-header';
 import FilterSelect from '@/components/ui/filter-select';
@@ -8,6 +8,9 @@ import StatusBadge from '@/components/StatusBadge';
 import { findBestMatch } from '@/lib/faceRecognition';
 import { getInsuranceStatus } from '@/lib/insuranceUtils';
 import DocumentViewer from '@/components/DocumentViewer';
+import ScanModeToggle from '@/components/scan/ScanModeToggle';
+import HardwareScannerInput from '@/components/scan/HardwareScannerInput';
+import { useScanMode } from '@/components/scan/useScanMode';
 
 export default function EmergencyScan() {
   const [scanning, setScanning] = useState(false);
@@ -16,6 +19,7 @@ export default function EmergencyScan() {
   const [events, setEvents] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState('');
   const [scanKey, setScanKey] = useState(0);
+  const [scanMode, setScanMode] = useScanMode();
 
   useEffect(() => {
     base44.entities.Event.list('-start_at', 100).then(setEvents).catch(() => {});
@@ -76,6 +80,41 @@ export default function EmergencyScan() {
     }
   };
 
+  const handleBadgeScan = async (code) => {
+    if (!code) return;
+    setScanning(true);
+    setError('');
+    setResult(null);
+    try {
+      let accred = null;
+      // El QR de la credencial codifica el id de la acreditación
+      try {
+        const byId = await base44.entities.Accreditation.get(code);
+        if (byId) accred = byId;
+      } catch {}
+      // Fallback por badge_code (texto legible de la credencial)
+      if (!accred) {
+        const list = await base44.entities.Accreditation.filter({ badge_code: code, status: 'active' }, '-created_date', 5);
+        accred = list[0];
+      }
+      if (selectedEventId && accred && accred.event_id !== selectedEventId) accred = null;
+      if (!accred) {
+        setError('No se encontró una acreditación con ese código.');
+        return;
+      }
+      const person = await base44.entities.Person.get(accred.person_id);
+      const [vehicles, insurance] = await Promise.all([
+        base44.entities.Vehicle.filter({ person_id: accred.person_id }, '-created_date', 10),
+        getInsuranceStatus(person),
+      ]);
+      setResult({ person, vehicles, accred, insuranceDocs: insurance.docs });
+    } catch (err) {
+      setError(err.message || 'Error al buscar la acreditación.');
+    } finally {
+      setScanning(false);
+    }
+  };
+
   const reset = () => {
     setResult(null);
     setError('');
@@ -107,12 +146,26 @@ export default function EmergencyScan() {
 
       {!result && !scanning && (
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-            <ScanFace className="h-5 w-5 text-emerald-600" /> Capturá el rostro
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+              {scanMode === 'scanner'
+                ? <ScanLine className="h-5 w-5 text-emerald-600" />
+                : <ScanFace className="h-5 w-5 text-emerald-600" />}
+              {scanMode === 'scanner' ? 'Escaneá la credencial' : 'Capturá el rostro'}
+            </div>
+            <ScanModeToggle mode={scanMode} onChange={setScanMode} />
           </div>
-          <p className="mt-1 text-sm text-slate-500">La cámara se abrirá para identificar a la persona acreditada.</p>
+          <p className="mt-1 text-sm text-slate-500">
+            {scanMode === 'scanner'
+              ? 'Usá el lector de la PDA para identificar a la persona acreditada por su credencial.'
+              : 'La cámara se abrirá para identificar a la persona acreditada.'}
+          </p>
           <div className="mt-5">
-            <FaceCapture key={scanKey} onCaptured={handleScan} label="Abrir cámara" autoCapture />
+            {scanMode === 'scanner' ? (
+              <HardwareScannerInput onScan={handleBadgeScan} />
+            ) : (
+              <FaceCapture key={scanKey} onCaptured={handleScan} label="Abrir cámara" autoCapture />
+            )}
           </div>
         </div>
       )}
