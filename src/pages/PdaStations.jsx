@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Loader2, RefreshCw, Smartphone, Wifi, WifiOff, CloudUpload, Pencil, Trash2, X, Plus } from 'lucide-react';
+import { Loader2, RefreshCw, Smartphone, Wifi, WifiOff, CloudUpload, Pencil, Trash2, X, Plus, Battery, BatteryFull, BatteryMedium, BatteryLow } from 'lucide-react';
 import PageHeader from '@/components/ui/page-header';
 import { useZones } from '@/lib/useZones';
 import { useParkingSectors } from '@/lib/useParkingSectors';
@@ -55,6 +55,19 @@ export default function PdaStations() {
 
   const saveEdit = async () => {
     if (!editing || !editing.station_number) return;
+    setSaveError('');
+    // Validar número único de PDA (no se pueden repetir identificadores)
+    try {
+      const existing = await base44.entities.PdaStation.filter({ station_number: editing.station_number }, '-created_date', 50);
+      const dup = (existing || []).find((s) => s.id !== editing.id);
+      if (dup) {
+        setSaveError(`Ya existe una estación PDA con el número "${editing.station_number}". Cada PDA debe tener un número único.`);
+        return;
+      }
+    } catch {
+      setSaveError('No se pudo validar el número de estación. Reintentá.');
+      return;
+    }
     const evt = events.find((e) => e.id === editing.assigned_event_id);
     const payload = {
       station_number: editing.station_number,
@@ -120,6 +133,7 @@ export default function PdaStations() {
                 <th className="px-4 py-3">Zona asignada</th>
                 <th className="px-4 py-3">Operador</th>
                 <th className="px-4 py-3">Estado</th>
+                <th className="px-4 py-3">Batería</th>
                 <th className="px-4 py-3">Última actividad</th>
                 <th className="px-4 py-3">Pendientes</th>
                 <th className="px-4 py-3"></th>
@@ -161,6 +175,16 @@ export default function PdaStations() {
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-500 ring-1 ring-inset ring-slate-200">
                           <Smartphone className="h-3.5 w-3.5" /> Sin conectar
                         </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {s.battery_level != null ? (
+                        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${s.battery_level > 50 ? 'text-emerald-600' : s.battery_level >= 20 ? 'text-amber-600' : 'text-red-600'}`}>
+                          {s.battery_level > 50 ? <BatteryFull className="h-4 w-4" /> : s.battery_level >= 20 ? <BatteryMedium className="h-4 w-4" /> : <BatteryLow className="h-4 w-4" />}
+                          {Math.round(s.battery_level)}%
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-slate-500">

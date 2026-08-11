@@ -4,7 +4,7 @@
   "properties": {
     "station_number": {
       "type": "string",
-      "description": "N\u00famero/identificador de la estaci\u00f3n PDA elegido por el operador"
+      "description": "N\u00famero/identificador \u00fanico de la estaci\u00f3n PDA (una por dispositivo)"
     },
     "label": {
       "type": "string",
@@ -60,6 +60,12 @@
       "type": "number",
       "default": 0,
       "description": "Cantidad de registros de acceso pendientes de sincronizar"
+    },
+    "battery_level": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Nivel de bater\u00eda del dispositivo reportado en el heartbeat (0-100). null si no est\u00e1 disponible."
     }
   },
   "required": [
