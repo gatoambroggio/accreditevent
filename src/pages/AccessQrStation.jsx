@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { Loader2, CheckCircle2, XCircle, Calendar, Clock, AlertTriangle, Car, User } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Calendar, Clock, AlertTriangle, Car, User, WifiOff, RefreshCw, CloudUpload } from 'lucide-react';
 import QrScanner from '@/components/QrScanner';
-import { canAccessAnyZone } from '@/lib/accessZones';
 import { useZones } from '@/lib/useZones';
 import { useParkingSectors } from '@/lib/useParkingSectors';
-import { getEventStatus, EVENT_STATUS_INFO, speakResult, isWithinEventPhases } from '@/lib/accessUtils';
+import { getEventStatus, EVENT_STATUS_INFO, speakResult } from '@/lib/accessUtils';
 import ScanModeToggle from '@/components/scan/ScanModeToggle';
 import HardwareScannerInput from '@/components/scan/HardwareScannerInput';
 import { useScanMode } from '@/components/scan/useScanMode';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import { useOfflineSync } from '@/hooks/useOfflineSync';
+import { saveEventData, getEventData, getCacheAgeMs, queueAccessLog, setCachedVerifier, getCachedVerifier } from '@/lib/offlineAccess';
+import { validatePersonAccred, validateVehicleObj } from '@/lib/offlineValidation';
 
 export default function AccessQrStation({ mode = 'person' }) {
   const [phase, setPhase] = useState('select');
@@ -27,9 +30,15 @@ export default function AccessQrStation({ mode = 'person' }) {
   const [vehicleResult, setVehicleResult] = useState(null);
   const [awaitingVehicle, setAwaitingVehicle] = useState(false);
   const [scanMode, setScanMode] = useScanMode();
+  const [offlineMode, setOfflineMode] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [cacheAge, setCacheAge] = useState(null);
   const qrCooldown = useRef(false);
   const { zones } = useZones();
   const { sectors: parkingSectors } = useParkingSectors();
+  const online = useOnlineStatus();
+  const { pendingCount, syncing, refresh: refreshPending } = useOfflineSync(online);
+  const effectiveOffline = offlineMode || !online;
 
   useEffect(() => {
     (async () => {
@@ -38,8 +47,26 @@ export default function AccessQrStation({ mode = 'person' }) {
         setEvents(data);
       } catch {}
       setLoadingEvents(false);
+      try {
+        const me = await base44.auth.me();
+        if (me?.full_name || me?.email) setCachedVerifier(me.full_name || me.email);
+      } catch {}
     })();
   }, []);
+
+  const downloadEventData = async (evt) => {
+    setDownloading(true);
+    try {
+      const [accs, allVehs] = await Promise.all([
+        base44.entities.Accreditation.filter({ status: 'active', event_id: evt.id }, '-created_date', 2000),
+        base44.entities.Vehicle.list('-created_date', 2000),
+      ]);
+      const vehs = (allVehs || []).filter((v) => (v.event_ids || []).includes(evt.id));
+      saveEventData(evt.id, { accreditations: accs, vehicles: vehs });
+      setCacheAge(0);
+    } catch {}
+    setDownloading(false);
+  };
 
   const startStation = () => {
     const evt = events.find((e) => e.id === selectedEventId);
@@ -47,6 +74,8 @@ export default function AccessQrStation({ mode = 'person' }) {
     setSelectedEvent(evt);
     setPhase('active');
     setCycle((c) => c + 1);
+    setCacheAge(getCacheAgeMs(evt.id));
+    if (navigator.onLine) downloadEventData(evt);
   };
 
   const resetFlow = () => {
@@ -69,29 +98,20 @@ export default function AccessQrStation({ mode = 'person' }) {
     setVerifying(false);
   };
 
-  const validateVehicleForPerson = async (code, logAccess) => {
-    let vehicle = null;
-    try { vehicle = await base44.entities.Vehicle.get(code); } catch {}
-    if (!vehicle) {
-      await logAccess('denied', { resource_type: 'vehicle', badge_code: code });
-      return { ok: false, type: 'vehicle', message: 'Vehículo no registrado.' };
+  const resolveAccreditations = async () => {
+    if (effectiveOffline) {
+      const cache = getEventData(selectedEvent.id);
+      return cache?.accreditations || [];
     }
-    const isAssigned = vehicle.event_ids?.includes(selectedEvent.id);
-    if (!isAssigned) {
-      await logAccess('denied', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, resource_type: 'vehicle', zone: selectedSectors.join(', ') });
-      return { ok: false, person_name: vehicle.person_name, type: 'vehicle', vehicle, message: 'Vehículo no asignado a este evento.' };
+    return base44.entities.Accreditation.filter({ status: 'active', event_id: selectedEvent.id }, '-created_date', 500);
+  };
+
+  const resolveVehicle = async (code) => {
+    if (effectiveOffline) {
+      const cache = getEventData(selectedEvent.id);
+      return cache?.vehicles?.find((v) => v.id === code) || null;
     }
-    if (vehicle.status !== 'approved') {
-      await logAccess('denied', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, resource_type: 'vehicle', zone: selectedSectors.join(', ') });
-      return { ok: false, person_name: vehicle.person_name, type: 'vehicle', vehicle, message: 'Vehículo no autorizado. El estado no es aprobado.' };
-    }
-    const sectorLabel = parkingSectors.find((s) => s.value === vehicle.parking_sector)?.label || vehicle.parking_sector || 'Sin sector';
-    if (selectedSectors.length > 0 && vehicle.parking_sector && !selectedSectors.includes(vehicle.parking_sector)) {
-      await logAccess('denied', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, resource_type: 'vehicle', zone: selectedSectors.join(', ') });
-      return { ok: false, person_name: vehicle.person_name, type: 'vehicle', vehicle, message: `Sector de estacionamiento no permitido: ${sectorLabel}.` };
-    }
-    await logAccess('granted', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, resource_type: 'vehicle', zone: selectedSectors.join(', ') });
-    return { ok: true, person_name: vehicle.person_name, type: 'vehicle', vehicle };
+    try { return await base44.entities.Vehicle.get(code); } catch { return null; }
   };
 
   const handleQrDetected = async (code) => {
@@ -99,12 +119,10 @@ export default function AccessQrStation({ mode = 'person' }) {
     if (qrCooldown.current || verifying || finalShowing) return;
     qrCooldown.current = true;
     setVerifying(true);
+    const verifier = getCachedVerifier();
     try {
-      const me = await base44.auth.me();
-      const verifier = me?.full_name || me?.email || 'Sistema';
-
       const logAccess = async (res, opts = {}) => {
-        await base44.entities.AccessLog.create({
+        const entry = {
           accreditation_id: opts.id || 'unknown',
           person_name: opts.person_name || 'Desconocido',
           badge_code: opts.badge_code || code,
@@ -117,84 +135,49 @@ export default function AccessQrStation({ mode = 'person' }) {
           zone: opts.zone || selectedZones.join(', '),
           result: res,
           access_level: opts.access_level || '',
-        });
+        };
+        if (effectiveOffline) {
+          queueAccessLog(entry);
+          refreshPending();
+        } else {
+          try { await base44.entities.AccessLog.create(entry); } catch {}
+        }
       };
 
       // --- Modo vehículo (ruta /control-vehicular): validación simple ---
       if (mode === 'vehicle') {
-        let vehicle = null;
-        try { vehicle = await base44.entities.Vehicle.get(code); } catch {}
-        if (!vehicle) {
-          await logAccess('denied');
-          setResult({ ok: false, type: 'vehicle', message: 'Vehículo no registrado.' });
-          return;
+        const vehicle = await resolveVehicle(code);
+        const vr = validateVehicleObj(vehicle, selectedEvent, selectedSectors, parkingSectors);
+        await logAccess(vr.ok ? 'granted' : 'denied', vehicle ? { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, zone: selectedSectors.join(', ') } : {});
+        if (vr.ok) {
+          setResult({ ok: true, person_name: vehicle.person_name, type: 'vehicle', vehicle });
+        } else {
+          setResult({ ok: false, person_name: vehicle?.person_name, type: 'vehicle', vehicle, message: vr.message });
         }
-        const isAssigned = vehicle.event_ids?.includes(selectedEvent.id);
-        if (!isAssigned) {
-          await logAccess('denied', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate });
-          setResult({ ok: false, person_name: vehicle.person_name, type: 'vehicle', vehicle, message: 'Vehículo no asignado a este evento.' });
-          return;
-        }
-        if (vehicle.status !== 'approved') {
-          await logAccess('denied', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, zone: selectedSectors.join(', ') });
-          setResult({ ok: false, person_name: vehicle.person_name, type: 'vehicle', vehicle, message: 'Vehículo no autorizado. El estado no es aprobado.' });
-          return;
-        }
-        const sectorLabel = parkingSectors.find((s) => s.value === vehicle.parking_sector)?.label || vehicle.parking_sector || 'Sin sector';
-        if (selectedSectors.length > 0 && vehicle.parking_sector && !selectedSectors.includes(vehicle.parking_sector)) {
-          await logAccess('denied', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, zone: selectedSectors.join(', ') });
-          setResult({ ok: false, person_name: vehicle.person_name, type: 'vehicle', vehicle, message: `Sector de estacionamiento no permitido: ${sectorLabel}.` });
-          return;
-        }
-        await logAccess('granted', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, zone: selectedSectors.join(', ') });
-        setResult({ ok: true, person_name: vehicle.person_name, type: 'vehicle', vehicle });
         return;
       }
 
       // --- Modo persona: flujo unificado persona + vehículo ---
-      const zoneLabel = selectedZones.map((z) => zones.find((zz) => zz.value === z)?.label || z).join(', ');
-
       // Paso 2: escaneo del vehículo
       if (awaitingVehicle) {
-        const vRes = await validateVehicleForPerson(code, logAccess);
-        setVehicleResult(vRes);
+        const vehicle = await resolveVehicle(code);
+        const vr = validateVehicleObj(vehicle, selectedEvent, selectedSectors, parkingSectors);
+        await logAccess(vr.ok ? 'granted' : 'denied', vehicle ? { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, resource_type: 'vehicle', zone: selectedSectors.join(', ') } : { resource_type: 'vehicle' });
+        setVehicleResult(vr.ok ? { ok: true, person_name: vehicle.person_name, type: 'vehicle', vehicle } : { ok: false, person_name: vehicle?.person_name, type: 'vehicle', vehicle, message: vr.message });
         setAwaitingVehicle(false);
         return;
       }
 
       // Paso 1: validación de persona
-      const accreditations = await base44.entities.Accreditation.filter(
-        { status: 'active', event_id: selectedEvent.id },
-        '-created_date',
-        500
-      );
+      const accreditations = await resolveAccreditations();
       const accred = accreditations.find((a) => a.id === code);
-
-      if (!accred) {
-        await logAccess('denied');
-        setVehicleResult(null);
-        setAwaitingVehicle(false);
-        setPersonResult({ ok: false, person_name: '', accred: null, message: 'Credencial no válida para este evento.' });
-        return;
-      }
-      if (!canAccessAnyZone(accred.access_level, selectedZones)) {
-        await logAccess('denied', { id: accred.id, person_name: accred.person_name, badge_code: accred.badge_code, company: accred.company, access_level: accred.access_level });
-        setVehicleResult(null);
-        setAwaitingVehicle(false);
-        setPersonResult({ ok: false, person_name: accred.person_name, accred, message: `Acceso restringido para la zona: ${zoneLabel}.` });
-        return;
-      }
-      if (!isWithinEventPhases(selectedEvent, accred.event_phases)) {
-        await logAccess('denied', { id: accred.id, person_name: accred.person_name, badge_code: accred.badge_code, company: accred.company, access_level: accred.access_level });
-        setVehicleResult(null);
-        setAwaitingVehicle(false);
-        setPersonResult({ ok: false, person_name: accred.person_name, accred, message: 'Acceso fuera del rango de fechas autorizado.' });
-        return;
-      }
-      await logAccess('granted', { id: accred.id, person_name: accred.person_name, badge_code: accred.badge_code, company: accred.company, access_level: accred.access_level });
+      const pv = validatePersonAccred(accred, selectedEvent, selectedZones, zones);
+      await logAccess(pv.ok ? 'granted' : 'denied', accred ? { id: accred.id, person_name: accred.person_name, badge_code: accred.badge_code, company: accred.company, access_level: accred.access_level } : {});
       setVehicleResult(null);
-      setPersonResult({ ok: true, person_name: accred.person_name, accred });
-      setAwaitingVehicle(true);
+      setPersonResult(pv.ok
+        ? { ok: true, person_name: accred.person_name, accred }
+        : { ok: false, person_name: accred?.person_name || '', accred: accred || null, message: pv.message });
+      if (pv.ok) setAwaitingVehicle(true);
     } catch (err) {
       if (mode === 'vehicle') {
         setResult({ ok: false, message: err.message || 'Error en la verificación.' });
@@ -448,6 +431,27 @@ export default function AccessQrStation({ mode = 'person' }) {
                 <div className="mt-3">
                   <ScanModeToggle mode={scanMode} onChange={setScanMode} />
                 </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                  <button
+                    onClick={() => setOfflineMode((v) => !v)}
+                    className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 font-semibold transition ${effectiveOffline ? 'border-amber-400 bg-amber-50 text-amber-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                  >
+                    <WifiOff className="h-3.5 w-3.5" /> Modo offline {effectiveOffline ? 'ON' : 'OFF'}
+                  </button>
+                  {downloading ? (
+                    <span className="inline-flex items-center gap-1.5 text-slate-500"><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Descargando datos…</span>
+                  ) : cacheAge != null ? (
+                    <span className="text-slate-500">Datos offline: {cacheAge === 0 ? 'actualizados' : `hace ${Math.max(1, Math.round(cacheAge / 60000))} min`}</span>
+                  ) : (
+                    <span className="text-slate-400">Sin datos offline</span>
+                  )}
+                  {!online && <span className="inline-flex items-center gap-1 font-semibold text-red-600"><WifiOff className="h-3.5 w-3.5" /> Sin conexión</span>}
+                  {pendingCount > 0 && (
+                    <span className={`inline-flex items-center gap-1 ${syncing ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      <CloudUpload className="h-3.5 w-3.5" /> {syncing ? 'Sincronizando…' : `${pendingCount} registro(s) pendientes`}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {(eventStatus === 'upcoming' || eventStatus === 'ended') ? (
@@ -480,6 +484,11 @@ export default function AccessQrStation({ mode = 'person' }) {
                       <button onClick={skipVehicle} className="mt-2 text-xs font-semibold text-emerald-700 underline">
                         Omitir vehículo
                       </button>
+                    </div>
+                  )}
+                  {effectiveOffline && !getEventData(selectedEvent.id) && (
+                    <div className="mb-4 rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-center text-sm font-semibold text-amber-800">
+                      Sin datos offline para este evento. Conectate y descargá los datos antes de usar modo offline.
                     </div>
                   )}
                   {scanMode === 'scanner' ? (
