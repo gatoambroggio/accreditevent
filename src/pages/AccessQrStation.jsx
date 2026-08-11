@@ -68,17 +68,34 @@ export default function AccessQrStation({ mode = 'person' }) {
     ]);
     const accs = accRes.status === 'fulfilled' ? (accRes.value || []) : [];
     const vehs = vehRes.status === 'fulfilled' ? (vehRes.value || []) : [];
-    setAccreditations(accs);
-    setVehicles(vehs);
-    // Guardamos lo que se haya podido obtener (aunque un listado falle).
-    saveEventData(evt.id, { accreditations: accs, vehicles: vehs });
-    setCacheAge(0);
-    if (accRes.status === 'rejected' || (accs.length === 0 && accRes.status === 'fulfilled')) {
-      // No se pudieron descargar personas: es crítico. Avisar claramente.
-      const prev = getEventData(evt.id);
-      if (!prev || (prev.accreditations || []).length === 0) {
-        setDownloadError('No se pudieron descargar los datos del evento. Revisá la conexión y volvé a intentar.');
-      }
+    const prev = getEventData(evt.id);
+    const prevAccs = prev?.accreditations || [];
+    const prevVehs = prev?.vehicles || [];
+
+    // Si la descarga de personas falló o vino vacía pero ya hay caché válido,
+    // NO pisamos el caché con listas vacías: conservamos el anterior.
+    const accreditationsOk = accRes.status === 'fulfilled' && accs.length > 0;
+    const vehiclesOk = vehRes.status === 'fulfilled' && vehs.length > 0;
+
+    const finalAccs = accreditationsOk ? accs : prevAccs;
+    const finalVehs = vehiclesOk ? vehs : prevVehs;
+
+    setAccreditations(finalAccs);
+    setVehicles(finalVehs);
+
+    // Solo persistimos en caché si tenemos personas reales (no vacías), para no
+    // destruir un caché válido con datos vacíos por una caída de red.
+    if (accreditationsOk) {
+      saveEventData(evt.id, { accreditations: finalAccs, vehicles: finalVehs });
+      setCacheAge(0);
+    } else if (prevAccs.length > 0) {
+      // Descarga falló pero hay caché previo: lo conservamos y avisamos.
+      const age = getCacheAgeMs(evt.id);
+      setCacheAge(age);
+      setDownloadError(`No se pudo actualizar (sin conexión). Usando caché previo de hace ${Math.max(1, Math.round(age / 60000))} min.`);
+    } else {
+      // Sin caché previo y sin datos nuevos: error crítico.
+      setDownloadError('No se pudieron descargar los datos del evento. Revisá la conexión y volvé a intentar.');
     }
     setDownloading(false);
   };
@@ -90,14 +107,14 @@ export default function AccessQrStation({ mode = 'person' }) {
     setPhase('active');
     setCycle((c) => c + 1);
     setResult(null);
+    // Cargar siempre el caché en memoria de inmediato (sincrónico) para que el
+    // escaneo funcione aunque la descarga en segundo plano falle (wifi sin internet).
+    const cache = getEventData(evt.id);
+    setAccreditations(cache?.accreditations || []);
+    setVehicles(cache?.vehicles || []);
     setCacheAge(getCacheAgeMs(evt.id));
     if (navigator.onLine) {
       downloadEventData(evt);
-    } else {
-      // Sin conexión: cargar datos desde caché local si existen.
-      const cache = getEventData(evt.id);
-      setAccreditations(cache?.accreditations || []);
-      setVehicles(cache?.vehicles || []);
     }
   };
 
