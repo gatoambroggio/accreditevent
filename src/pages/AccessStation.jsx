@@ -8,6 +8,7 @@ import { canAccessAnyZone } from '@/lib/accessZones';
 import { useZones } from '@/lib/useZones';
 import { getEventStatus, EVENT_STATUS_INFO, speakResult, isWithinEventPhases } from '@/lib/accessUtils';
 import { phaseLabel } from '@/lib/eventPhases';
+import { usePdaHeartbeat } from '@/hooks/usePdaRegistration';
 
 export default function AccessStation() {
   const [phase, setPhase] = useState('select');
@@ -20,6 +21,14 @@ export default function AccessStation() {
   const [verifying, setVerifying] = useState(false);
   const [result, setResult] = useState(null);
   const { zones } = useZones();
+  const { pdaNumber } = usePdaHeartbeat({
+    enabled: phase === 'active',
+    event: selectedEvent,
+    mode: 'person',
+    zones: selectedZones,
+    sectors: [],
+    pendingCount: 0,
+  });
 
   useEffect(() => {
     (async () => {
@@ -30,6 +39,25 @@ export default function AccessStation() {
       setLoadingEvents(false);
     })();
   }, []);
+
+  // Pre-selección de evento y zona desde la asignación remota del admin (Estaciones PDA).
+  useEffect(() => {
+    if (!pdaNumber || events.length === 0) return;
+    (async () => {
+      try {
+        const mine = await base44.entities.PdaStation.filter({ station_number: pdaNumber }, '-created_date', 20);
+        const withEvent = mine.find((s) => s.assigned_event_id && events.some((e) => e.id === s.assigned_event_id));
+        if (withEvent) {
+          if (!selectedEventId) setSelectedEventId(withEvent.assigned_event_id);
+          if (withEvent.assigned_zone && selectedZones.length === 1 && selectedZones[0] === 'general') {
+            const zs = withEvent.assigned_zone.split(',').map((z) => z.trim()).filter(Boolean);
+            if (zs.length > 0) setSelectedZones(zs);
+          }
+        }
+      } catch {}
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pdaNumber, events]);
 
   const startStation = () => {
     const evt = events.find((e) => e.id === selectedEventId);
@@ -343,10 +371,25 @@ export default function AccessStation() {
                     })}
                   </div>
                 </div>
+                {pdaNumber ? (
+                  <div className="mt-5 flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                    <div>
+                      <p className="text-xs font-semibold text-slate-600">PDA de este dispositivo</p>
+                      <p className="text-sm font-bold text-slate-900">Estación #{pdaNumber}</p>
+                    </div>
+                    <Link to="/pda-id" className="text-xs font-bold text-emerald-700 hover:underline">Cambiar</Link>
+                  </div>
+                ) : (
+                  <div className="mt-5 flex items-center justify-between rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5">
+                    <p className="text-xs font-semibold text-amber-700">Configurá el número de esta PDA antes de iniciar.</p>
+                    <Link to="/pda-id" className="text-xs font-bold text-amber-800 hover:underline">Ir a PDA ID</Link>
+                  </div>
+                )}
+
                 <button
                   onClick={startStation}
-                  disabled={!selectedEventId || selectedZones.length === 0}
-                  className="mt-5 w-full rounded-lg bg-emerald-700 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50"
+                  disabled={!selectedEventId || !pdaNumber || selectedZones.length === 0}
+                  className="mt-4 w-full rounded-lg bg-emerald-700 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50"
                 >
                   Iniciar estación de control
                 </button>
