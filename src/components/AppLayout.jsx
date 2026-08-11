@@ -34,6 +34,7 @@ import {
   ChevronDown,
   Palette,
   AlertTriangle,
+  Smartphone,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { applyTheme } from '@/lib/useTheme';
@@ -59,6 +60,7 @@ const NAV_ITEMS = [
   { path: '/access-control', label: 'Control de acceso', icon: DoorOpen, minLevel: 0 },
   { path: '/emergency-scan', label: 'Escaneo de emergencia', icon: AlertTriangle, minLevel: 0 },
   { path: '/access-monitor', label: 'Monitor en vivo', icon: Radio, minLevel: 0 },
+  { path: '/pda-stations', label: 'Estaciones PDA', icon: Smartphone, minLevel: 1, roles: ['productora', 'admin', 'superadmin'] },
   { path: '/zkteco-devices', label: 'Terminales ZKTeco', icon: Cpu, minLevel: 1 },
   // Documentos y vehículos
   { path: '/documents', label: 'Documentos', icon: FileText, minLevel: 1 },

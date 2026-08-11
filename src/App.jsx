@@ -50,6 +50,7 @@ import DniScan from '@/pages/DniScan';
 import CustomFields from '@/pages/CustomFields';
 import Appearance from '@/pages/Appearance';
 import EmergencyScan from '@/pages/EmergencyScan';
+import PdaStations from '@/pages/PdaStations';
 import Notifications from '@/pages/Notifications';
 
 const AUTH_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password', '/provider-register', '/registro-empresa'];
@@ -109,6 +110,7 @@ const AuthenticatedApp = () => {
         <Route path="/settings" element={<Settings />} />
         <Route path="/access-control" element={<AccessHub />} />
         <Route path="/access-monitor" element={<AccessMonitor />} />
+        <Route path="/pda-stations" element={<PdaStations />} />
         <Route path="/zkteco-devices" element={<ZKTecoDevices />} />
         <Route path="/vehicles" element={<Vehicles />} />
         <Route path="/parking-sectors" element={<ParkingSectors />} />

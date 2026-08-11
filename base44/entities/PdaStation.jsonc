@@ -1,0 +1,209 @@
+{
+  "name": "PdaStation",
+  "type": "object",
+  "properties": {
+    "station_number": {
+      "type": "string",
+      "description": "N\u00famero/identificador de la estaci\u00f3n PDA elegido por el operador"
+    },
+    "label": {
+      "type": "string",
+      "description": "Nombre descriptivo de la estaci\u00f3n"
+    },
+    "assigned_zone": {
+      "type": "string",
+      "description": "Zona(s) de acceso asignada(s) a esta PDA (separadas por coma)"
+    },
+    "assigned_sectors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Sectores de estacionamiento asignados"
+    },
+    "event_id": {
+      "type": "string",
+      "description": "Evento en el que opera la PDA"
+    },
+    "event_name": {
+      "type": "string",
+      "description": "Nombre del evento (denormalizado)"
+    },
+    "company": {
+      "type": "string",
+      "description": "Empresa productora (denormalizado para RLS)"
+    },
+    "operator_name": {
+      "type": "string",
+      "description": "Nombre del operador que opera la PDA"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "person",
+        "vehicle"
+      ],
+      "default": "person",
+      "description": "Modo de operaci\u00f3n de la PDA"
+    },
+    "last_seen": {
+      "type": "string",
+      "format": "date-time",
+      "description": "\u00daltima vez que la PDA report\u00f3 actividad (heartbeat)"
+    },
+    "pending_sync": {
+      "type": "number",
+      "default": 0,
+      "description": "Cantidad de registros de acceso pendientes de sincronizar"
+    }
+  },
+  "required": [
+    "station_number"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
+        },
+        {
+          "created_by_id": "{{user.id}}"
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "productora"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "operador"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "control"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
+        },
+        {
+          "created_by_id": "{{user.id}}"
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

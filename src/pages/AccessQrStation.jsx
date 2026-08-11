@@ -30,6 +30,12 @@ export default function AccessQrStation({ mode = 'person' }) {
   const [verifying, setVerifying] = useState(false);
   const [result, setResult] = useState(null);
   const [scanMode, setScanMode] = useScanMode();
+  const [stationNumber, setStationNumber] = useState(() => {
+    try { return localStorage.getItem('accreditevent.station_number') || ''; } catch { return ''; }
+  });
+  const pdaIdRef = useRef(null);
+  const pendingCountRef = useRef(0);
+  pendingCountRef.current = pendingCount;
   const [downloading, setDownloading] = useState(false);
   const [cacheAge, setCacheAge] = useState(null);
   const [accreditations, setAccreditations] = useState([]);
@@ -67,6 +73,20 @@ export default function AccessQrStation({ mode = 'person' }) {
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online, selectedEvent]);
+
+  // Persistir número de estación seleccionado para esta PDA.
+  useEffect(() => {
+    try { localStorage.setItem('accreditevent.station_number', stationNumber); } catch {}
+  }, [stationNumber]);
+
+  // Heartbeat: reporta actividad de la PDA cada 45s mientras el control está activo.
+  useEffect(() => {
+    if (phase !== 'active') return;
+    heartbeatPda();
+    const id = setInterval(heartbeatPda, 45000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, selectedEvent]);
 
   const [downloadError, setDownloadError] = useState('');
 
@@ -113,6 +133,45 @@ export default function AccessQrStation({ mode = 'person' }) {
     setDownloading(false);
   };
 
+  const registerPda = async (evt) => {
+    if (!stationNumber) return;
+    const verifier = getCachedVerifier();
+    const payload = {
+      station_number: stationNumber,
+      event_id: evt.id,
+      event_name: evt.name,
+      company: evt.company || '',
+      operator_name: verifier || '',
+      mode,
+      assigned_zone: mode === 'person' ? selectedZones.join(', ') : selectedSectors.join(', '),
+      assigned_sectors: selectedSectors,
+      last_seen: new Date().toISOString(),
+      pending_sync: pendingCountRef.current || 0,
+    };
+    try {
+      const existing = await base44.entities.PdaStation.filter({ station_number: stationNumber, event_id: evt.id }, '-created_date', 5);
+      if (existing && existing.length > 0) {
+        const id = existing[0].id;
+        await base44.entities.PdaStation.update(id, payload);
+        pdaIdRef.current = id;
+      } else {
+        const created = await base44.entities.PdaStation.create(payload);
+        pdaIdRef.current = created?.id || null;
+      }
+    } catch {}
+  };
+
+  const heartbeatPda = async () => {
+    const id = pdaIdRef.current;
+    if (!id) return;
+    try {
+      await base44.entities.PdaStation.update(id, {
+        last_seen: new Date().toISOString(),
+        pending_sync: pendingCountRef.current || 0,
+      });
+    } catch {}
+  };
+
   const startStation = () => {
     const evt = events.find((e) => e.id === selectedEventId);
     if (!evt) return;
@@ -126,6 +185,7 @@ export default function AccessQrStation({ mode = 'person' }) {
     setAccreditations(cache?.accreditations || []);
     setVehicles(cache?.vehicles || []);
     setCacheAge(getCacheAgeMs(evt.id));
+    registerPda(evt);
     // La descarga inicial la dispara el useEffect al setear selectedEvent.
   };
 
@@ -406,10 +466,23 @@ export default function AccessQrStation({ mode = 'person' }) {
                   )}
                 </div>
 
+                <div className="mt-5">
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-600">Número de estación / PDA</label>
+                  <p className="mb-2 text-xs text-slate-400">Identificá esta PDA con un número. Se recuerda en este dispositivo y se reporta al panel de monitoreo.</p>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={stationNumber}
+                    onChange={(e) => setStationNumber(e.target.value.trim())}
+                    placeholder="Ej: 1"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                  />
+                </div>
+
                 <button
                   onClick={startStation}
-                  disabled={!selectedEventId || (mode === 'person' && selectedZones.length === 0)}
-                  className="mt-5 w-full rounded-lg bg-emerald-700 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50"
+                  disabled={!selectedEventId || !stationNumber || (mode === 'person' && selectedZones.length === 0)}
+                  className="mt-4 w-full rounded-lg bg-emerald-700 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50"
                 >
                   Iniciar control de acceso
                 </button>
@@ -519,15 +592,6 @@ export default function AccessQrStation({ mode = 'person' }) {
                       ? 'No hay datos en caché. Conectate a internet y abrí el control al menos una vez para descargarlos.'
                       : 'No se pudieron descargar los datos. Verificá la conexión y volvé a intentarlo.'}
                   </p>
-                  {!effectiveOffline && (
-                    <button
-                      onClick={() => selectedEvent && downloadEventData(selectedEvent)}
-                      disabled={downloading}
-                      className="mt-6 inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:opacity-50"
-                    >
-                      <RefreshCw className="h-4 w-4" /> Descargar datos ahora
-                    </button>
-                  )}
                   <button onClick={backToSelect} className="mt-3 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
                     ← Volver
                   </button>
