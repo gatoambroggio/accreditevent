@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Download, Users, BadgeCheck, Fingerprint, Pencil, Trash2, Check, Minus } from 'lucide-react';
+import { Download, Users, BadgeCheck, Fingerprint, Pencil, Trash2, Check, Minus, Printer, Car } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
 import AccreditationEditModal from '@/components/AccreditationEditModal';
 import PersonDetailModal from '@/components/PersonDetailModal';
+import BadgePrint from '@/components/BadgePrint';
+import VehicleBadgePrint from '@/components/VehicleBadgePrint';
+import { useParkingSectors } from '@/lib/useParkingSectors';
 import StatusBadge from '@/components/StatusBadge';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
@@ -25,21 +28,29 @@ export default function PersonalAcreditado() {
   const [editing, setEditing] = useState(null);
   const [statusFilter, setStatusFilter] = useState('active');
   const [detailPerson, setDetailPerson] = useState(null);
+  const [settings, setSettings] = useState(null);
+  const [printingPersonal, setPrintingPersonal] = useState(null);
+  const [printingVehicular, setPrintingVehicular] = useState(null);
+  const [vehicularAccredId, setVehicularAccredId] = useState(null);
+  const [vehiclePick, setVehiclePick] = useState(null);
   const { user } = useAuth();
   const canManageRecords = canManage(user);
+  const { sectors } = useParkingSectors();
 
   useEffect(() => {
     (async () => {
       try {
-        const [evs, accs, ps] = await Promise.all([
+        const [evs, accs, ps, sts] = await Promise.all([
           base44.entities.Event.list('-created_date', 200),
           base44.entities.Accreditation.list('-created_date', 5000),
           base44.entities.Person.list('-created_date', 5000),
+          base44.entities.SystemSetting.list('-created_date', 1),
         ]);
         setEvents(evs);
         // Personal acreditado = acreditaciones activas/autorizadas (no bloqueadas ni revocadas)
         setAccreditations(accs);
         setPeople(ps);
+        setSettings(sts[0] || null);
       } catch {
       } finally {
         setLoading(false);
@@ -109,6 +120,33 @@ export default function PersonalAcreditado() {
       setAccreditations((prev) => prev.filter((x) => x.id !== a.id));
     } catch (e) {
       alert('No se pudo eliminar: ' + (e?.message || e));
+    }
+  };
+
+  const refreshAccred = async (id) => {
+    try {
+      const updated = await base44.entities.Accreditation.get(id);
+      setAccreditations((prev) => prev.map((x) => (x.id === id ? updated : x)));
+    } catch {}
+  };
+
+  const handlePrintVehicular = async (a) => {
+    try {
+      const vehs = await base44.entities.Vehicle.filter({ person_id: a.person_id }, '-created_date', 50);
+      const assigned = vehs.filter((v) => (v.event_ids || []).includes(a.event_id));
+      const list = assigned.length > 0 ? assigned : vehs;
+      if (list.length === 0) {
+        alert('La persona no tiene vehículos asignados.');
+        return;
+      }
+      if (list.length === 1) {
+        setVehicularAccredId(a.id);
+        setPrintingVehicular(list[0]);
+      } else {
+        setVehiclePick({ accreditation: a, vehicles: list });
+      }
+    } catch (e) {
+      alert('No se pudo cargar el vehículo: ' + (e?.message || e));
     }
   };
 
@@ -211,18 +249,40 @@ export default function PersonalAcreditado() {
                 </Td>
                 <Td>
                   <div className="flex flex-col gap-1.5">
-                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${a.delivered_personal ? 'text-emerald-700' : 'text-slate-400'}`}>
-                      <span className={`grid h-4 w-4 place-items-center rounded-full ${a.delivered_personal ? 'bg-emerald-100' : 'bg-slate-100'}`}>
-                        {a.delivered_personal ? <Check className="h-3 w-3" /> : <Minus className="h-3 w-3 text-slate-300" />}
+                    <div className="flex items-center gap-1.5">
+                      <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${a.delivered_personal ? 'text-emerald-700' : 'text-slate-400'}`}>
+                        <span className={`grid h-4 w-4 place-items-center rounded-full ${a.delivered_personal ? 'bg-emerald-100' : 'bg-slate-100'}`}>
+                          {a.delivered_personal ? <Check className="h-3 w-3" /> : <Minus className="h-3 w-3 text-slate-300" />}
+                        </span>
+                        {a.delivered_personal ? 'Entregada' : 'Pendiente'} · Personal
                       </span>
-                      {a.delivered_personal ? 'Entregada' : 'Pendiente'} · Personal
-                    </span>
-                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${a.delivered_vehicular ? 'text-emerald-700' : 'text-slate-400'}`}>
-                      <span className={`grid h-4 w-4 place-items-center rounded-full ${a.delivered_vehicular ? 'bg-emerald-100' : 'bg-slate-100'}`}>
-                        {a.delivered_vehicular ? <Check className="h-3 w-3" /> : <Minus className="h-3 w-3 text-slate-300" />}
+                      {canManageRecords && (
+                        <button
+                          onClick={() => setPrintingPersonal(a)}
+                          title="Imprimir credencial personal"
+                          className="rounded-md border border-slate-200 bg-white p-1 text-slate-500 transition hover:bg-emerald-50 hover:text-emerald-700"
+                        >
+                          <Printer className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${a.delivered_vehicular ? 'text-emerald-700' : 'text-slate-400'}`}>
+                        <span className={`grid h-4 w-4 place-items-center rounded-full ${a.delivered_vehicular ? 'bg-emerald-100' : 'bg-slate-100'}`}>
+                          {a.delivered_vehicular ? <Check className="h-3 w-3" /> : <Minus className="h-3 w-3 text-slate-300" />}
+                        </span>
+                        {a.delivered_vehicular ? 'Entregada' : 'Pendiente'} · Vehicular
                       </span>
-                      {a.delivered_vehicular ? 'Entregada' : 'Pendiente'} · Vehicular
-                    </span>
+                      {canManageRecords && (
+                        <button
+                          onClick={() => handlePrintVehicular(a)}
+                          title="Imprimir credencial vehicular"
+                          className="rounded-md border border-slate-200 bg-white p-1 text-slate-500 transition hover:bg-emerald-50 hover:text-emerald-700"
+                        >
+                          <Car className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </Td>
                 <Td>
@@ -277,6 +337,49 @@ export default function PersonalAcreditado() {
           } catch {}
         }}
       />
+
+      {printingPersonal && (
+        <BadgePrint
+          accreditation={printingPersonal}
+          event={events.find((e) => e.id === printingPersonal.event_id)}
+          onClose={() => { const id = printingPersonal.id; setPrintingPersonal(null); refreshAccred(id); }}
+        />
+      )}
+
+      {printingVehicular && (
+        <VehicleBadgePrint
+          vehicle={printingVehicular}
+          settings={settings}
+          events={events.filter((e) => printingVehicular.event_ids?.includes(e.id))}
+          parkingSectors={sectors}
+          accreditationId={vehicularAccredId}
+          onClose={() => { const id = vehicularAccredId; setPrintingVehicular(null); setVehicularAccredId(null); if (id) refreshAccred(id); }}
+        />
+      )}
+
+      {vehiclePick && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm" onClick={() => setVehiclePick(null)}>
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl ring-1 ring-slate-200" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-bold text-slate-900">Elegir vehículo</h3>
+            <p className="text-xs text-slate-500">{vehiclePick.accreditation.person_name}</p>
+            <div className="mt-3 space-y-2">
+              {vehiclePick.vehicles.map((v) => (
+                <button
+                  key={v.id}
+                  onClick={() => { setVehicularAccredId(vehiclePick.accreditation.id); setPrintingVehicular(v); setVehiclePick(null); }}
+                  className="flex w-full items-center justify-between rounded-lg border border-slate-200 p-3 text-left transition hover:bg-slate-50"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{v.brand} {v.model}</p>
+                    <span className="font-mono text-xs text-slate-500">{v.plate}</span>
+                  </div>
+                  <Printer className="h-4 w-4 text-emerald-600" />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
