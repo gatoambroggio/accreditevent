@@ -42,7 +42,7 @@ export default async function (req) {
         isAuthorized = true;
       }
     } catch {
-      isAuthorized = true;
+      // auth falló: NO otorgar acceso (mantener isAuthorized = false)
     }
     if (!isAuthorized) {
       return Response.json({ error: 'No autorizado' }, { status: 401 });

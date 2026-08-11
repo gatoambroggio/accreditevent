@@ -19,6 +19,16 @@ export default async function (req) {
       return Response.json({ error: 'Persona no encontrada' }, { status: 404 });
     }
 
+    // Authorization: verificar rol + pertenencia antes de cualquier delete
+    const userCompany = user.company || user.data?.company || '';
+    const allowed =
+      ['superadmin', 'admin', 'coordinator'].includes(user.role) ||
+      (user.role === 'productora' && person.productora && person.productora === userCompany) ||
+      (user.role === 'empresa' && person.company && person.company === userCompany);
+    if (!allowed) {
+      return Response.json({ error: 'No autorizado para eliminar esta persona' }, { status: 403 });
+    }
+
     // Get accreditation IDs for access log cleanup
     const accreditations = await base44.asServiceRole.entities.Accreditation.filter(
       { person_id },

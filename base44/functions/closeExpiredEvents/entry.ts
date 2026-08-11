@@ -4,6 +4,11 @@ export default async function(req: Request): Promise<Response> {
   try {
     const base44 = createClientFromRequest(req);
 
+    const user = await base44.auth.me();
+    if (!user || !['superadmin', 'admin'].includes(user.role)) {
+      return Response.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
     const now = Date.now();
     const events = await base44.asServiceRole.entities.Event.filter(
       { status: 'active' },

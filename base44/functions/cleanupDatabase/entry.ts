@@ -42,7 +42,9 @@ export default async function (req) {
     try {
       const user = await base44.auth.me();
       if (user && ['superadmin', 'admin'].includes(user.role)) isAuthorized = true;
-    } catch { isAuthorized = true; }
+    } catch {
+      // auth falló: NO otorgar acceso (mantener isAuthorized = false)
+    }
     if (!isAuthorized) return Response.json({ error: 'No autorizado' }, { status: 401 });
 
     const report = {
