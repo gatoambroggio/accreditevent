@@ -10,6 +10,20 @@ export default async function(req) {
       return Response.json({ ok: false, skipped: true, reason: 'missing email' });
     }
 
+    // Auth: el llamador debe estar autenticado y procesar su propia invitación
+    // (flujo de signup) o tener rol de administración.
+    const caller = await base44.auth.me().catch(() => null);
+    if (!caller) {
+      return Response.json({ error: 'No autorizado' }, { status: 401 });
+    }
+    const callerEmail = (caller.email || '').toString().trim().toLowerCase();
+    const callerRole = caller.role || (caller.data && caller.data.role) || '';
+    const isSelf = callerEmail && callerEmail === email;
+    const isManager = ['superadmin', 'admin'].includes(callerRole);
+    if (!isSelf && !isManager) {
+      return Response.json({ error: 'No autorizado para procesar esta asignación' }, { status: 403 });
+    }
+
     const pending = await base44.asServiceRole.entities.PendingOperator.filter({ email, status: 'pending' });
     if (!pending.length) {
       return Response.json({ ok: true, processed: false, reason: 'no pending assignment' });
