@@ -304,13 +304,21 @@ export default function Users() {
         }
         await logAudit('invite-operator', 'User', '', `Operador invitado: ${inviteEmail}`);
       } else {
-        await base44.users.inviteUser(inviteEmail, inviteRole);
+        // Usamos createUser (backend) en lugar de inviteUser directo: la
+        // invitación nativa de la plataforma no reconoce roles personalizados
+        // (pda, operador, control, etc.) y deja al usuario en "user" sin
+        // empresa ni eventos. createUser guarda la asignación pendiente con el
+        // rol elegido y el workflow la aplica automáticamente al registrarse.
+        const res = await base44.functions.invoke('createUser', { email: inviteEmail, role: inviteRole });
+        const data = res?.data ?? res;
+        if (data?.error) throw new Error(data.error);
         await logAudit('invite', 'User', '', `Invitación a ${inviteEmail} (${inviteRole})`);
       }
       setInviteOpen(false);
       setInviteEmail('');
       setInviteRole('provider');
       await load();
+      await loadPending();
     } catch (err) {
       setError(err.message || 'No se pudo enviar la invitación.');
     } finally {
