@@ -265,10 +265,12 @@ export default function AccessQrStation({ mode = 'person' }) {
     } catch {}
   };
 
-  const handleQrDetected = async (code) => {
+  const handleQrDetected = async (rawCode) => {
     if (qrCooldown.current || verifying || result) return;
     qrCooldown.current = true;
     setVerifying(true);
+    const code = String(rawCode || '').trim();
+    const codeUp = code.toUpperCase();
     const verifier = getCachedVerifier();
     try {
       const logAccess = async (res, opts = {}) => {
@@ -297,7 +299,7 @@ export default function AccessQrStation({ mode = 'person' }) {
       // --- Modo vehicular puro (ruta /control-vehicular) ---
       if (mode === 'vehicle') {
         const vehs = resolveVehicles();
-        let vehicle = vehs.find((v) => v.id === code || (v.plate && v.plate.toUpperCase() === String(code).toUpperCase()));
+        let vehicle = vehs.find((v) => v.id === code || (v.plate && v.plate.toUpperCase() === codeUp));
         if (!vehicle && !effectiveOffline) {
           // fallback online directo por id
           try { const dv = await base44.entities.Vehicle.get(code); if (dv && (dv.event_ids || []).includes(selectedEvent.id)) vehicle = dv; } catch {}
@@ -317,9 +319,9 @@ export default function AccessQrStation({ mode = 'person' }) {
       const vehs = resolveVehicles();
 
       // 1) ¿Es una acreditación de persona? (por id o badge_code)
-      let accred = accs.find((a) => a.id === code || (a.badge_code && a.badge_code === code));
+      let accred = accs.find((a) => a.id === code || (a.badge_code && a.badge_code === code) || (a.person_id && a.person_id === code));
       // 2) ¿Es un vehículo? (por id o patente)
-      let vehicle = vehs.find((v) => v.id === code || (v.plate && v.plate.toUpperCase() === String(code).toUpperCase()));
+      let vehicle = vehs.find((v) => v.id === code || (v.plate && v.plate.toUpperCase() === codeUp));
 
       // Fallback online directo si no se encontró en listado (superaba límite o RLS por evento asignado)
       if (!accred && !vehicle && !effectiveOffline) {
@@ -364,13 +366,15 @@ export default function AccessQrStation({ mode = 'person' }) {
 
       // No encontrado en ningún listado
       await logAccess('denied', {});
-      const hasCache = resolveAccreditations().length > 0 || resolveVehicles().length > 0;
+      const accsNow = resolveAccreditations();
+      const hasCache = accsNow.length > 0 || resolveVehicles().length > 0;
+      const sample = accsNow.slice(0, 3).map((a) => `${a.id}${a.badge_code ? ' / ' + a.badge_code : ''}`).join('  ·  ');
       setResult({
         ok: false,
         type: 'unknown',
         message: effectiveOffline && !hasCache
           ? 'Sin datos offline para este evento. Conectá la PDA a internet y abrí el control al menos una vez para descargar las credenciales.'
-          : 'Credencial no encontrada para este evento.',
+          : `Credencial no encontrada para este evento. Código leído: "${code}". En caché (${accsNow.length}): ${sample || '—'}`,
       });
     } catch (err) {
       setResult({ ok: false, type: 'unknown', message: err.message || 'Error en la verificación.' });
