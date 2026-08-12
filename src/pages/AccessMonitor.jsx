@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { CheckCircle2, XCircle, Loader2, Radio, Users, TrendingUp, AlertTriangle } from 'lucide-react';
 import { formatTimeWithSeconds } from '@/lib/formatDate';
 import { useZones } from '@/lib/useZones';
+import { deniedReasonLabel, deniedReasonColor } from '@/lib/accessLogCategories';
 
 export default function AccessMonitor() {
   const { user } = useAuth();
@@ -160,15 +161,16 @@ export default function AccessMonitor() {
                     <p className="text-xs text-slate-500">
                       {log.event_name || 'Sin evento'}
                       {log.zone ? ` · ${log.zone.split(',').map((z) => zones.find((zz) => zz.value === z.trim())?.label || z.trim()).join(', ')}` : ''}
+                      {log.pda_number ? ` · PDA ${log.pda_number}` : ''}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
                     <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${
                       isDenied
-                        ? 'bg-red-50 text-red-700 ring-red-200'
+                        ? deniedReasonColor(log.denied_reason)
                         : 'bg-emerald-50 text-emerald-700 ring-emerald-200'
                     }`}>
-                      {isDenied ? 'Denegado' : 'Concedido'}
+                      {isDenied ? deniedReasonLabel(log.denied_reason) : 'Concedido'}
                     </span>
                     <div className="text-right">
                       <p className="font-mono text-sm font-medium text-slate-700">{formatTimeWithSeconds(log.created_date)}</p>

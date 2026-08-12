@@ -30,6 +30,10 @@
       "type": "string",
       "description": "Usuario que valid\u00f3 el acceso"
     },
+    "pda_number": {
+      "type": "string",
+      "description": "N\u00famero/identificador de la PDA que registr\u00f3 el acceso"
+    },
     "method": {
       "type": "string",
       "enum": [
@@ -64,6 +68,18 @@
       ],
       "default": "granted",
       "description": "Resultado del intento de acceso"
+    },
+    "denied_reason": {
+      "type": "string",
+      "enum": [
+        "zone",
+        "phase",
+        "not_found",
+        "blocked",
+        ""
+      ],
+      "default": "",
+      "description": "Motivo de denegaci\u00f3n cuando result=denied: zone/fase (rechazado), not_found (acceso incorrecto), blocked (acreditaci\u00f3n cancelada/deshabilitada)"
     },
     "access_level": {
       "type": "string",

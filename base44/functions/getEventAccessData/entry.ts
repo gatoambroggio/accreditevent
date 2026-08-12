@@ -13,10 +13,13 @@ export default async function (req) {
     if (!eventId) return Response.json({ error: 'event_id requerido' }, { status: 400 });
 
     const [accs, vehs] = await Promise.all([
-      base44.asServiceRole.entities.Accreditation.filter({ status: 'active' }, '-created_date', 5000),
+      base44.asServiceRole.entities.Accreditation.filter({ status: { $in: ['active', 'blocked', 'revoked'] } }, '-created_date', 5000),
       base44.asServiceRole.entities.Vehicle.list('-created_date', 5000),
     ]);
 
+    // Incluye activas, bloqueadas y revocadas: las bloqueadas/revocadas se
+    // detectan offline como "canceladas" al validar el status, en lugar de
+    // quedar como "no encontradas".
     const accreditations = (accs || []).filter((a) => a.event_id === eventId);
     const vehicles = (vehs || []).filter((v) => (v.event_ids || []).includes(eventId));
 

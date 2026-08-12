@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { Loader2, Users, Car, CheckCircle2, XCircle, DoorOpen, FileBarChart, Download, Search } from 'lucide-react';
+import { Loader2, Users, Car, CheckCircle2, XCircle, DoorOpen, FileBarChart, Download, Search, Smartphone } from 'lucide-react';
 import { exportToExcel } from '@/lib/exportUtils';
 import { formatDateTime, parseServerDate } from '@/lib/formatDate';
+import { deniedReasonLabel, deniedReasonColor, accessCategory } from '@/lib/accessLogCategories';
 
 const userEventIdsRef = { current: [] };
 const userCompanyRef = { current: '' };
@@ -33,6 +34,7 @@ export default function Reports() {
   const [accreditations, setAccreditations] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [accessLogs, setAccessLogs] = useState([]);
+  const [pdaStations, setPdaStations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [eventFilter, setEventFilter] = useState('');
   const [resultFilter, setResultFilter] = useState('');
@@ -46,16 +48,18 @@ export default function Reports() {
 
     (async () => {
       try {
-        const [evs, accs, vehs, logs] = await Promise.all([
+        const [evs, accs, vehs, logs, pdas] = await Promise.all([
           base44.entities.Event.list('-created_date', 100),
           base44.entities.Accreditation.list('-created_date', 500),
           base44.entities.Vehicle.list('-created_date', 500),
           base44.entities.AccessLog.list('-created_date', 500),
+          base44.entities.PdaStation.list('-created_date', 500),
         ]);
         setEvents(evs);
         setAccreditations(accs);
         setVehicles(vehs);
         setAccessLogs(logs.filter(shouldShowLog));
+        setPdaStations(pdas || []);
       } catch {}
       setLoading(false);
     })();
@@ -144,6 +148,33 @@ export default function Reports() {
     return arr;
   }, [tabLogs, tab]);
 
+  // Reporte por PDA: agrupa los AccessLog por pda_number y los clasifica en
+  // validados / rechazados / acceso incorrecto / cancelados. Junta el nombre
+  // del dispositivo (label) desde PdaStation.
+  const pdaStats = useMemo(() => {
+    let logs = accessLogs;
+    if (eventFilter) {
+      const evt = events.find((e) => e.id === eventFilter);
+      if (evt) logs = logs.filter((l) => l.event_name === evt.name);
+    }
+    const byPda = {};
+    for (const log of logs) {
+      const key = log.pda_number || '';
+      if (!key) continue;
+      if (!byPda[key]) byPda[key] = { pda_number: key, validados: 0, rechazados: 0, acceso_incorrecto: 0, cancelados: 0, total: 0 };
+      byPda[key].total++;
+      const cat = accessCategory(log);
+      if (byPda[key][cat] != null) byPda[key][cat]++;
+    }
+    // PDAs sin actividad también aparecen (en 0) para tener el dispositivo
+    const stations = (pdaStations || []).map((s) => s.station_number);
+    const allKeys = Array.from(new Set([...Object.keys(byPda), ...stations]));
+    const labelOf = (num) => pdaStations.find((s) => s.station_number === num)?.label || '';
+    return allKeys
+      .map((num) => ({ pda_number: num, label: labelOf(num), ...(byPda[num] || { validados: 0, rechazados: 0, acceso_incorrecto: 0, cancelados: 0, total: 0 }) }))
+      .sort((a, b) => b.total - a.total);
+  }, [accessLogs, pdaStations, eventFilter, events]);
+
   const handleExportList = () => {
     if (tab === 'vehicle') {
       exportToExcel(
@@ -186,7 +217,7 @@ export default function Reports() {
           l.badge_code || '',
           l.event_name || '',
           l.access_level || l.zone || '',
-          l.result === 'denied' ? 'Denegado' : 'Concedido',
+          l.result === 'denied' ? deniedReasonLabel(l.denied_reason) : 'Validado',
           l.verified_by || '',
           l.created_date ? parseServerDate(l.created_date).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }) : '',
         ]),
@@ -200,7 +231,7 @@ export default function Reports() {
           l.badge_code || '',
           l.event_name || '',
           l.zone || '',
-          l.result === 'denied' ? 'Denegado' : 'Concedido',
+          l.result === 'denied' ? deniedReasonLabel(l.denied_reason) : 'Validado',
           l.method === 'biometric' ? 'Facial' : 'Manual',
           l.verified_by || '',
           l.created_date ? parseServerDate(l.created_date).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }) : '',
@@ -391,6 +422,50 @@ export default function Reports() {
         )}
       </div>
 
+      {/* Accesos por PDA */}
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 px-5 py-4">
+          <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900">
+            <Smartphone className="h-4 w-4 text-emerald-600" /> Accesos por PDA
+          </h2>
+          <p className="mt-0.5 text-xs text-slate-500">Conteo por dispositivo de los accesos validados, rechazados, con acceso incorrecto y cancelados.</p>
+        </div>
+        {pdaStats.length === 0 ? (
+          <p className="py-12 text-center text-sm text-slate-400">No hay accesos registrados por PDA.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50">
+                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">ID</th>
+                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Dispositivo</th>
+                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Validados</th>
+                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Rechazados</th>
+                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Acceso incorrecto</th>
+                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Cancelados</th>
+                  <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pdaStats.map((p) => (
+                  <tr key={p.pda_number} className="border-b border-slate-50 hover:bg-slate-50/50">
+                    <td className="px-4 py-3">
+                      <span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-50 text-xs font-extrabold text-emerald-700">{p.pda_number}</span>
+                    </td>
+                    <td className="px-4 py-3 text-sm font-semibold text-slate-900">{p.label || `Estación ${p.pda_number}`}</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-emerald-600">{p.validados}</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-amber-600">{p.rechazados}</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-slate-500">{p.acceso_incorrecto}</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-purple-600">{p.cancelados}</td>
+                    <td className="px-4 py-3 text-sm font-bold text-slate-900">{p.total}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* Access log table */}
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-5 py-4">
@@ -443,9 +518,11 @@ export default function Reports() {
                     )}
                     <td className="px-4 py-3">
                       {log.result === 'denied' ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ring-1 ring-inset bg-red-50 text-red-700 ring-red-200">Denegado</span>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ring-1 ring-inset ${deniedReasonColor(log.denied_reason)}`}>
+                          {deniedReasonLabel(log.denied_reason)}
+                        </span>
                       ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ring-1 ring-inset bg-emerald-50 text-emerald-700 ring-emerald-200">Concedido</span>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ring-1 ring-inset bg-emerald-50 text-emerald-700 ring-emerald-200">Validado</span>
                       )}
                     </td>
                     {!isVehicle && <td className="px-4 py-3 text-sm text-slate-500">{log.method === 'biometric' ? 'Facial' : 'Manual'}</td>}

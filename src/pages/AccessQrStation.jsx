@@ -282,10 +282,12 @@ export default function AccessQrStation({ mode = 'person' }) {
           event_id: selectedEvent.id,
           company: opts.company || selectedEvent.company,
           verified_by: verifier,
+          pda_number: pdaNumber || '',
           method: 'manual',
           resource_type: opts.resource_type || 'person',
           zone: opts.zone || (opts.resource_type === 'vehicle' ? selectedSectors.join(', ') : selectedZones.join(', ')),
           result: res,
+          denied_reason: res === 'denied' ? (opts.denied_reason || '') : '',
           access_level: opts.access_level || '',
         };
         if (effectiveOffline) {
@@ -305,7 +307,7 @@ export default function AccessQrStation({ mode = 'person' }) {
           try { const dv = await base44.entities.Vehicle.get(code); if (dv && (dv.event_ids || []).includes(selectedEvent.id)) vehicle = dv; } catch {}
         }
         const vr = validateVehicleObj(vehicle, selectedEvent, selectedSectors, parkingSectors);
-        await logAccess(vr.ok ? 'granted' : 'denied', vehicle ? { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, resource_type: 'vehicle' } : { resource_type: 'vehicle' });
+        await logAccess(vr.ok ? 'granted' : 'denied', vehicle ? { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, resource_type: 'vehicle', denied_reason: vr.reason } : { resource_type: 'vehicle', denied_reason: vr.reason });
         if (vr.ok) {
           setResult({ ok: true, type: 'vehicle', person_name: vehicle.person_name, vehicle });
         } else {
@@ -348,7 +350,7 @@ export default function AccessQrStation({ mode = 'person' }) {
 
       if (accred) {
         const pv = validatePersonAccred(accred, selectedEvent, selectedZones, zones);
-        await logAccess(pv.ok ? 'granted' : 'denied', { id: accred.id, person_name: accred.person_name, badge_code: accred.badge_code, company: accred.company, access_level: accred.access_level });
+        await logAccess(pv.ok ? 'granted' : 'denied', { id: accred.id, person_name: accred.person_name, badge_code: accred.badge_code, company: accred.company, access_level: accred.access_level, denied_reason: pv.reason });
         setResult(pv.ok
           ? { ok: true, type: 'person', person_name: accred.person_name, accred }
           : { ok: false, type: 'person', person_name: accred.person_name || '', accred, message: pv.message });
@@ -357,7 +359,7 @@ export default function AccessQrStation({ mode = 'person' }) {
 
       if (vehicle) {
         const vr = validateVehicleObj(vehicle, selectedEvent, selectedSectors, parkingSectors);
-        await logAccess(vr.ok ? 'granted' : 'denied', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, resource_type: 'vehicle' });
+        await logAccess(vr.ok ? 'granted' : 'denied', { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, resource_type: 'vehicle', denied_reason: vr.reason });
         setResult(vr.ok
           ? { ok: true, type: 'vehicle', person_name: vehicle.person_name, vehicle }
           : { ok: false, type: 'vehicle', person_name: vehicle?.person_name, vehicle, message: vr.message });
@@ -365,7 +367,7 @@ export default function AccessQrStation({ mode = 'person' }) {
       }
 
       // No encontrado en ningún listado
-      await logAccess('denied', {});
+      await logAccess('denied', { denied_reason: 'not_found' });
       const accsNow = resolveAccreditations();
       const hasCache = accsNow.length > 0 || resolveVehicles().length > 0;
       const sample = accsNow.slice(0, 3).map((a) => `${a.id}${a.badge_code ? ' / ' + a.badge_code : ''}`).join('  ·  ');
