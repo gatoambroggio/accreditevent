@@ -74,17 +74,51 @@ export default function AccessQrStation({ mode = 'person' }) {
     })();
   }, []);
 
-  // Refresco automático del caché: al (re)conectarse y cada 2 minutos mientras
-  // haya conexión y un evento seleccionado. Sin botones manuales.
+  // Pre-carga de TODOS los eventos al montar (mientras haya internet): cachea
+  // acreditaciones y vehículos por evento para que el modo offline funcione
+  // sin necesidad de descargar en el momento (ej. la PDA se carga en la oficina
+  // y opera offline en el venue). Cada vez que vuelve la conexión, refresca.
   useEffect(() => {
-    if (!online || !selectedEvent) return;
-    downloadEventData(selectedEvent);
+    if (!online) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [accRes, vehRes] = await Promise.allSettled([
+          base44.entities.Accreditation.filter({ status: 'active' }, '-created_date', PERSON_LIMIT),
+          base44.entities.Vehicle.list('-created_date', VEHICLE_LIMIT),
+        ]);
+        if (cancelled) return;
+        setRealOnline(accRes.status === 'fulfilled');
+        if (accRes.status !== 'fulfilled') return;
+        const allAccs = accRes.value || [];
+        const allVehs = vehRes.status === 'fulfilled' ? (vehRes.value || []) : [];
+        const byEvent = {};
+        allAccs.forEach((a) => { if (a.event_id) (byEvent[a.event_id] = byEvent[a.event_id] || []).push(a); });
+        Object.keys(byEvent).forEach((eid) => {
+          const prev = getEventData(eid);
+          const vehs = allVehs.filter((v) => (v.event_ids || []).includes(eid));
+          saveEventData(eid, { accreditations: byEvent[eid], vehicles: vehs.length > 0 ? vehs : (prev?.vehicles || []) });
+        });
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [online]);
+
+  // Refresco del caché del evento seleccionado: al (re)conectarse y cada 2
+  // minutos. También descarga en la fase de selección (al elegir evento),
+  // para cargar datos antes de iniciar la estación.
+  useEffect(() => {
+    if (!online) return;
+    const evt = selectedEvent || events.find((e) => e.id === selectedEventId);
+    if (!evt) return;
+    downloadEventData(evt);
     const id = setInterval(() => {
-      downloadEventData(selectedEvent);
+      downloadEventData(evt);
     }, CACHE_REFRESH_MS);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [online, selectedEvent]);
+  }, [online, selectedEvent, selectedEventId, events]);
 
   // Pre-selección automática de evento y zona desde la asignación remota del
   // administrador (panel Estaciones PDA). Sólo pre-carga si el operador aún no
@@ -349,7 +383,14 @@ export default function AccessQrStation({ mode = 'person' }) {
 
       // No encontrado en ningún listado
       await logAccess('denied', {});
-      setResult({ ok: false, type: 'unknown', message: 'Credencial no encontrada para este evento.' });
+      const hasCache = resolveAccreditations().length > 0 || resolveVehicles().length > 0;
+      setResult({
+        ok: false,
+        type: 'unknown',
+        message: effectiveOffline && !hasCache
+          ? 'Sin datos offline para este evento. Conectá la PDA a internet y abrí el control al menos una vez para descargar las credenciales.'
+          : 'Credencial no encontrada para este evento.',
+      });
     } catch (err) {
       setResult({ ok: false, type: 'unknown', message: err.message || 'Error en la verificación.' });
     } finally {
