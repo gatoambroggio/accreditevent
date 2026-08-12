@@ -185,33 +185,124 @@ export default async function(req) {
     // Verify each non-repetition clause is present in the document using LLM
     let clauseValidation = null;
     if (nonRepetitionClauses.length > 0) {
-      try {
-        const clausePrompt = `Analizá el siguiente documento de póliza de seguro. Verificá si cada una de las siguientes cláusulas está presente en el documento. Para cada cláusula, indicá si está presente (true/false) y, si lo está, un breve extracto del texto que coincide.\n\nCláusulas a verificar:\n${nonRepetitionClauses.map((c, i) => `${i + 1}. ${c}`).join('\n')}`;
-        const clauseResult = await base44.integrations.Core.InvokeLLM({
-          prompt: clausePrompt,
-          file_urls: [doc.file_url],
-          response_json_schema: {
-            type: 'object',
-            properties: {
-              clauses: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    clause: { type: 'string', description: 'Texto de la cláusula verificada' },
-                    found: { type: 'boolean', description: 'Indica si la cláusula está presente en el documento' },
-                    excerpt: { type: 'string', description: 'Extracto del texto encontrado en el documento que coincide con la cláusula' }
-                  }
-                }
-              },
-              all_found: { type: 'boolean', description: 'Indica si todas las cláusulas fueron encontradas' }
+      // Las "cláusulas de no repetición" del evento suelen ser una lista de
+      // personas (nombre + CUIT/CUIL/DNI) que deben figurar en la póliza. Las
+      // verificamos contra la nómina extraída por OCR (insured_employees + titular),
+      // matching por DNI base (maneja CUIT/CUIL) y por nombre. Es determinístico,
+      // rápido y sin segunda llamada LLM (evita timeout). Para cláusulas que no
+      // son personas (texto legal sin CUIT), caemos a LLM con el archivo.
+      const stripAccents = (s: string) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const normName = (s: string) => stripAccents(s).replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+      const digitsOf = (s: string) => (s || '').replace(/\D/g, '');
+
+      const insuredDniBases = new Set<string>();
+      const insuredNameSet = new Set<string>();
+      for (const e of insuredList) {
+        const d = digitsOf(e.dni || '');
+        if (d) insuredDniBases.add((dniToBase(e.dni || '') as string) || d);
+        const nm = normName(e.name || '');
+        if (nm) insuredNameSet.add(nm);
+      }
+      const phDni = digitsOf(extracted.policyholder_dni || '');
+      if (phDni) insuredDniBases.add((dniToBase(extracted.policyholder_dni || '') as string) || phDni);
+      const phName = normName(extracted.policyholder_name || '');
+      if (phName) insuredNameSet.add(phName);
+
+      const tokenOverlap = (a: string, b: string) => {
+        const ta = new Set(a.split(' ').filter((w) => w.length >= 3));
+        const tb = b.split(' ').filter((w) => w.length >= 3);
+        if (!ta.size || !tb.length) return 0;
+        let hit = 0;
+        for (const w of tb) if (ta.has(w)) hit++;
+        return hit / tb.length;
+      };
+
+      // Expandir cláusulas multi-línea en entradas individuales (una por línea)
+      // para dar resultado granular por persona.
+      const clauseLines: string[] = [];
+      for (const clause of nonRepetitionClauses) {
+        const lines = clause.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+        if (lines.length > 1) clauseLines.push(...lines);
+        else clauseLines.push(clause.trim());
+      }
+
+      // Separar líneas tipo "persona" (con CUIT/DNI) del resto (texto legal)
+      const personClauses: { idx: number; clause: string; digitRuns: string[] }[] = [];
+      const textClauses: { idx: number; clause: string }[] = [];
+      clauseLines.forEach((clause, idx) => {
+        const digitRuns = (clause.match(/\d[\d.\-]{5,}/g) || []).map((r) => digitsOf(r)).filter((d) => d.length >= 6);
+        if (digitRuns.length > 0) personClauses.push({ idx, clause, digitRuns });
+        else textClauses.push({ idx, clause });
+      });
+
+      const clausesResult: { clause: string; found: boolean; excerpt: string }[] = clauseLines.map((c) => ({ clause: c, found: false, excerpt: '' }));
+
+      // 1) Personas: matchear por DNI base (y nombre como respaldo)
+      for (const pc of personClauses) {
+        let found = false;
+        let excerpt = '';
+        for (const dr of pc.digitRuns) {
+          const base = (dniToBase(dr) as string) || dr;
+          if (base && [...insuredDniBases].some((b) => b.includes(base) || base.includes(b))) {
+            found = true;
+            excerpt = `Presente en la nómina (DNI ${base})`;
+            break;
+          }
+        }
+        if (!found) {
+          const cn = normName(pc.clause);
+          if (cn) {
+            for (const nm of insuredNameSet) {
+              if (nm && (nm.includes(cn) || cn.includes(nm) || tokenOverlap(cn, nm) >= 0.8)) {
+                found = true;
+                excerpt = `Nombre presente en la nómina: ${nm}`;
+                break;
+              }
             }
           }
-        });
-        clauseValidation = clauseResult;
-      } catch (e) {
-        clauseValidation = { error: e.message, clauses: [], all_found: false };
+        }
+        clausesResult[pc.idx] = { clause: pc.clause, found, excerpt };
       }
+
+      // 2) Cláusulas de texto legal (sin CUIT/DNI): fallback a LLM con el archivo
+      if (textClauses.length > 0) {
+        try {
+          const tcList = textClauses.map((t) => t.clause);
+          const clauseResult: any = await base44.integrations.Core.InvokeLLM({
+            prompt: `Sos un validador estricto de pólizas de seguro. Verificá si CADA cláusula de no repetición está presente en el documento adjunto. Marcá found=true SOLO si hay una frase que exprese claramente el mismo significado; si no aparece, found=false. En excerpt copiá la frase que justifica.\n\nCláusulas a verificar:\n${tcList.map((c, i) => `${i + 1}. ${c}`).join('\n')}`,
+            file_urls: [doc.file_url],
+            response_json_schema: {
+              type: 'object',
+              properties: {
+                clauses: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      clause: { type: 'string' },
+                      found: { type: 'boolean' },
+                      excerpt: { type: 'string' }
+                    },
+                    required: ['clause', 'found']
+                  }
+                },
+                all_found: { type: 'boolean' }
+              },
+              required: ['clauses', 'all_found']
+            }
+          });
+          const rc: any[] = Array.isArray(clauseResult?.clauses) ? clauseResult.clauses : [];
+          textClauses.forEach((t, i) => {
+            const m = rc[i];
+            clausesResult[t.idx] = { clause: t.clause, found: !!(m && m.found), excerpt: (m && m.excerpt) || '' };
+          });
+        } catch (e) {
+          textClauses.forEach((t) => { clausesResult[t.idx] = { clause: t.clause, found: false, excerpt: '' }; });
+        }
+      }
+
+      const allFound = clausesResult.every((c) => c.found);
+      clauseValidation = { clauses: clausesResult, all_found: allFound };
     }
 
     const nonRepetitionOk = nonRepetitionClauses.length === 0 || (clauseValidation?.all_found === true);
@@ -248,12 +339,14 @@ export default async function(req) {
       reconciliation,
     } : null;
 
-    // Overall validity — employee coverage only blocks if the policy has a nómina
+    // Overall validity — la nómina parcial NO bloquea la aprobación: se aprueba
+    // el seguro para los empleados que figuran en la nómina y los que no figuran
+    // quedan como "sin seguro" (el flujo de acreditación ya les impide
+    // acreditarse sin seguro aprobado). Sólo bloquean fechas, cláusulas, monto y tipo.
     const isCompanyLevelDoc = !doc.person_id && !!doc.company;
-    const employeeCoverageOk = !employeeValidation || !hasInsuredList || uncoveredCount === 0;
     const overallValid = isCompanyLevelDoc
-      ? dateValid && (!eventCoverage || eventCoverage.covers_event) && employeeCoverageOk && nonRepetitionOk && amountOk && kindMatch
-      : dniMatch && dateValid && (!eventCoverage || eventCoverage.covers_event) && employeeCoverageOk && nonRepetitionOk && amountOk && kindMatch;
+      ? dateValid && (!eventCoverage || eventCoverage.covers_event) && nonRepetitionOk && amountOk && kindMatch
+      : dniMatch && dateValid && (!eventCoverage || eventCoverage.covers_event) && nonRepetitionOk && amountOk && kindMatch;
 
     return Response.json({
       valid: overallValid,

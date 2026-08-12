@@ -240,26 +240,42 @@ export default function InsuranceValidationModal({ document: doc, onClose, onVal
                   )}
                   <CheckRow label="Vigencia de fechas" passed={result.validation.date_valid}
                     detail={result.validation.date_issues.length > 0 ? result.validation.date_issues.join(' · ') : 'Fechas válidas y vigentes'} />
-                  {result.validation.insurance_config && result.validation.insurance_config.non_repetition_clauses?.length > 0 && (
-                    <CheckRow label={`Cláusulas de no repetición (${(result.validation.insurance_config.clause_validation?.clauses || []).filter(c => c.found).length}/${result.validation.insurance_config.non_repetition_clauses.length} encontradas)`}
-                      passed={result.validation.insurance_config.non_repetition_ok}
-                      detail={result.validation.insurance_config.non_repetition_ok
-                        ? 'Todas las cláusulas requeridas están presentes en la póliza'
-                        : 'Faltan cláusulas requeridas en la póliza'} />
-                  )}
+                  {result.validation.insurance_config && result.validation.insurance_config.non_repetition_clauses?.length > 0 && (() => {
+                    const cv = result.validation.insurance_config.clause_validation;
+                    const found = (cv?.clauses || []).filter(c => c.found).length;
+                    const total = (cv?.clauses || []).length;
+                    return (
+                      <CheckRow label={`Cláusulas de no repetición (${found}/${total} encontradas)`}
+                        passed={result.validation.insurance_config.non_repetition_ok}
+                        detail={result.validation.insurance_config.non_repetition_ok
+                          ? 'Todas las cláusulas requeridas están presentes en la póliza'
+                          : `Faltan ${total - found} cláusula(s)/persona(s) requeridas en la póliza`} />
+                    );
+                  })()}
                   {result.validation.insurance_config && result.validation.insurance_config.required_amount > 0 && result.extracted.insurance_kind !== 'ART' && (
                     <CheckRow label="Monto asegurado"
                       passed={result.validation.insurance_config.amount_ok}
                       detail={`Requerido: ${fmtMoney(result.validation.insurance_config.required_amount)} · Póliza: ${fmtMoney(result.validation.insurance_config.document_amount)}`} />
                   )}
-                  {result.validation.employee_validation && result.validation.employee_validation.total_employees > 0 && (
-                    <CheckRow
-                      label={`Nómina de empleados (${result.validation.employee_validation.covered_count}/${result.validation.employee_validation.total_employees} cubiertos)`}
-                      passed={result.validation.employee_validation.all_covered}
-                      detail={result.validation.employee_validation.uncovered_count > 0
-                        ? `${result.validation.employee_validation.uncovered_count} empleado(s) no aparecen en la póliza`
-                        : 'Todos los empleados están en la nómina de la póliza'} />
-                  )}
+                  {result.validation.employee_validation && result.validation.employee_validation.total_employees > 0 && (() => {
+                    const ev = result.validation.employee_validation;
+                    const allCovered = ev.all_covered;
+                    return (
+                      <div className={`flex items-start gap-2.5 rounded-lg border p-3 ${allCovered ? 'border-emerald-100 bg-emerald-50/50' : 'border-amber-200 bg-amber-50/50'}`}>
+                        <Users className={`mt-0.5 h-4 w-4 shrink-0 ${allCovered ? 'text-emerald-600' : 'text-amber-600'}`} />
+                        <div>
+                          <p className={`text-sm font-semibold ${allCovered ? 'text-emerald-800' : 'text-amber-800'}`}>
+                            Nómina de empleados ({ev.covered_count}/{ev.total_employees} cubiertos)
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {ev.uncovered_count > 0
+                              ? `${ev.uncovered_count} empleado(s) no figuran en la póliza: al aprobar quedarán registrados pero SIN seguro (no se podrán acreditar hasta validarles el seguro).`
+                              : 'Todos los empleados figuran en la nómina de la póliza.'}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
