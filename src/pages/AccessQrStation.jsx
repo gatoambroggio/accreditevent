@@ -250,9 +250,10 @@ export default function AccessQrStation({ mode = 'person' }) {
   };
 
   // Fallback online: obtener acreditación por id directo (por si excede el límite o RLS por evento).
-  const fallbackGetAccred = async (code) => {
+  const fallbackGetAccred = async (idOrCode) => {
     if (effectiveOffline) return null;
-    try { return await base44.entities.Accreditation.get(code); } catch { return null; }
+    const key = String(idOrCode || '').toLowerCase();
+    try { return await base44.entities.Accreditation.get(key); } catch { return null; }
   };
 
   // Persiste un cambio de zonas/sectores hecho desde la PDA (con clave) en la
@@ -271,6 +272,10 @@ export default function AccessQrStation({ mode = 'person' }) {
     setVerifying(true);
     const code = String(rawCode || '').trim();
     const codeUp = code.toUpperCase();
+    // Los IDs de acreditación/vehículo se guardan en lowercase en la base, pero
+    // algunos QR los codifican en mayúsculas. Usamos codeLower para comparar
+    // case-insensitive y que el offline funcione sin importar el casing del QR.
+    const codeLower = code.toLowerCase();
     const verifier = getCachedVerifier();
     try {
       const logAccess = async (res, opts = {}) => {
@@ -301,10 +306,10 @@ export default function AccessQrStation({ mode = 'person' }) {
       // --- Modo vehicular puro (ruta /control-vehicular) ---
       if (mode === 'vehicle') {
         const vehs = resolveVehicles();
-        let vehicle = vehs.find((v) => v.id === code || (v.plate && v.plate.toUpperCase() === codeUp));
+        let vehicle = vehs.find((v) => (v.id && v.id.toLowerCase() === codeLower) || (v.plate && v.plate.toUpperCase() === codeUp));
         if (!vehicle && !effectiveOffline) {
-          // fallback online directo por id
-          try { const dv = await base44.entities.Vehicle.get(code); if (dv && (dv.event_ids || []).includes(selectedEvent.id)) vehicle = dv; } catch {}
+          // fallback online directo por id (lowercase: los IDs se guardan así)
+          try { const dv = await base44.entities.Vehicle.get(codeLower); if (dv && (dv.event_ids || []).includes(selectedEvent.id)) vehicle = dv; } catch {}
         }
         const vr = validateVehicleObj(vehicle, selectedEvent, selectedSectors, parkingSectors);
         await logAccess(vr.ok ? 'granted' : 'denied', vehicle ? { id: vehicle.id, person_name: vehicle.person_name, badge_code: vehicle.plate, access_level: vehicle.parking_sector, resource_type: 'vehicle', denied_reason: vr.reason } : { resource_type: 'vehicle', denied_reason: vr.reason });
@@ -320,14 +325,14 @@ export default function AccessQrStation({ mode = 'person' }) {
       const accs = resolveAccreditations();
       const vehs = resolveVehicles();
 
-      // 1) ¿Es una acreditación de persona? (por id o badge_code)
-      let accred = accs.find((a) => a.id === code || (a.badge_code && a.badge_code === code) || (a.person_id && a.person_id === code));
+      // 1) ¿Es una acreditación de persona? (por id o badge_code) — case-insensitive
+      let accred = accs.find((a) => (a.id && a.id.toLowerCase() === codeLower) || (a.badge_code && a.badge_code.toLowerCase() === codeLower) || (a.person_id && a.person_id === code));
       // 2) ¿Es un vehículo? (por id o patente)
-      let vehicle = vehs.find((v) => v.id === code || (v.plate && v.plate.toUpperCase() === codeUp));
+      let vehicle = vehs.find((v) => (v.id && v.id.toLowerCase() === codeLower) || (v.plate && v.plate.toUpperCase() === codeUp));
 
       // Fallback online directo si no se encontró en listado (superaba límite o RLS por evento asignado)
       if (!accred && !vehicle && !effectiveOffline) {
-        accred = await fallbackGetAccred(code);
+        accred = await fallbackGetAccred(codeLower);
         if (accred && accred.event_id !== selectedEvent.id) accred = null;
         if (accred) {
           // Cachear para futuras validaciones offline
@@ -337,7 +342,7 @@ export default function AccessQrStation({ mode = 'person' }) {
         }
         if (!accred) {
           try {
-            const dv = await base44.entities.Vehicle.get(code);
+            const dv = await base44.entities.Vehicle.get(codeLower);
             if (dv && (dv.event_ids || []).includes(selectedEvent.id)) {
               vehicle = dv;
               setVehicles((prev) => prev.some((v) => v.id === dv.id) ? prev : [...prev, dv]);

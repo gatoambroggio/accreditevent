@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { CheckCircle2, XCircle, Loader2, Radio, Users, TrendingUp, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, Radio, Users, TrendingUp, AlertTriangle, Smartphone } from 'lucide-react';
 import { formatTimeWithSeconds } from '@/lib/formatDate';
 import { useZones } from '@/lib/useZones';
 import { deniedReasonLabel, deniedReasonColor } from '@/lib/accessLogCategories';
@@ -161,10 +161,14 @@ export default function AccessMonitor() {
                     <p className="text-xs text-slate-500">
                       {log.event_name || 'Sin evento'}
                       {log.zone ? ` · ${log.zone.split(',').map((z) => zones.find((zz) => zz.value === z.trim())?.label || z.trim()).join(', ')}` : ''}
-                      {log.pda_number ? ` · PDA ${log.pda_number}` : ''}
                     </p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-3">
+                  <div className="flex shrink-0 items-center gap-2">
+                    {log.pda_number && (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-slate-900 px-2 py-0.5 text-xs font-bold text-white">
+                        <Smartphone className="h-3 w-3" /> PDA {log.pda_number}
+                      </span>
+                    )}
                     <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${
                       isDenied
                         ? deniedReasonColor(log.denied_reason)
