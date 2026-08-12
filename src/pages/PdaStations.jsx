@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Loader2, RefreshCw, Smartphone, Wifi, WifiOff, CloudUpload, Pencil, Trash2, X, Plus, Battery, BatteryFull, BatteryMedium, BatteryLow, AlertTriangle } from 'lucide-react';
 import PageHeader from '@/components/ui/page-header';
@@ -24,16 +24,45 @@ export default function PdaStations() {
   const [editing, setEditing] = useState(null);
   const [saveError, setSaveError] = useState('');
   const [offlineDismissed, setOfflineDismissed] = useState(false);
+  const [toasts, setToasts] = useState([]);
+  const prevStatusRef = useRef({});
   const { zones } = useZones();
   const { sectors: parkingSectors } = useParkingSectors();
+
+  // Detecta transiciones de estado entre polls para lanzar pop-ups (toasts):
+  // PDA que pasa de online a offline, y batería que cae a <=10%.
+  const evaluateAlerts = useCallback((data) => {
+    const now = Date.now();
+    const prev = prevStatusRef.current;
+    const newToasts = [];
+    const next = {};
+    (data || []).forEach((s) => {
+      const lastSeenMs = s.last_seen ? now - new Date(s.last_seen).getTime() : null;
+      const isOnline = lastSeenMs != null && lastSeenMs < ONLINE_THRESHOLD_MS;
+      const prevEntry = prev[s.id];
+      if (prevEntry) {
+        if (prevEntry.online && !isOnline) {
+          newToasts.push({ id: `off-${s.id}-${now}`, severity: 'error', icon: 'offline', title: 'PDA desconectada', message: `Estación #${s.station_number}${s.label ? ' · ' + s.label : ''} perdió conexión.` });
+        }
+        const prevBat = prevEntry.battery;
+        if (s.battery_level != null && s.battery_level <= 10 && (prevBat == null || prevBat > 10)) {
+          newToasts.push({ id: `bat-${s.id}-${now}`, severity: 'warning', icon: 'battery', title: 'Batería baja', message: `Estación #${s.station_number}${s.label ? ' · ' + s.label : ''} tiene ${Math.round(s.battery_level)}% de batería.` });
+        }
+      }
+      next[s.id] = { online: isOnline, battery: s.battery_level };
+    });
+    prevStatusRef.current = next;
+    if (newToasts.length > 0) setToasts((t) => [...t, ...newToasts]);
+  }, []);
 
   const load = useCallback(async () => {
     try {
       const data = await base44.entities.PdaStation.list('-last_seen', 500);
       setStations(data || []);
+      evaluateAlerts(data || []);
     } catch {}
     setLoading(false);
-  }, []);
+  }, [evaluateAlerts]);
 
   const loadEvents = useCallback(async () => {
     try {
@@ -56,6 +85,13 @@ export default function PdaStations() {
   });
   const showOfflinePopup = offlineStations.length > 0 && !offlineDismissed;
   useEffect(() => { if (offlineStations.length === 0) setOfflineDismissed(false); }, [offlineStations.length]);
+
+  // Auto-cierre de los pop-ups (toasts) de desconexión / batería baja.
+  useEffect(() => {
+    if (toasts.length === 0) return;
+    const timers = toasts.map((t) => setTimeout(() => setToasts((cur) => cur.filter((x) => x.id !== t.id)), 7000));
+    return () => timers.forEach(clearTimeout);
+  }, [toasts]);
 
   const openNew = () => {
     setSaveError('');
@@ -317,6 +353,24 @@ export default function PdaStations() {
           </div>
         </div>
       )}
+
+      {/* Pop-ups (toasts) abajo a la derecha: desconexión y batería baja */}
+      <div className="fixed bottom-4 right-4 z-[80] flex w-80 flex-col gap-2">
+        {toasts.map((t) => (
+          <div key={t.id} className={`flex items-start gap-3 rounded-xl border px-4 py-3 shadow-lg ${t.severity === 'error' ? 'border-red-200 bg-white' : 'border-amber-200 bg-white'}`}>
+            <span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg ${t.severity === 'error' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'}`}>
+              {t.icon === 'battery' ? <BatteryLow className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-slate-900">{t.title}</p>
+              <p className="text-xs text-slate-500">{t.message}</p>
+            </div>
+            <button onClick={() => setToasts((cur) => cur.filter((x) => x.id !== t.id))} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

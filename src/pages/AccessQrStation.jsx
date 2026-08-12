@@ -16,8 +16,6 @@ import { saveEventData, getEventData, getCacheAgeMs, queueAccessLog, setCachedVe
 import { validatePersonAccred, validateVehicleObj } from '@/lib/offlineValidation';
 import PdaPinPrompt from '@/components/PdaPinPrompt';
 
-const PERSON_LIMIT = 3000;
-const VEHICLE_LIMIT = 3000;
 const ASSIGNED_SYNC_MS = 15 * 1000;
 
 export default function AccessQrStation({ mode = 'person' }) {
@@ -74,27 +72,32 @@ export default function AccessQrStation({ mode = 'person' }) {
     })();
   }, []);
 
-  // Sincronización automática del evento ASIGNADO a esta PDA: cada 15 segundos
-  // descarga las credenciales y vehículos del evento que el admin le asignó
-  // (panel Estaciones PDA), así el caché siempre está fresco y el modo offline
-  // funciona. Corre desde que se conoce el número de PDA (no requiere iniciar
-  // la estación) y sólo sincroniza el evento asignado, no todos.
+  // Sincronización automática: cada 15 segundos descarga las credenciales y
+  // vehículos del evento ASIGNADO a esta PDA (panel Estaciones PDA) y, si el
+  // operador eligió otro, también del seleccionado. Así el caché siempre está
+  // fresco y el modo offline funciona. Corre desde que se conoce el número de
+  // PDA (no requiere iniciar la estación) y sólo sincroniza el/los evento(s)
+  // de esta PDA, no todos.
   useEffect(() => {
     if (!online || !pdaNumber) return;
     const sync = async () => {
+      const toSync = new Set();
       try {
         const mine = await base44.entities.PdaStation.filter({ station_number: pdaNumber }, '-created_date', 5);
         const st = mine?.[0];
-        if (!st || !st.assigned_event_id) return;
-        const evt = events.find((e) => e.id === st.assigned_event_id);
-        if (evt) downloadEventData(evt, true);
+        if (st?.assigned_event_id) toSync.add(st.assigned_event_id);
       } catch {}
+      if (selectedEventId) toSync.add(selectedEventId);
+      for (const eid of toSync) {
+        const evt = events.find((e) => e.id === eid);
+        if (evt) downloadEventData(evt, true);
+      }
     };
     sync();
     const id = setInterval(sync, ASSIGNED_SYNC_MS);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [online, pdaNumber, events]);
+  }, [online, pdaNumber, events, selectedEventId]);
 
   // Pre-selección automática de evento y zona desde la asignación remota del
   // administrador (panel Estaciones PDA). Sólo pre-carga si el operador aún no
@@ -150,31 +153,33 @@ export default function AccessQrStation({ mode = 'person' }) {
   const downloadEventData = async (evt, silent = false) => {
     if (!silent) setDownloading(true);
     setDownloadError('');
-    // Usamos allSettled para que el guardado de personas no se cancele si la
-    // carga de vehículos falla (payload pesado / red inestable).
-    const [accRes, vehRes] = await Promise.allSettled([
-      base44.entities.Accreditation.filter({ status: 'active' }, '-created_date', PERSON_LIMIT),
-      base44.entities.Vehicle.list('-created_date', VEHICLE_LIMIT),
-    ]);
-    // Filtrado del lado del cliente por evento (mismo motivo que vehículos:
-    // garantiza el caché del evento aunque el filter por event_id no devuelva).
-    const accs = (accRes.status === 'fulfilled' ? (accRes.value || []) : []).filter((a) => a.event_id === evt.id);
-    const rawVehs = vehRes.status === 'fulfilled' ? (vehRes.value || []) : [];
-    const vehs = rawVehs.filter((v) => (v.event_ids || []).includes(evt.id));
-    // Detección real de conexión: si la API respondió hay red; si fue
-    // rechazado (wifi sin internet), pasamos a modo offline y usamos caché.
-    setRealOnline(accRes.status === 'fulfilled');
+    // Descarga vía función backend (asServiceRole): NO depende del RLS del
+    // operador (problema de casing User.company/Company.name que dejaba la
+    // caché vacía). Devuelve sólo las acreditaciones activas y vehículos del
+    // evento indicado.
+    let res = null;
+    let failed = false;
+    try {
+      res = await base44.functions.invoke('getEventAccessData', { event_id: evt.id });
+    } catch {
+      failed = true;
+    }
+    const data = !failed && res?.data && !res.data.error ? res.data : null;
+    const ok = !!data && Array.isArray(data.accreditations);
+    // Detección real de conexión: si la función respondió hay red; si falló
+    // (wifi sin internet), pasamos a modo offline y usamos caché.
+    setRealOnline(ok);
+    const accs = ok ? data.accreditations : [];
+    const vehs = ok ? data.vehicles : [];
     const prev = getEventData(evt.id);
     const prevAccs = prev?.accreditations || [];
     const prevVehs = prev?.vehicles || [];
 
-    // Si la descarga de personas falló o vino vacía pero ya hay caché válido,
-    // NO pisamos el caché con listas vacías: conservamos el anterior.
-    const accreditationsOk = accRes.status === 'fulfilled' && accs.length > 0;
-    const vehiclesOk = vehRes.status === 'fulfilled';
-
+    // Si la descarga trajo personas, actualizamos; si falló pero hay caché
+    // válido, NO pisamos el caché con listas vacías: conservamos el anterior.
+    const accreditationsOk = ok && accs.length > 0;
     const finalAccs = accreditationsOk ? accs : prevAccs;
-    const finalVehs = vehiclesOk ? vehs : prevVehs;
+    const finalVehs = ok ? vehs : prevVehs;
 
     setAccreditations(finalAccs);
     setVehicles(finalVehs);
