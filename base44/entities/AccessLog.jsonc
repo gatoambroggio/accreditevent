@@ -114,6 +114,11 @@
           }
         },
         {
+          "user_condition": {
+            "role": "pda"
+          }
+        },
+        {
           "$and": [
             {
               "user_condition": {
@@ -152,6 +157,11 @@
         {
           "user_condition": {
             "role": "control"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "pda"
           }
         },
         {
