@@ -31,6 +31,9 @@ export default async function(req) {
 
     const assignment = pending[0];
     const company = (assignment.company || '').toUpperCase();
+    const desiredRole = (assignment.desired_role || 'operador').toString();
+    const assignedEventIds = Array.isArray(assignment.assigned_event_ids) ? assignment.assigned_event_ids : [];
+    const allowedPaths = Array.isArray(assignment.allowed_paths) ? assignment.allowed_paths : [];
 
     const userRecord = await base44.asServiceRole.entities.User.filter({ email });
     if (!userRecord.length) {
@@ -43,7 +46,9 @@ export default async function(req) {
       return Response.json({ ok: true, processed: false, reason: 'user has superior role' });
     }
 
-    await base44.asServiceRole.entities.User.update(target.id, { role: 'operador', company });
+    const patch = { role: desiredRole, assigned_event_ids: assignedEventIds, allowed_paths: allowedPaths };
+    if (company) patch.company = company;
+    await base44.asServiceRole.entities.User.update(target.id, patch);
 
     try {
       const comps = await base44.asServiceRole.entities.Company.filter({ name: company });
@@ -59,7 +64,7 @@ export default async function(req) {
 
     await base44.asServiceRole.entities.PendingOperator.update(assignment.id, { status: 'processed' });
 
-    return Response.json({ ok: true, processed: true, user: { id: target.id, email: target.email, role: 'operador', company } });
+    return Response.json({ ok: true, processed: true, user: { id: target.id, email: target.email, role: desiredRole, company } });
   } catch (error) {
     return Response.json({ error: error.message || 'Error al procesar operador pendiente' }, { status: 500 });
   }

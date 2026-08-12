@@ -10,6 +10,27 @@
       "type": "string",
       "description": "Empresa productora a la que se vincular\u00e1 el operador"
     },
+    "desired_role": {
+      "type": "string",
+      "default": "operador",
+      "description": "Rol que se aplicar\u00e1 al usuario cuando complete el registro (pda, operador, control, etc.)"
+    },
+    "assigned_event_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Eventos asignados que se aplicar\u00e1n al registrar"
+    },
+    "allowed_paths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "M\u00f3dulos permitidos que se aplicar\u00e1n al registrar"
+    },
     "invite_url": {
       "type": "string",
       "description": "Link de registro prellenado para compartir manualmente"

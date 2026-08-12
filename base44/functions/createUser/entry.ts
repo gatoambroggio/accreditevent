@@ -28,69 +28,85 @@ export default async function(req) {
       return Response.json({ error: 'La contraseña temporal debe tener al menos 6 caracteres' }, { status: 400 });
     }
 
-    // ¿Ya existe un usuario con ese email?
+    // Link de registro prellenado para compartir manualmente
+    let origin = req.headers.get('origin');
+    if (!origin) {
+      const referer = req.headers.get('referer');
+      try { origin = referer ? new URL(referer).origin : null; } catch {}
+    }
+    const inviteUrl = origin ? `${origin}/register?email=${encodeURIComponent(email)}` : '';
+
+    // ¿Ya existe como usuario registrado?
     const existing = await base44.asServiceRole.entities.User.filter({ email });
     if (existing && existing.length) {
-      return Response.json({ error: 'Ya existe un usuario con ese email' }, { status: 400 });
+      const target = existing[0];
+      const currentRole = target.role || (target.data && target.data.role);
+      // No re-crear usuarios con rol superior
+      if (['productora', 'admin', 'superadmin'].includes(currentRole)) {
+        return Response.json({ error: 'Ya existe un usuario con ese email y tiene un rol superior. Editálo desde la lista.' }, { status: 400 });
+      }
+      const patch = { role: newRole, assigned_event_ids, allowed_paths };
+      if (company) patch.company = company;
+      await base44.asServiceRole.entities.User.update(target.id, patch);
+      if (fullName) {
+        try { await base44.asServiceRole.entities.User.update(target.id, { full_name: fullName }); } catch {}
+      }
+      let passwordWarning = '';
+      if (setTempPassword && tempPassword.length >= 6) {
+        try { await base44.auth.changePassword({ userId: target.id, newPassword: tempPassword }); }
+        catch (e) { passwordWarning = 'No se pudo setear la contraseña temporal.'; }
+      }
+      if (company) {
+        try {
+          const comps = await base44.asServiceRole.entities.Company.filter({ name: company });
+          if (comps.length) {
+            const c = comps[0];
+            if (!(c.assigned_user_ids || []).includes(target.id)) {
+              await base44.asServiceRole.entities.Company.update(c.id, { assigned_user_ids: [...(c.assigned_user_ids || []), target.id] });
+            }
+          }
+        } catch {}
+      }
+      return Response.json({ ok: true, pending: false, user: { id: target.id, email, role: newRole, company }, passwordWarning });
     }
 
-    // Invitar (crea el usuario en la plataforma y envía email)
+    // No está registrado todavía: guardar asignación pendiente con todos los datos
+    // y enviar invitación. Cuando la persona complete el registro, el workflow
+    // "Asignar Operadores Pendientes" aplica rol + eventos + módulos automáticamente.
+    const pendingData = {
+      email,
+      company: company || '',
+      desired_role: newRole,
+      assigned_event_ids,
+      allowed_paths,
+      invite_url: inviteUrl,
+      status: 'pending',
+    };
+    const pendingExisting = await base44.asServiceRole.entities.PendingOperator.filter({ email, status: 'pending' });
+    if (pendingExisting.length) {
+      await base44.asServiceRole.entities.PendingOperator.update(pendingExisting[0].id, pendingData);
+    } else {
+      await base44.asServiceRole.entities.PendingOperator.create(pendingData);
+    }
+
     try {
-      await base44.asServiceRole.users.inviteUser(email, newRole);
+      // inviteUser solo acepta 'user' o 'admin'; el rol final se aplica al registrar.
+      await base44.users.inviteUser(email, 'user');
     } catch (e) {
-      return Response.json({ error: 'No se pudo invitar al usuario: ' + (e.message || e) }, { status: 500 });
-    }
-
-    // Recuperar el id del usuario recién creado (reintentos por eventual consistencia)
-    let target = null;
-    for (let i = 0; i < 6 && !target; i++) {
-      const recs = await base44.asServiceRole.entities.User.filter({ email });
-      if (recs && recs.length) target = recs[0];
-      if (!target) await new Promise((r) => setTimeout(r, 400));
-    }
-
-    if (!target) {
-      return Response.json({ ok: true, pending: true, message: 'La invitación fue enviada por email. El usuario deberá completar su registro desde el link enviado.' });
-    }
-
-    // Setear metadata (company, eventos asignados, módulos permitidos)
-    const patch = { assigned_event_ids, allowed_paths };
-    if (company) patch.company = company;
-    await base44.asServiceRole.entities.User.update(target.id, patch);
-
-    // Intentar setear el nombre por separado (full_name es built-in; puede no ser asignable)
-    if (fullName) {
-      try { await base44.asServiceRole.entities.User.update(target.id, { full_name: fullName }); } catch {}
-    }
-
-    // Contraseña temporal (opcional). Si falla (p.ej. el usuario aún no completó el
-    // registro en la plataforma), no abortamos: el alta igual quedó hecha y el email
-    // de invitación sigue siendo válido.
-    let passwordWarning = '';
-    if (setTempPassword && tempPassword.length >= 6) {
-      try {
-        await base44.auth.changePassword({ userId: target.id, newPassword: tempPassword });
-      } catch (e) {
-        passwordWarning = 'No se pudo setear la contraseña temporal (es posible que el usuario deba completar el registro desde el email enviado).';
+      const msg = (e.message || '').toLowerCase();
+      // Si ya fue invitado antes, no es un error fatal
+      if (!msg.includes('ya') && !msg.includes('exist') && !msg.includes('registrad') && !msg.includes('already')) {
+        return Response.json({ error: 'No se pudo invitar al usuario: ' + (e.message || e) }, { status: 500 });
       }
     }
 
-    // Sincronizar Company.assigned_user_ids
-    if (company) {
-      try {
-        const comps = await base44.asServiceRole.entities.Company.filter({ name: company });
-        if (comps.length) {
-          const c = comps[0];
-          if (!(c.assigned_user_ids || []).includes(target.id)) {
-            await base44.asServiceRole.entities.Company.update(c.id, {
-              assigned_user_ids: [...(c.assigned_user_ids || []), target.id],
-            });
-          }
-        }
-      } catch {}
-    }
-
-    return Response.json({ ok: true, user: { id: target.id, email, role: newRole, company }, passwordWarning });
+    const roleLabel = { pda: 'PDA', operador: 'operador', control: 'control', coordinator: 'coordinador', provider: 'proveedor', empresa: 'empresa' }[newRole] || newRole;
+    return Response.json({
+      ok: true,
+      pending: true,
+      invite_url: inviteUrl,
+      message: `La invitación fue enviada a ${email}. Cuando complete su registro desde el email, quedará vinculado como ${roleLabel}${company ? ' de ' + company : ''} con los eventos y módulos asignados.${inviteUrl ? ' Si el email no llega, compartí este link: ' + inviteUrl : ''}`
+    });
   } catch (error) {
     return Response.json({ error: error.message || 'Error al crear usuario' }, { status: 500 });
   }
