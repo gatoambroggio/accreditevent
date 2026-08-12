@@ -68,7 +68,8 @@ export default function InsuranceValidationModal({ document: doc, onClose, onVal
 
   if (!doc) return null;
 
-  const handleAction = async (status) => {
+  const handleAction = async (status, opts = {}) => {
+    const partial = !!opts.partial;
     setActing(true);
     try {
       const me = await base44.auth.me();
@@ -89,8 +90,11 @@ export default function InsuranceValidationModal({ document: doc, onClose, onVal
         customFields.has_insured_list = false;
         customFields.covered_person_ids = [];
       }
+      if (status === 'approved') customFields.partial_approval = partial;
       const reviewNote = status === 'approved'
-        ? 'Seguro validado automáticamente (fechas, DNI y nómina de empleados verificados)'
+        ? (partial
+          ? 'Aprobación parcial: seguro aprobado manualmente con observaciones (cláusulas o personas no cubiertas). Los no cubiertos quedan SIN seguro.'
+          : 'Seguro validado automáticamente (fechas, DNI y nómina de empleados verificados)')
         : 'Seguro rechazado: validación automática falló (DNI, fechas o nómina de empleados)';
       const expiresAt = result?.extracted?.valid_until || '';
       // Persistir tipo de seguro (ART / AP) y monto de cobertura extraído por OCR
@@ -369,6 +373,10 @@ export default function InsuranceValidationModal({ document: doc, onClose, onVal
             <button onClick={() => handleAction('rejected')} disabled={acting}
               className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-50">
               Rechazar
+            </button>
+            <button onClick={() => handleAction('approved', { partial: true })} disabled={acting}
+              className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-600 disabled:opacity-50">
+              Aprobación parcial
             </button>
             <button onClick={() => handleAction('approved')} disabled={acting}
               className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50">

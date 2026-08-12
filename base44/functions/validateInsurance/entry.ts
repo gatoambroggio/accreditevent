@@ -60,6 +60,11 @@ export default async function(req) {
                 dni: { type: 'string', description: 'DNI o CUIT/CUIL del empleado asegurado' }
               }
             }
+          },
+          all_document_numbers: {
+            type: 'array',
+            description: 'Lista de TODOS los números de documento (DNI, CUIT, CUIL) que aparezcan en cualquier parte del documento (nómina, encabezado, pie, anexos), tal como aparecen. Ej: "20-08531478-6", "08531478", "30-70843115-6". No omitir ninguno.',
+            items: { type: 'string' }
           }
         }
       }
@@ -162,6 +167,12 @@ export default async function(req) {
     const insuredDnis = new Set(insuredList.map(e => dniToBase(e.dni)).filter(Boolean));
     const insuredNames = new Set(insuredList.map(e => normalizeName(e.name)).filter(Boolean));
     const insuredCuitCount = insuredList.filter(e => (e.dni || '').replace(/\D/g, '').length === 11).length;
+    // Respaldo: números sueltos del documento (no solo nómina estructurada)
+    const allDocNums: any[] = Array.isArray((extracted as any).all_document_numbers) ? (extracted as any).all_document_numbers : [];
+    for (const num of allDocNums) {
+      const base = dniToBase(num || '');
+      if (base) insuredDnis.add(base as string);
+    }
 
     const reconciliation = companyEmployees.map(emp => {
       const empDniBase = dniToBase(emp.document || '');
@@ -207,6 +218,18 @@ export default async function(req) {
       if (phDni) insuredDniBases.add((dniToBase(extracted.policyholder_dni || '') as string) || phDni);
       const phName = normName(extracted.policyholder_name || '');
       if (phName) insuredNameSet.add(phName);
+      // Respaldo: todos los CUIT/DNI que aparezcan en cualquier parte del
+      // documento (no solo en la nómina estructurada). Esto recupera filas
+      // que el OCR omitió en insured_employees pero que sí leyó como texto.
+      const allDocNumbers: any[] = Array.isArray((extracted as any).all_document_numbers) ? (extracted as any).all_document_numbers : [];
+      for (const num of allDocNumbers) {
+        const d = digitsOf(num || '');
+        if (d) {
+          const base = (dniToBase(num || '') as string) || d;
+          if (base && base.length >= 6) insuredDniBases.add(base);
+          if (d.length >= 6) insuredDniBases.add(d);
+        }
+      }
 
       const tokenOverlap = (a: string, b: string) => {
         const ta = new Set(a.split(' ').filter((w) => w.length >= 3));
@@ -228,11 +251,9 @@ export default async function(req) {
 
       // Separar líneas tipo "persona" (con CUIT/DNI) del resto (texto legal)
       const personClauses: { idx: number; clause: string; digitRuns: string[] }[] = [];
-      const textClauses: { idx: number; clause: string }[] = [];
       clauseLines.forEach((clause, idx) => {
         const digitRuns = (clause.match(/\d[\d.\-]{5,}/g) || []).map((r) => digitsOf(r)).filter((d) => d.length >= 6);
         if (digitRuns.length > 0) personClauses.push({ idx, clause, digitRuns });
-        else textClauses.push({ idx, clause });
       });
 
       const clausesResult: { clause: string; found: boolean; excerpt: string }[] = clauseLines.map((c) => ({ clause: c, found: false, excerpt: '' }));
@@ -264,12 +285,17 @@ export default async function(req) {
         clausesResult[pc.idx] = { clause: pc.clause, found, excerpt };
       }
 
-      // 2) Cláusulas de texto legal (sin CUIT/DNI): fallback a LLM con el archivo
-      if (textClauses.length > 0) {
+      // 2) Fallback LLM (una sola llamada) para TODAS las cláusulas no
+      // encontradas deterministamente (personas cuyos CUIT/DNI el OCR omitió
+      // en la nómina estructurada, y cláusulas de texto legal). El LLM lee el
+      // archivo y verifica presencia literal del CUIT/DNI o del significado.
+      const missingIdx: number[] = [];
+      clausesResult.forEach((c, i) => { if (!c.found) missingIdx.push(i); });
+      if (missingIdx.length > 0) {
         try {
-          const tcList = textClauses.map((t) => t.clause);
+          const mcList = missingIdx.map((i) => clausesResult[i].clause);
           const clauseResult: any = await base44.integrations.Core.InvokeLLM({
-            prompt: `Sos un validador estricto de pólizas de seguro. Verificá si CADA cláusula de no repetición está presente en el documento adjunto. Marcá found=true SOLO si hay una frase que exprese claramente el mismo significado; si no aparece, found=false. En excerpt copiá la frase que justifica.\n\nCláusulas a verificar:\n${tcList.map((c, i) => `${i + 1}. ${c}`).join('\n')}`,
+            prompt: `Sos un validador estricto de pólizas de seguro. Para CADA ítem de la lista, verificá si está presente en el documento adjunto.\n- Si el ítem contiene un CUIT/CUIL/DNI, marcá found=true SOLO si ese número aparece literalmente en el documento (con o sin guiones/puntos), aunque el nombre no coincida.\n- Si el ítem es texto legal (sin número), marcá found=true solo si hay una frase que exprese claramente el mismo significado.\n- En excerpt copiá el número o frase que justifica, o una pista de dónde aparece.\n\nÍtems a verificar:\n${mcList.map((c, i) => `${i + 1}. ${c}`).join('\n')}`,
             file_urls: [doc.file_url],
             response_json_schema: {
               type: 'object',
@@ -292,12 +318,14 @@ export default async function(req) {
             }
           });
           const rc: any[] = Array.isArray(clauseResult?.clauses) ? clauseResult.clauses : [];
-          textClauses.forEach((t, i) => {
+          missingIdx.forEach((mi, i) => {
             const m = rc[i];
-            clausesResult[t.idx] = { clause: t.clause, found: !!(m && m.found), excerpt: (m && m.excerpt) || '' };
+            if (m && m.found) {
+              clausesResult[mi] = { clause: clausesResult[mi].clause, found: true, excerpt: (m.excerpt || 'Encontrado en el documento') };
+            }
           });
         } catch (e) {
-          textClauses.forEach((t) => { clausesResult[t.idx] = { clause: t.clause, found: false, excerpt: '' }; });
+          // Si el fallback falla, se mantiene el resultado determinista.
         }
       }
 
