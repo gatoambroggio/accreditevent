@@ -10,6 +10,7 @@ import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
 import { btnPrimary, btnIcon } from '@/components/ui/button-styles';
 import { slugify } from '@/lib/slugify';
 import OperatorModulesModal from '@/components/OperatorModulesModal';
+import CreateUserModal from '@/components/CreateUserModal';
 import { MODULES } from '@/lib/modules';
 
 const ROLES = [
@@ -17,6 +18,7 @@ const ROLES = [
   { value: 'empresa', label: 'Empresa' },
   { value: 'control', label: 'Control' },
   { value: 'operador', label: 'Operador' },
+  { value: 'pda', label: 'PDA' },
   { value: 'coordinator', label: 'Coordinador' },
   { value: 'admin', label: 'Administrador' },
   { value: 'superadmin', label: 'Superadministrador' },
@@ -37,6 +39,7 @@ const ROLE_LABELS = {
   coordinator: 'Coordinador',
   control: 'Control',
   operador: 'Operador',
+  pda: 'PDA',
   provider: 'Proveedor',
   empresa: 'Empresa',
 };
@@ -48,6 +51,7 @@ const ROLE_STYLES = {
   coordinator: 'bg-blue-50 text-blue-700 ring-blue-200',
   control: 'bg-amber-50 text-amber-700 ring-amber-200',
   operador: 'bg-teal-50 text-teal-700 ring-teal-200',
+  pda: 'bg-sky-50 text-sky-700 ring-sky-200',
   provider: 'bg-slate-100 text-slate-600 ring-slate-200',
   empresa: 'bg-cyan-50 text-cyan-700 ring-cyan-200',
 };
@@ -55,6 +59,7 @@ const ROLE_STYLES = {
 export default function Users() {
   const { user: currentUser } = useAuth();
   const isProductora = currentUser?.role === 'productora';
+  const isSuperadmin = currentUser?.role === 'superadmin';
   const myCompany = currentUser?.company || currentUser?.data?.company || '';
   const [users, setUsers] = useState([]);
   const [pendingInvites, setPendingInvites] = useState([]);
@@ -72,6 +77,7 @@ export default function Users() {
   const [resetMsg, setResetMsg] = useState('');
   const [modulesModalOpen, setModulesModalOpen] = useState(false);
   const [companyModules, setCompanyModules] = useState([]);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const PRODUCTORA_ASSIGNABLE = ['operador', 'control', 'coordinator', 'provider', 'empresa'];
   const availableRoles = isProductora ? ROLES.filter((r) => PRODUCTORA_ASSIGNABLE.includes(r.value)) : ROLES;
@@ -293,7 +299,12 @@ export default function Users() {
             <Layers className="h-4 w-4" /> Módulos de operadores
           </button>
         )}
-        <button onClick={() => { setInviteOpen(true); if (isProductora) setInviteRole('operador'); }} className={btnPrimary}>
+        {isSuperadmin && (
+          <button onClick={() => setCreateOpen(true)} className={btnPrimary}>
+            <UserPlus className="h-4 w-4" /> Crear usuario
+          </button>
+        )}
+        <button onClick={() => { setInviteOpen(true); if (isProductora) setInviteRole('operador'); }} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
           <UserPlus className="h-4 w-4" /> {isProductora ? 'Asignar operador' : 'Invitar usuario'}
         </button>
       </PageHeader>
@@ -474,6 +485,16 @@ export default function Users() {
           onClose={() => setModulesModalOpen(false)}
           initialModules={companyModules}
           onSave={handleSaveModules}
+        />
+      )}
+      {createOpen && (
+        <CreateUserModal
+          open={createOpen}
+          onClose={() => setCreateOpen(false)}
+          onCreated={() => { setCreateOpen(false); load(); }}
+          events={events}
+          availableRoles={ROLES}
+          moduleOptions={MODULE_OPTIONS}
         />
       )}
     </div>
