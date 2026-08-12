@@ -18,6 +18,14 @@ import PdaPinPrompt from '@/components/PdaPinPrompt';
 
 const ASSIGNED_SYNC_MS = 15 * 1000;
 
+// Normaliza un código/ID para comparación: lowercase + quita todo caracter no
+// alfanumérico. Esto hace el matching a prueba de diferencias de mayúsculas,
+// espacios, guiones, saltos de línea o caracteres invisibles que el lector QR
+// (cámara o láser Zebra) pueda agregar. Los IDs de Base44 son hex lowercase de
+// 24 chars, pero algunos scanners devuelven el texto en mayúsculas o con
+// caracteres extra — esta normalización cubre todos esos casos.
+const normalizeKey = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
 export default function AccessQrStation({ mode = 'person' }) {
   const [phase, setPhase] = useState('select');
   const [events, setEvents] = useState([]);
@@ -271,10 +279,9 @@ export default function AccessQrStation({ mode = 'person' }) {
     qrCooldown.current = true;
     setVerifying(true);
     const code = String(rawCode || '').trim();
-    const codeUp = code.toUpperCase();
-    // Los IDs de acreditación/vehículo se guardan en lowercase en la base, pero
-    // algunos QR los codifican en mayúsculas. Usamos codeLower para comparar
-    // case-insensitive y que el offline funcione sin importar el casing del QR.
+    // codeNorm: normalizado (lowercase + solo alfanumérico) para matching en caché.
+    // codeLower: solo lowercase, para llamadas API (los IDs se guardan así).
+    const codeNorm = normalizeKey(code);
     const codeLower = code.toLowerCase();
     const verifier = getCachedVerifier();
     try {
@@ -306,7 +313,7 @@ export default function AccessQrStation({ mode = 'person' }) {
       // --- Modo vehicular puro (ruta /control-vehicular) ---
       if (mode === 'vehicle') {
         const vehs = resolveVehicles();
-        let vehicle = vehs.find((v) => (v.id && v.id.toLowerCase() === codeLower) || (v.plate && v.plate.toUpperCase() === codeUp));
+        let vehicle = vehs.find((v) => normalizeKey(v.id) === codeNorm || (v.plate && normalizeKey(v.plate) === codeNorm));
         if (!vehicle && !effectiveOffline) {
           // fallback online directo por id (lowercase: los IDs se guardan así)
           try { const dv = await base44.entities.Vehicle.get(codeLower); if (dv && (dv.event_ids || []).includes(selectedEvent.id)) vehicle = dv; } catch {}
@@ -325,10 +332,10 @@ export default function AccessQrStation({ mode = 'person' }) {
       const accs = resolveAccreditations();
       const vehs = resolveVehicles();
 
-      // 1) ¿Es una acreditación de persona? (por id o badge_code) — case-insensitive
-      let accred = accs.find((a) => (a.id && a.id.toLowerCase() === codeLower) || (a.badge_code && a.badge_code.toLowerCase() === codeLower) || (a.person_id && a.person_id === code));
+      // 1) ¿Es una acreditación de persona? (por id o badge_code) — match normalizado
+      let accred = accs.find((a) => normalizeKey(a.id) === codeNorm || (a.badge_code && normalizeKey(a.badge_code) === codeNorm) || (a.person_id && normalizeKey(a.person_id) === codeNorm));
       // 2) ¿Es un vehículo? (por id o patente)
-      let vehicle = vehs.find((v) => (v.id && v.id.toLowerCase() === codeLower) || (v.plate && v.plate.toUpperCase() === codeUp));
+      let vehicle = vehs.find((v) => normalizeKey(v.id) === codeNorm || (v.plate && normalizeKey(v.plate) === codeNorm));
 
       // Fallback online directo si no se encontró en listado (superaba límite o RLS por evento asignado)
       if (!accred && !vehicle && !effectiveOffline) {
@@ -374,14 +381,20 @@ export default function AccessQrStation({ mode = 'person' }) {
       // No encontrado en ningún listado
       await logAccess('denied', { denied_reason: 'not_found' });
       const accsNow = resolveAccreditations();
-      const hasCache = accsNow.length > 0 || resolveVehicles().length > 0;
+      const vehsNow = resolveVehicles();
+      const hasCache = accsNow.length > 0 || vehsNow.length > 0;
+      // Diagnóstico: muestra el código normalizado y si algún ID del caché coincide
+      // normalizado. Si coinciden normalizados pero no matcheó, hay un bug; si no
+      // coinciden, la credencial no está en el caché (stale o de otro evento).
+      const allCacheIds = [...accsNow.map((a) => a.id), ...vehsNow.map((v) => v.id)].filter(Boolean);
+      const matchByNorm = allCacheIds.some((id) => normalizeKey(id) === codeNorm);
       const sample = accsNow.slice(0, 3).map((a) => `${a.id}${a.badge_code ? ' / ' + a.badge_code : ''}`).join('  ·  ');
       setResult({
         ok: false,
         type: 'unknown',
         message: effectiveOffline && !hasCache
           ? 'Sin datos offline para este evento. Conectá la PDA a internet y abrí el control al menos una vez para descargar las credenciales.'
-          : `Credencial no encontrada para este evento. Código leído: "${code}". En caché (${accsNow.length}): ${sample || '—'}`,
+          : `Credencial no encontrada. Código: "${code}" (norm: ${codeNorm}). En caché ${accsNow.length} personas / ${vehsNow.length} vehículos. Coincidencia normalizada: ${matchByNorm ? 'SÍ (revisá lógica)' : 'NO (credencial no está en caché)'}. Ej: ${sample || '—'}`,
       });
     } catch (err) {
       setResult({ ok: false, type: 'unknown', message: err.message || 'Error en la verificación.' });
