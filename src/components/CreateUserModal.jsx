@@ -5,7 +5,7 @@ import { Loader2, X, KeyRound, Copy, ShieldCheck } from 'lucide-react';
 // Módulos PDA por defecto: control de acceso + sus modos, PDA ID y emergencia.
 const PDA_DEFAULT_PATHS = ['/access-control', '/control-qr', '/control-vehicular', '/control-manual', '/pda-id', '/emergency-scan'];
 
-export default function CreateUserModal({ open, onClose, onCreated, events, availableRoles, moduleOptions }) {
+export default function CreateUserModal({ open, onClose, onCreated, events, availableRoles, moduleOptions, companies }) {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('pda');
@@ -162,8 +162,12 @@ export default function CreateUserModal({ open, onClose, onCreated, events, avai
                 </select>
               </label>
               <label className="block">
-                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Empresa</span>
-                <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Productora" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+                <span className="mb-1.5 block text-xs font-semibold text-slate-600">Empresa (productora)</span>
+                <select value={company} onChange={(e) => setCompany(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20">
+                  <option value="">Sin empresa</option>
+                  {(companies || []).map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+                </select>
+                <span className="mt-1 block text-[11px] text-slate-400">Vincula al usuario a una productora (define qué datos ve).</span>
               </label>
             </div>
 

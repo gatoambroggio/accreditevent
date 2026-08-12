@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 
-const PDA_DEFAULT_PATHS = ['/access-control', '/pda-id', '/emergency-scan'];
+const PDA_DEFAULT_PATHS = ['/access-control', '/control-qr', '/control-vehicular', '/control-manual', '/pda-id', '/emergency-scan'];
 
 export default async function(req) {
   try {
@@ -28,7 +28,6 @@ export default async function(req) {
       return Response.json({ error: 'La contraseña temporal debe tener al menos 6 caracteres' }, { status: 400 });
     }
 
-    // Link de registro prellenado para compartir manualmente
     let origin = req.headers.get('origin');
     if (!origin) {
       const referer = req.headers.get('referer');
@@ -36,17 +35,17 @@ export default async function(req) {
     }
     const inviteUrl = origin ? `${origin}/register?email=${encodeURIComponent(email)}` : '';
 
-    // ¿Ya existe como usuario registrado?
+    const patch = { role: newRole, assigned_event_ids, allowed_paths };
+    if (company) patch.company = company;
+
+    // ¿Ya existe como usuario registrado? Lo configuramos directamente.
     const existing = await base44.asServiceRole.entities.User.filter({ email });
     if (existing && existing.length) {
       const target = existing[0];
       const currentRole = target.role || (target.data && target.data.role);
-      // No re-crear usuarios con rol superior
       if (['productora', 'admin', 'superadmin'].includes(currentRole)) {
         return Response.json({ error: 'Ya existe un usuario con ese email y tiene un rol superior. Editálo desde la lista.' }, { status: 400 });
       }
-      const patch = { role: newRole, assigned_event_ids, allowed_paths };
-      if (company) patch.company = company;
       await base44.asServiceRole.entities.User.update(target.id, patch);
       if (fullName) {
         try { await base44.asServiceRole.entities.User.update(target.id, { full_name: fullName }); } catch {}
@@ -56,31 +55,18 @@ export default async function(req) {
         try { await base44.auth.changePassword({ userId: target.id, newPassword: tempPassword }); }
         catch (e) { passwordWarning = 'No se pudo setear la contraseña temporal.'; }
       }
-      if (company) {
-        try {
-          const comps = await base44.asServiceRole.entities.Company.filter({ name: company });
-          if (comps.length) {
-            const c = comps[0];
-            if (!(c.assigned_user_ids || []).includes(target.id)) {
-              await base44.asServiceRole.entities.Company.update(c.id, { assigned_user_ids: [...(c.assigned_user_ids || []), target.id] });
-            }
-          }
-        } catch {}
-      }
+      if (company) await linkCompany(base44, target.id, company);
       return Response.json({ ok: true, pending: false, user: { id: target.id, email, role: newRole, company }, passwordWarning });
     }
 
-    // No está registrado todavía: guardar asignación pendiente con todos los datos
-    // y enviar invitación. Cuando la persona complete el registro, el workflow
-    // "Asignar Operadores Pendientes" aplica rol + eventos + módulos automáticamente.
+    // No está registrado: guardamos la asignación pendiente con todos los datos
+    // (rol, empresa, eventos, módulos) y enviamos la invitación. La entidad User
+    // se crea recién cuando la persona completa el registro; en ese momento el
+    // workflow "Asignar Operadores Pendientes" aplica todo automáticamente. La
+    // asignación queda visible en la sección "Invitaciones pendientes" del panel.
     const pendingData = {
-      email,
-      company: company || '',
-      desired_role: newRole,
-      assigned_event_ids,
-      allowed_paths,
-      invite_url: inviteUrl,
-      status: 'pending',
+      email, company: company || '', desired_role: newRole,
+      assigned_event_ids, allowed_paths, invite_url: inviteUrl, status: 'pending',
     };
     const pendingExisting = await base44.asServiceRole.entities.PendingOperator.filter({ email, status: 'pending' });
     if (pendingExisting.length) {
@@ -90,11 +76,9 @@ export default async function(req) {
     }
 
     try {
-      // inviteUser solo acepta 'user' o 'admin'; el rol final se aplica al registrar.
       await base44.users.inviteUser(email, 'user');
     } catch (e) {
       const msg = (e.message || '').toLowerCase();
-      // Si ya fue invitado antes, no es un error fatal
       if (!msg.includes('ya') && !msg.includes('exist') && !msg.includes('registrad') && !msg.includes('already')) {
         return Response.json({ error: 'No se pudo invitar al usuario: ' + (e.message || e) }, { status: 500 });
       }
@@ -105,9 +89,21 @@ export default async function(req) {
       ok: true,
       pending: true,
       invite_url: inviteUrl,
-      message: `La invitación fue enviada a ${email}. Cuando complete su registro desde el email, quedará vinculado como ${roleLabel}${company ? ' de ' + company : ''} con los eventos y módulos asignados.${inviteUrl ? ' Si el email no llega, compartí este link: ' + inviteUrl : ''}`
+      message: `La invitación fue enviada a ${email}. Quedó registrada en "Invitaciones pendientes" como ${roleLabel}${company ? ' de ' + company : ''} con los eventos y módulos asignados. Cuando la persona complete su registro desde el email, se activará automáticamente.${inviteUrl ? ' Si el email no llega, compartí este link: ' + inviteUrl : ''}`
     });
   } catch (error) {
     return Response.json({ error: error.message || 'Error al crear usuario' }, { status: 500 });
   }
+}
+
+async function linkCompany(base44, userId, companyName) {
+  try {
+    const comps = await base44.asServiceRole.entities.Company.filter({ name: companyName });
+    if (comps.length) {
+      const c = comps[0];
+      if (!(c.assigned_user_ids || []).includes(userId)) {
+        await base44.asServiceRole.entities.Company.update(c.id, { assigned_user_ids: [...(c.assigned_user_ids || []), userId] });
+      }
+    }
+  } catch {}
 }

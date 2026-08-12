@@ -78,6 +78,7 @@ export default function Users() {
   const [modulesModalOpen, setModulesModalOpen] = useState(false);
   const [companyModules, setCompanyModules] = useState([]);
   const [createOpen, setCreateOpen] = useState(false);
+  const [companies, setCompanies] = useState([]);
 
   const PRODUCTORA_ASSIGNABLE = ['operador', 'control', 'coordinator', 'provider', 'empresa'];
   const availableRoles = isProductora ? ROLES.filter((r) => PRODUCTORA_ASSIGNABLE.includes(r.value)) : ROLES;
@@ -95,7 +96,6 @@ export default function Users() {
         const res = await base44.functions.invoke('getCompanyOperators');
         if (res.data?.error) throw new Error(res.data.error);
         setUsers(res.data.operators || []);
-        setPendingInvites(res.data.pending || []);
         setCompanyModules(res.data.operator_allowed_paths || []);
       } else {
         const data = await base44.entities.User.list('-created_date', 200);
@@ -109,9 +109,36 @@ export default function Users() {
     }
   };
 
+  const loadPending = async () => {
+    try {
+      let pend = [];
+      if (isProductora && myCompany) {
+        pend = await base44.entities.PendingOperator.filter({ company: myCompany, status: 'pending' });
+      } else if (!isProductora) {
+        pend = await base44.entities.PendingOperator.filter({ status: 'pending' });
+      }
+      setPendingInvites(pend || []);
+    } catch {
+      setPendingInvites([]);
+    }
+  };
+
+  const handleDeletePending = async (p) => {
+    if (!window.confirm(`¿Eliminar la invitación pendiente de ${p.email}?`)) return;
+    try {
+      await base44.entities.PendingOperator.delete(p.id);
+      await loadPending();
+      await logAudit('delete', 'PendingOperator', p.id, `Invitación cancelada: ${p.email}`);
+    } catch (err) {
+      alert('No se pudo eliminar: ' + (err.message || err));
+    }
+  };
+
   useEffect(() => {
     load();
+    loadPending();
     base44.entities.Event.list('-start_at', 200).then(setEvents).catch(() => {});
+    base44.entities.Company.list('name', 200).then(setCompanies).catch(() => {});
   }, []);
 
   const filtered = useMemo(() => {
@@ -313,29 +340,46 @@ export default function Users() {
         <SearchInput value={search} onChange={setSearch} placeholder="Buscar por nombre, email o empresa…" />
       </div>
 
-      {isProductora && pendingInvites.length > 0 && (
+      {pendingInvites.length > 0 && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
           <h3 className="text-sm font-semibold text-amber-900">Invitaciones pendientes ({pendingInvites.length})</h3>
-          <p className="mt-0.5 text-xs text-amber-700">Personas que aún no completaron su registro. Copiá el link y compartilo por el medio que prefieras.</p>
+          <p className="mt-0.5 text-xs text-amber-700">Personas invitadas que aún no completaron su registro. La asignación (rol, empresa, eventos y módulos) se aplica automáticamente al registrarse.</p>
           <div className="mt-3 space-y-2">
-            {pendingInvites.map((p) => (
-              <div key={p.id} className="flex flex-col gap-2 rounded-xl border border-amber-200 bg-white px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-slate-800">{p.email}</p>
-                  {p.invite_url ? (
-                    <p className="mt-0.5 truncate text-xs text-slate-400">{p.invite_url}</p>
-                  ) : (
-                    <p className="mt-0.5 text-xs text-slate-400">Sin link generado</p>
-                  )}
+            {pendingInvites.map((p) => {
+              const roleLabel = ROLE_LABELS[p.desired_role] || p.desired_role || '—';
+              const roleStyle = ROLE_STYLES[p.desired_role] || 'bg-slate-100 text-slate-600 ring-slate-200';
+              const eventCount = (p.assigned_event_ids || []).length;
+              const moduleCount = (p.allowed_paths || []).length;
+              return (
+                <div key={p.id} className="flex flex-col gap-2 rounded-xl border border-amber-200 bg-white px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="truncate text-sm font-medium text-slate-800">{p.email}</p>
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${roleStyle}`}>{roleLabel}</span>
+                      {p.company && <span className="inline-flex items-center gap-1 text-[11px] text-slate-500"><Building2 className="h-3 w-3" /> {p.company}</span>}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                      <span>{eventCount} evento(s)</span>
+                      <span>·</span>
+                      <span>{moduleCount} módulo(s)</span>
+                      {p.invite_url && <><span>·</span><span className="truncate text-slate-400">{p.invite_url}</span></>}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {p.invite_url && (
+                      <button type="button" onClick={() => copyInviteLink(p.invite_url)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100">
+                        <Link2 className="h-3.5 w-3.5" /> Copiar link
+                      </button>
+                    )}
+                    <button type="button" onClick={() => handleDeletePending(p)} title="Eliminar invitación"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50">
+                      <Ban className="h-3.5 w-3.5" /> Eliminar
+                    </button>
+                  </div>
                 </div>
-                {p.invite_url && (
-                  <button type="button" onClick={() => copyInviteLink(p.invite_url)}
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100">
-                    <Link2 className="h-3.5 w-3.5" /> Copiar link
-                  </button>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -491,10 +535,11 @@ export default function Users() {
         <CreateUserModal
           open={createOpen}
           onClose={() => setCreateOpen(false)}
-          onCreated={() => { setCreateOpen(false); load(); }}
+          onCreated={() => { setCreateOpen(false); load(); loadPending(); }}
           events={events}
           availableRoles={ROLES}
           moduleOptions={MODULE_OPTIONS}
+          companies={companies}
         />
       )}
     </div>
