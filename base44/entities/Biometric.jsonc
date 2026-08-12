@@ -88,6 +88,11 @@
           }
         },
         {
+          "user_condition": {
+            "role": "pda"
+          }
+        },
+        {
           "$and": [
             {
               "user_condition": {
