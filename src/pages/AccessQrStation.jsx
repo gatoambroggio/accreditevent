@@ -18,7 +18,7 @@ import PdaPinPrompt from '@/components/PdaPinPrompt';
 
 const PERSON_LIMIT = 3000;
 const VEHICLE_LIMIT = 3000;
-const CACHE_REFRESH_MS = 2 * 60 * 1000;
+const ASSIGNED_SYNC_MS = 15 * 1000;
 
 export default function AccessQrStation({ mode = 'person' }) {
   const [phase, setPhase] = useState('select');
@@ -74,51 +74,27 @@ export default function AccessQrStation({ mode = 'person' }) {
     })();
   }, []);
 
-  // Pre-carga de TODOS los eventos al montar (mientras haya internet): cachea
-  // acreditaciones y vehículos por evento para que el modo offline funcione
-  // sin necesidad de descargar en el momento (ej. la PDA se carga en la oficina
-  // y opera offline en el venue). Cada vez que vuelve la conexión, refresca.
+  // Sincronización automática del evento ASIGNADO a esta PDA: cada 15 segundos
+  // descarga las credenciales y vehículos del evento que el admin le asignó
+  // (panel Estaciones PDA), así el caché siempre está fresco y el modo offline
+  // funciona. Corre desde que se conoce el número de PDA (no requiere iniciar
+  // la estación) y sólo sincroniza el evento asignado, no todos.
   useEffect(() => {
-    if (!online) return;
-    let cancelled = false;
-    (async () => {
+    if (!online || !pdaNumber) return;
+    const sync = async () => {
       try {
-        const [accRes, vehRes] = await Promise.allSettled([
-          base44.entities.Accreditation.filter({ status: 'active' }, '-created_date', PERSON_LIMIT),
-          base44.entities.Vehicle.list('-created_date', VEHICLE_LIMIT),
-        ]);
-        if (cancelled) return;
-        setRealOnline(accRes.status === 'fulfilled');
-        if (accRes.status !== 'fulfilled') return;
-        const allAccs = accRes.value || [];
-        const allVehs = vehRes.status === 'fulfilled' ? (vehRes.value || []) : [];
-        const byEvent = {};
-        allAccs.forEach((a) => { if (a.event_id) (byEvent[a.event_id] = byEvent[a.event_id] || []).push(a); });
-        Object.keys(byEvent).forEach((eid) => {
-          const prev = getEventData(eid);
-          const vehs = allVehs.filter((v) => (v.event_ids || []).includes(eid));
-          saveEventData(eid, { accreditations: byEvent[eid], vehicles: vehs.length > 0 ? vehs : (prev?.vehicles || []) });
-        });
+        const mine = await base44.entities.PdaStation.filter({ station_number: pdaNumber }, '-created_date', 5);
+        const st = mine?.[0];
+        if (!st || !st.assigned_event_id) return;
+        const evt = events.find((e) => e.id === st.assigned_event_id);
+        if (evt) downloadEventData(evt, true);
       } catch {}
-    })();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [online]);
-
-  // Refresco del caché del evento seleccionado: al (re)conectarse y cada 2
-  // minutos. También descarga en la fase de selección (al elegir evento),
-  // para cargar datos antes de iniciar la estación.
-  useEffect(() => {
-    if (!online) return;
-    const evt = selectedEvent || events.find((e) => e.id === selectedEventId);
-    if (!evt) return;
-    downloadEventData(evt);
-    const id = setInterval(() => {
-      downloadEventData(evt);
-    }, CACHE_REFRESH_MS);
+    };
+    sync();
+    const id = setInterval(sync, ASSIGNED_SYNC_MS);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [online, selectedEvent, selectedEventId, events]);
+  }, [online, pdaNumber, events]);
 
   // Pre-selección automática de evento y zona desde la asignación remota del
   // administrador (panel Estaciones PDA). Sólo pre-carga si el operador aún no
@@ -171,8 +147,8 @@ export default function AccessQrStation({ mode = 'person' }) {
 
   const [downloadError, setDownloadError] = useState('');
 
-  const downloadEventData = async (evt) => {
-    setDownloading(true);
+  const downloadEventData = async (evt, silent = false) => {
+    if (!silent) setDownloading(true);
     setDownloadError('');
     // Usamos allSettled para que el guardado de personas no se cancele si la
     // carga de vehículos falla (payload pesado / red inestable).
@@ -217,7 +193,7 @@ export default function AccessQrStation({ mode = 'person' }) {
       // Sin caché previo y sin datos nuevos: error crítico.
       setDownloadError('No se pudieron descargar los datos del evento. Revisá la conexión y volvé a intentar.');
     }
-    setDownloading(false);
+    if (!silent) setDownloading(false);
   };
 
   const startStation = () => {
