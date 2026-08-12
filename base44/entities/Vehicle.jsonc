@@ -113,6 +113,18 @@
           ]
         },
         {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "pda"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
           "user_condition": {
             "role": "superadmin"
           }
