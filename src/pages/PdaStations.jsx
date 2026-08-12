@@ -25,35 +25,48 @@ export default function PdaStations() {
   const [saveError, setSaveError] = useState('');
   const [offlineDismissed, setOfflineDismissed] = useState(false);
   const [toasts, setToasts] = useState([]);
-  const prevStatusRef = useRef({});
+  const dismissedRef = useRef(new Set());
   const { zones } = useZones();
   const { sectors: parkingSectors } = useParkingSectors();
 
-  // Detecta transiciones de estado entre polls para lanzar pop-ups (toasts):
-  // PDA que pasa de online a offline, y batería que cae a <=10%.
+  // En cada poll evalúa todas las estaciones. Las que estén offline
+  // (last_seen >= 90s o nulo) o con batería <=10% generan un toast abajo a la
+  // derecha si no tienen ya uno activo. El toast persiste y se elimina solo
+  // cuando la estación se recupera (online y batería >10%) o se cierra a mano.
   const evaluateAlerts = useCallback((data) => {
     const now = Date.now();
-    const prev = prevStatusRef.current;
-    const newToasts = [];
-    const next = {};
+    const alerts = {};
     (data || []).forEach((s) => {
       const lastSeenMs = s.last_seen ? now - new Date(s.last_seen).getTime() : null;
-      const isOnline = lastSeenMs != null && lastSeenMs < ONLINE_THRESHOLD_MS;
-      const prevEntry = prev[s.id];
-      if (prevEntry) {
-        if (prevEntry.online && !isOnline) {
-          newToasts.push({ id: `off-${s.id}-${now}`, severity: 'error', icon: 'offline', title: 'PDA desconectada', message: `Estación #${s.station_number}${s.label ? ' · ' + s.label : ''} perdió conexión.` });
-        }
-        const prevBat = prevEntry.battery;
-        if (s.battery_level != null && s.battery_level <= 10 && (prevBat == null || prevBat > 10)) {
-          newToasts.push({ id: `bat-${s.id}-${now}`, severity: 'warning', icon: 'battery', title: 'Batería baja', message: `Estación #${s.station_number}${s.label ? ' · ' + s.label : ''} tiene ${Math.round(s.battery_level)}% de batería.` });
-        }
-      }
-      next[s.id] = { online: isOnline, battery: s.battery_level };
+      const online = lastSeenMs != null && lastSeenMs < ONLINE_THRESHOLD_MS;
+      const offline = !online;
+      const lowBattery = s.battery_level != null && s.battery_level <= 10;
+      if (offline || lowBattery) alerts[s.id] = { s, offline, lastSeenMs };
     });
-    prevStatusRef.current = next;
-    if (newToasts.length > 0) setToasts((t) => [...t, ...newToasts]);
+    // Libera los cierres manuales de estaciones que ya se recuperaron.
+    dismissedRef.current.forEach((sid) => { if (!alerts[sid]) dismissedRef.current.delete(sid); });
+    setToasts((cur) => {
+      const activeIds = new Set(Object.keys(alerts));
+      const kept = cur.filter((t) => activeIds.has(t.stationId) && !dismissedRef.current.has(t.stationId));
+      const existingIds = new Set(kept.map((t) => t.stationId));
+      const additions = [];
+      Object.entries(alerts).forEach(([sid, a]) => {
+        if (existingIds.has(sid) || dismissedRef.current.has(sid)) return;
+        const offline = a.offline;
+        const title = offline ? 'PDA desconectada' : 'Batería baja';
+        const message = offline
+          ? `Estación #${a.s.station_number}${a.s.label ? ' · ' + a.s.label : ''} ${a.lastSeenMs != null ? 'perdió conexión.' : 'sin conectar.'}`
+          : `Estación #${a.s.station_number}${a.s.label ? ' · ' + a.s.label : ''} tiene ${Math.round(a.s.battery_level)}% de batería.`;
+        additions.push({ id: `toast-${sid}-${now}`, stationId: sid, severity: offline ? 'error' : 'warning', icon: offline ? 'offline' : 'battery', title, message });
+      });
+      return [...kept, ...additions];
+    });
   }, []);
+
+  const dismissToast = (toastId, stationId) => {
+    if (stationId) dismissedRef.current.add(stationId);
+    setToasts((cur) => cur.filter((t) => t.id !== toastId));
+  };
 
   const load = useCallback(async () => {
     try {
@@ -85,13 +98,6 @@ export default function PdaStations() {
   });
   const showOfflinePopup = offlineStations.length > 0 && !offlineDismissed;
   useEffect(() => { if (offlineStations.length === 0) setOfflineDismissed(false); }, [offlineStations.length]);
-
-  // Auto-cierre de los pop-ups (toasts) de desconexión / batería baja.
-  useEffect(() => {
-    if (toasts.length === 0) return;
-    const timers = toasts.map((t) => setTimeout(() => setToasts((cur) => cur.filter((x) => x.id !== t.id)), 7000));
-    return () => timers.forEach(clearTimeout);
-  }, [toasts]);
 
   const openNew = () => {
     setSaveError('');
@@ -365,7 +371,7 @@ export default function PdaStations() {
               <p className="text-sm font-bold text-slate-900">{t.title}</p>
               <p className="text-xs text-slate-500">{t.message}</p>
             </div>
-            <button onClick={() => setToasts((cur) => cur.filter((x) => x.id !== t.id))} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+            <button onClick={() => dismissToast(t.id, t.stationId)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
               <X className="h-3.5 w-3.5" />
             </button>
           </div>
