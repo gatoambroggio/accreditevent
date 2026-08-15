@@ -1,0 +1,176 @@
+{
+  "name": "DahuaDevice",
+  "type": "object",
+  "properties": {
+    "serial_number": {
+      "type": "string",
+      "description": "N\u00famero de serie de la terminal Dahua (referencia)"
+    },
+    "name": {
+      "type": "string",
+      "description": "Nombre descriptivo del dispositivo"
+    },
+    "ip": {
+      "type": "string",
+      "description": "Direcci\u00f3n IP de la terminal en la LAN"
+    },
+    "port": {
+      "type": "number",
+      "default": 80,
+      "description": "Puerto HTTP de la terminal (80 por defecto)"
+    },
+    "username": {
+      "type": "string",
+      "default": "admin",
+      "description": "Usuario de administraci\u00f3n de la terminal"
+    },
+    "password": {
+      "type": "string",
+      "description": "Contrase\u00f1a del usuario de administraci\u00f3n"
+    },
+    "api_key": {
+      "type": "string",
+      "description": "Clave que la terminal env\u00eda en el webhook de eventos para autenticar el push"
+    },
+    "zone": {
+      "type": "string",
+      "description": "Zona(s) de acceso asignada(s) a la terminal"
+    },
+    "door_channel": {
+      "type": "number",
+      "default": 0,
+      "description": "Canal/puerta que controla la terminal (para apertura remota)"
+    },
+    "event_id": {
+      "type": "string",
+      "description": "Evento asociado al dispositivo"
+    },
+    "event_name": {
+      "type": "string",
+      "description": "Nombre del evento (denormalizado)"
+    },
+    "last_seen": {
+      "type": "string",
+      "format": "date-time",
+      "description": "\u00daltima comunicaci\u00f3n recibida (push de evento)"
+    },
+    "last_error": {
+      "type": "string",
+      "description": "\u00daltimo error de sincronizaci\u00f3n o acci\u00f3n remota (vac\u00edo si OK)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "inactive"
+      ],
+      "default": "active",
+      "description": "Estado del dispositivo"
+    }
+  },
+  "required": [
+    "name",
+    "ip",
+    "username",
+    "password",
+    "api_key"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
+        }
+      ]
+    }
+  }
+}

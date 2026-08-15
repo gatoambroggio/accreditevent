@@ -1,0 +1,154 @@
+{
+  "name": "DahuaCommand",
+  "type": "object",
+  "properties": {
+    "device_id": {
+      "type": "string",
+      "description": "Terminal Dahua destino del comando"
+    },
+    "event_id": {
+      "type": "string",
+      "description": "Evento asociado al comando"
+    },
+    "command_type": {
+      "type": "string",
+      "enum": [
+        "sync_user",
+        "sync_face",
+        "delete_user",
+        "open_door",
+        "reboot",
+        "clear_data"
+      ],
+      "description": "Tipo de comando ejecutado contra la terminal"
+    },
+    "command_data": {
+      "type": "string",
+      "description": "Detalle/par\u00e1metros del comando (UserID, UserName, etc.)"
+    },
+    "person_id": {
+      "type": "string",
+      "description": "Persona asociada al comando (cuando aplica)"
+    },
+    "person_name": {
+      "type": "string",
+      "description": "Nombre de la persona (denormalizado)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "delivered",
+        "failed"
+      ],
+      "default": "pending",
+      "description": "Estado del comando"
+    },
+    "result": {
+      "type": "string",
+      "description": "Respuesta de la terminal o mensaje de error"
+    }
+  },
+  "required": [
+    "device_id",
+    "command_type"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
+        }
+      ]
+    }
+  }
+}
