@@ -151,13 +151,22 @@ var server = http.createServer(function (req, res) {
   }
 
   if (req.method === 'GET' && req.url === '/debug') {
-    var debug = { platform: PLATFORM, lpstat_e: null, lpstat_p: null, lpstat_v: null, lpstat_a: null };
-    var tasks = [];
-    tasks.push(execFileAsync('lpstat', ['-e']).then(function(o) { debug.lpstat_e = o; }).catch(function(e) { debug.lpstat_e = 'ERROR: ' + e.message; }));
-    tasks.push(execFileAsync('lpstat', ['-p']).then(function(o) { debug.lpstat_p = o; }).catch(function(e) { debug.lpstat_p = 'ERROR: ' + e.message; }));
-    tasks.push(execFileAsync('lpstat', ['-v']).then(function(o) { debug.lpstat_v = o; }).catch(function(e) { debug.lpstat_v = 'ERROR: ' + e.message; }));
-    tasks.push(execFileAsync('lpstat', ['-a']).then(function(o) { debug.lpstat_a = o; }).catch(function(e) { debug.lpstat_a = 'ERROR: ' + e.message; }));
-    Promise.all(tasks).then(function() { sendJSON(res, 200, debug); });
+    var debug = { platform: PLATFORM, printers: null, raw: {} };
+    listPrinters()
+      .then(function (printers) { debug.printers = printers; })
+      .catch(function (e) { debug.printers_error = e.message; })
+      .then(function () {
+        var tasks = [];
+        if (PLATFORM === 'win32') {
+          tasks.push(execFileAsync('powershell.exe', ['-NoProfile', '-NoLogo', '-Command', 'Get-Printer | Select-Object -ExpandProperty Name']).then(function (o) { debug.raw.powershell_getprinter = o; }).catch(function (e) { debug.raw.powershell_getprinter = 'ERROR: ' + e.message; }));
+        } else {
+          tasks.push(execFileAsync('lpstat', ['-e']).then(function (o) { debug.raw.lpstat_e = o; }).catch(function (e) { debug.raw.lpstat_e = 'ERROR: ' + e.message; }));
+          tasks.push(execFileAsync('lpstat', ['-p']).then(function (o) { debug.raw.lpstat_p = o; }).catch(function (e) { debug.raw.lpstat_p = 'ERROR: ' + e.message; }));
+          tasks.push(execFileAsync('lpstat', ['-v']).then(function (o) { debug.raw.lpstat_v = o; }).catch(function (e) { debug.raw.lpstat_v = 'ERROR: ' + e.message; }));
+          tasks.push(execFileAsync('lpstat', ['-a']).then(function (o) { debug.raw.lpstat_a = o; }).catch(function (e) { debug.raw.lpstat_a = 'ERROR: ' + e.message; }));
+        }
+        Promise.all(tasks).then(function () { sendJSON(res, 200, debug); });
+      });
     return;
   }
 

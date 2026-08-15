@@ -1,16 +1,16 @@
 // Integración con el AccreditEvent Print Agent.
 // El agente escucha en 127.0.0.1 en uno de varios puertos posibles (9100,
 // 9101, 9200, 9300, 4100) para esquivar puertos reservados en Windows.
-// Usamos 127.0.0.1 (no localhost) para evitar que macOS resuelva a IPv6 (::1)
-// mientras el agente escucha solo en IPv4. Si el agente no está disponible,
-// cae al diálogo del navegador (window.print()).
+// El frontend prueba 'localhost' primero (exento de mixed-content cuando la
+// app se sirve por HTTPS) y '127.0.0.1' como fallback IPv4. Si el agente no
+// está disponible, cae al diálogo del navegador (window.print()).
 
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
-const AGENT_HOST = '127.0.0.1';
+const AGENT_HOSTS = ['localhost', '127.0.0.1'];
 const AGENT_PORTS = [9100, 9101, 9200, 9300, 4100];
-let _agentPort = null;
+let _agentBase = null; // p.ej. 'http://localhost:9101'
 
 function fetchWithTimeout(url, options = {}, ms = 1500) {
   const controller = new AbortController();
@@ -19,35 +19,37 @@ function fetchWithTimeout(url, options = {}, ms = 1500) {
     .finally(() => clearTimeout(timer));
 }
 
-// Descubre en qué puerto escucha el agente probando /health en cada candidato.
-function discoverPort() {
-  if (_agentPort) return Promise.resolve(_agentPort);
-  return (async () => {
+// Descubre la URL base del agente probando /health en cada combinación
+// host×puerto. 'localhost' va primero (exento de mixed-content en HTTPS);
+// '127.0.0.1' es fallback IPv4 por si localhost resuelve a ::1.
+async function discoverBase() {
+  if (_agentBase) return _agentBase;
+  for (const host of AGENT_HOSTS) {
     for (const port of AGENT_PORTS) {
       try {
-        const res = await fetchWithTimeout(`http://${AGENT_HOST}:${port}/health`, {}, 1500);
-        if (res.ok) { _agentPort = port; return port; }
+        const res = await fetchWithTimeout(`http://${host}:${port}/health`, {}, 1500);
+        if (res.ok) { _agentBase = `http://${host}:${port}`; return _agentBase; }
       } catch {}
     }
-    return null;
-  })();
+  }
+  return null;
 }
 
 async function agentUrl(path) {
-  const port = await discoverPort();
-  return port ? `http://${AGENT_HOST}:${port}${path}` : null;
+  const base = await discoverBase();
+  return base ? `${base}${path}` : null;
 }
 
-// Verifica si el agente local está corriendo (y cachea el puerto).
+// Verifica si el agente local está corriendo (y cachea la URL base).
 export async function checkAgent() {
-  const port = await discoverPort();
-  if (!port) return null;
+  const base = await discoverBase();
+  if (!base) return null;
   try {
-    const res = await fetchWithTimeout(`http://${AGENT_HOST}:${port}/health`, {}, 1500);
-    if (!res.ok) { _agentPort = null; return null; }
+    const res = await fetchWithTimeout(`${base}/health`, {}, 1500);
+    if (!res.ok) { _agentBase = null; return null; }
     return await res.json();
   } catch {
-    _agentPort = null;
+    _agentBase = null;
     return null;
   }
 }
@@ -58,11 +60,11 @@ export async function getAgentPrinters() {
   if (!url) return [];
   try {
     const res = await fetchWithTimeout(url, {}, 6000);
-    if (!res.ok) { _agentPort = null; return []; }
+    if (!res.ok) { _agentBase = null; return []; }
     const data = await res.json();
     return data.printers || [];
   } catch {
-    _agentPort = null;
+    _agentBase = null;
     return [];
   }
 }
@@ -105,10 +107,10 @@ export async function printToAgent(element, printerName, copies = 1) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ printer: printerName, pdf_base64: base64, copies }),
     }, 10000);
-    if (!res.ok) { _agentPort = null; return false; }
+    if (!res.ok) { _agentBase = null; return false; }
     return true;
   } catch {
-    _agentPort = null;
+    _agentBase = null;
     return false;
   }
 }
