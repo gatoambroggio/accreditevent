@@ -93,6 +93,12 @@
   input[type="text"], input:not([type]), textarea {
     text-transform: uppercase;
   }
+
+  .allow-lowercase input[type="text"],
+  .allow-lowercase input:not([type]),
+  .allow-lowercase textarea {
+    text-transform: none;
+  }
 }
 
 @media print {

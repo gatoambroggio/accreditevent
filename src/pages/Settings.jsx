@@ -225,7 +225,7 @@ export default function Settings() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="allow-lowercase space-y-6">
       <div className="flex items-end justify-between">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-wider text-emerald-600">Sistema</p>
@@ -336,7 +336,10 @@ export default function Settings() {
             {agentPrinters && (
               <div className="mt-3">
                 {agentPrinters.length === 0 ? (
-                  <p className="text-xs text-amber-600">No se encontraron impresoras en el equipo.</p>
+                  <div className="text-xs text-amber-600">
+                    <p>No se encontraron impresoras en el equipo.</p>
+                    <p className="mt-1">Abrí <code className="rounded bg-slate-100 px-1">http://localhost:9100/debug</code> en el navegador para ver qué detecta el agente.</p>
+                  </div>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {agentPrinters.map((p) => (

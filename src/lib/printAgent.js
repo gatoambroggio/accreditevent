@@ -28,7 +28,7 @@ export async function checkAgent() {
 // Lista las impresoras disponibles en el sistema operativo del agente
 export async function getAgentPrinters() {
   try {
-    const res = await fetchWithTimeout(`${AGENT_URL}/printers`, {}, 3000);
+    const res = await fetchWithTimeout(`${AGENT_URL}/printers`, {}, 6000);
     if (res.ok) {
       const data = await res.json();
       return data.printers || [];

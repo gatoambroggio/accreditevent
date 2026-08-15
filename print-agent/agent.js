@@ -52,12 +52,49 @@ async function listPrinters() {
       return [];
     }
   } else {
+    // Linux / macOS: probar varios formatos de lpstat (algunos no listan con -e)
+    var found = [];
+    var seen = {};
+    function add(name) {
+      if (name && !seen[name]) { seen[name] = true; found.push(name); }
+    }
+    // Intento 1: lpstat -e (destinos, uno por línea)
     try {
       var out = await execFileAsync('lpstat', ['-e']);
-      return out.split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
-    } catch (e) {
-      return [];
-    }
+      out.split('\n').forEach(function (s) { add(s.trim()); });
+    } catch (e) {}
+    if (found.length > 0) return found;
+    // Intento 2: lpstat -p ("printer NAME is ...")
+    try {
+      var out2 = await execFileAsync('lpstat', ['-p']);
+      out2.split('\n').forEach(function (line) {
+        var parts = line.trim().split(' ').filter(Boolean);
+        if (parts[0] === 'printer' && parts[1]) add(parts[1]);
+      });
+    } catch (e) {}
+    if (found.length > 0) return found;
+    // Intento 3: lpstat -v ("device for NAME: ...")
+    try {
+      var out3 = await execFileAsync('lpstat', ['-v']);
+      out3.split('\n').forEach(function (line) {
+        var parts = line.trim().split(' ').filter(Boolean);
+        if (parts[0] === 'device' && parts[1] === 'for' && parts[2]) {
+          var name = parts[2];
+          if (name.charAt(name.length - 1) === ':') name = name.slice(0, -1);
+          add(name);
+        }
+      });
+    } catch (e) {}
+    if (found.length > 0) return found;
+    // Intento 4: lpstat -a (primera palabra de cada línea = destino)
+    try {
+      var out4 = await execFileAsync('lpstat', ['-a']);
+      out4.split('\n').forEach(function (line) {
+        var parts = line.trim().split(' ').filter(Boolean);
+        if (parts[0]) add(parts[0]);
+      });
+    } catch (e) {}
+    return found;
   }
 }
 
@@ -110,6 +147,17 @@ var server = http.createServer(function (req, res) {
     listPrinters()
       .then(function (printers) { sendJSON(res, 200, { printers: printers }); })
       .catch(function (err) { sendJSON(res, 500, { error: err.message, printers: [] }); });
+    return;
+  }
+
+  if (req.method === 'GET' && req.url === '/debug') {
+    var debug = { platform: PLATFORM, lpstat_e: null, lpstat_p: null, lpstat_v: null, lpstat_a: null };
+    var tasks = [];
+    tasks.push(execFileAsync('lpstat', ['-e']).then(function(o) { debug.lpstat_e = o; }).catch(function(e) { debug.lpstat_e = 'ERROR: ' + e.message; }));
+    tasks.push(execFileAsync('lpstat', ['-p']).then(function(o) { debug.lpstat_p = o; }).catch(function(e) { debug.lpstat_p = 'ERROR: ' + e.message; }));
+    tasks.push(execFileAsync('lpstat', ['-v']).then(function(o) { debug.lpstat_v = o; }).catch(function(e) { debug.lpstat_v = 'ERROR: ' + e.message; }));
+    tasks.push(execFileAsync('lpstat', ['-a']).then(function(o) { debug.lpstat_a = o; }).catch(function(e) { debug.lpstat_a = 'ERROR: ' + e.message; }));
+    Promise.all(tasks).then(function() { sendJSON(res, 200, debug); });
     return;
   }
 
