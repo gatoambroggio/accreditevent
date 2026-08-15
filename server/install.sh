@@ -100,7 +100,7 @@ fi
 
 # ── 4. Copiar código del servidor ────────────────────────────────────────────
 step "Servidor: código + dependencias"
-rsync -a --delete --exclude node_modules --exclude uploads --exclude public/models --exclude .env "$REPO_DIR/server/" "$APP_HOME/server/"
+rsync -a --delete --exclude node_modules --exclude uploads --exclude public --exclude .env "$REPO_DIR/server/" "$APP_HOME/server/"
 chown -R "$APP_USER":"$APP_USER" "$APP_HOME/server"
 
 # .env con secretos aleatorios
@@ -250,12 +250,12 @@ if need_models; then
 fi
 
 if need_models; then
-  err "No se pudieron descargar los modelos de face-api.js (sin internet a GitHub)."
+  warn "No se pudieron descargar los modelos de face-api.js (sin internet a GitHub)."
   echo "    Copialos a mano a $MODELS_DIR desde cualquier PC con internet:"
   echo "      https://github.com/vladmandic/face-api/tree/master/weights"
   echo "    Archivos necesarios: ${MODELS[*]}"
   echo "    El reconocimiento facial no funcionará hasta que estén presentes."
-  exit 1
+  echo "    El resto del sistema funciona normalmente — solo biometría queda en espera."
 else
   ok "Modelos de face-api.js presentes (${#MODELS[@]} archivos)"
 fi
