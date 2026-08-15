@@ -3,12 +3,15 @@ import { Camera, Loader2, Upload, Check, X, RotateCcw, ScanLine } from 'lucide-r
 import { base44 } from '@/api/base44Client';
 import { toast } from '@/components/ui/use-toast';
 
-// Lector de patentes reutilizable. Captura con cámara (o subida de foto),
-// invoca readPatente (visión + validación) y muestra el dominio detectado con
-// edición manual. onPatente(patente) se dispara al confirmar.
-export default function PatenteScanner({ onPatente, autoConfirm = false }) {
+// Lector de patentes reutilizable con captura automática en bucle.
+// Al abrir la cámara, captura un frame cada ~1.5s y lo envía a readPatente.
+// Al detectar una patente válida, autoconfirma (onPatente) y detiene el bucle.
+// Mantiene subida manual y edición manual como respaldo.
+export default function PatenteScanner({ onPatente, autoConfirm = true, intervalMs = 1500 }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+  const loopRef = useRef(null);
+  const busyRef = useRef(false);
   const [streaming, setStreaming] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState(null);
@@ -16,12 +19,49 @@ export default function PatenteScanner({ onPatente, autoConfirm = false }) {
   const [error, setError] = useState('');
 
   const stopCamera = useCallback(() => {
+    if (loopRef.current) { clearInterval(loopRef.current); loopRef.current = null; }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
     setStreaming(false);
   }, []);
+
+  const processBlob = async (blob) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setProcessing(true);
+    setError('');
+    try {
+      const file = new File([blob], 'patente.jpg', { type: blob.type || 'image/jpeg' });
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const res = await base44.functions.invoke('readPatente', { file_url });
+      const d = res?.data ?? res;
+      if (d?.error) throw new Error(d.error);
+      if (d.patente && d.valido) {
+        setResult(d);
+        setManual(d.patente);
+        stopCamera();
+        if (autoConfirm && onPatente) onPatente(d.patente);
+      }
+      // Si no es válida, el bucle sigue y se sobreescribe en la próxima captura
+    } catch (e) {
+      setError(e.message || 'No se pudo leer la patente.');
+    } finally {
+      setProcessing(false);
+      busyRef.current = false;
+    }
+  };
+
+  const captureFrame = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || video.readyState < 2) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => blob && processBlob(blob), 'image/jpeg', 0.92);
+  }, [processBlob]);
 
   const startCamera = useCallback(async () => {
     setError('');
@@ -35,46 +75,25 @@ export default function PatenteScanner({ onPatente, autoConfirm = false }) {
         await videoRef.current.play().catch(() => {});
       }
       setStreaming(true);
+      // Esperar a que el video tenga dimensiones reales antes de arrancar el bucle
+      const startLoop = () => {
+        if (loopRef.current) clearInterval(loopRef.current);
+        loopRef.current = setInterval(captureFrame, intervalMs);
+      };
+      if (videoRef.current && videoRef.current.readyState >= 2) {
+        startLoop();
+      } else if (videoRef.current) {
+        videoRef.current.addEventListener('loadeddata', startLoop, { once: true });
+      }
     } catch (e) {
       setError('No se pudo acceder a la cámara. Usá "Subir foto".');
     }
-  }, []);
+  }, [captureFrame, intervalMs]);
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
-  const processBlob = async (blob) => {
-    setProcessing(true);
-    setError('');
-    setResult(null);
-    try {
-      const file = new File([blob], 'patente.jpg', { type: blob.type || 'image/jpeg' });
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      const res = await base44.functions.invoke('readPatente', { file_url });
-      const d = res?.data ?? res;
-      if (d?.error) throw new Error(d.error);
-      setResult(d);
-      setManual(d.patente || '');
-      if (d.patente && d.valido && autoConfirm && onPatente) {
-        onPatente(d.patente);
-      }
-    } catch (e) {
-      setError(e.message || 'No se pudo leer la patente.');
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const capture = () => {
-    const video = videoRef.current;
-    if (!video) return;
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob((blob) => blob && processBlob(blob), 'image/jpeg', 0.92);
-  };
-
   const handleFile = (e) => {
+    stopCamera();
     const f = e.target.files?.[0];
     if (f) processBlob(f);
   };
@@ -94,7 +113,7 @@ export default function PatenteScanner({ onPatente, autoConfirm = false }) {
       {!streaming && !result && (
         <div className="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 py-10 text-center">
           <Camera className="h-10 w-10 text-slate-300" />
-          <p className="text-sm text-slate-500">Capturá o subí una foto de la patente</p>
+          <p className="text-sm text-slate-500">La cámara escaneará la patente automáticamente</p>
           <div className="flex flex-wrap items-center justify-center gap-2">
             <button onClick={startCamera} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800">
               <Camera className="h-4 w-4" /> Abrir cámara
@@ -115,18 +134,15 @@ export default function PatenteScanner({ onPatente, autoConfirm = false }) {
               <div className="h-20 w-3/4 rounded-lg border-2 border-emerald-400/80 shadow-[0_0_0_2000px_rgba(15,23,42,0.25)]" />
             </div>
             {processing && (
-              <div className="absolute inset-0 flex items-center justify-center bg-slate-900/50">
-                <Loader2 className="h-8 w-8 animate-spin text-white" />
+              <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-slate-900/60 py-2">
+                <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
+                <span className="text-xs font-medium text-white">Escaneando patente…</span>
               </div>
             )}
           </div>
           <div className="flex items-center justify-center gap-2">
-            <button onClick={capture} disabled={processing} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:opacity-50">
-              {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanLine className="h-4 w-4" />}
-              {processing ? 'Leyendo…' : 'Capturar patente'}
-            </button>
             <button onClick={stopCamera} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
-              <X className="h-4 w-4" /> Cerrar
+              <X className="h-4 w-4" /> Cerrar cámara
             </button>
           </div>
         </div>

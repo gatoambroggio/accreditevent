@@ -24,7 +24,7 @@ export default function Patentes() {
     setSearched(true);
     setVehicles(null);
     try {
-      const res = await base44.entities.Vehicle.filter({ plate: p });
+      const res = await base44.entities.Vehicle.filter({ plate: p, status: { $in: ['approved', 'pending'] } });
       setVehicles(res);
     } catch (e) {
       setVehicles([]);
@@ -76,7 +76,7 @@ export default function Patentes() {
 
               {searched && vehicles && vehicles.length === 0 && (
                 <div className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700 ring-1 ring-amber-200">
-                  No se encontró ningún vehículo registrado con esa patente.
+                  No se encontró ningún vehículo acreditado ni pendiente con esa patente.
                 </div>
               )}
 
