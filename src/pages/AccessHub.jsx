@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Hand, ScanFace, QrCode, Car, ArrowRight } from 'lucide-react';
+import { Hand, ScanFace, QrCode, Car, ScanSearch, ArrowRight } from 'lucide-react';
 
 const STATIONS = [
   {
@@ -38,6 +38,15 @@ const STATIONS = [
     to: '/control-vehicular',
     accent: 'bg-amber-50 text-amber-600 ring-amber-200',
     btn: 'bg-amber-600 hover:bg-amber-700',
+  },
+  {
+    key: 'vehicle-plate',
+    label: 'Control por Patentes',
+    description: 'Lectura automática de patentes con validación de sector de estacionamiento.',
+    icon: ScanSearch,
+    to: '/control-patentes',
+    accent: 'bg-orange-50 text-orange-600 ring-orange-200',
+    btn: 'bg-orange-600 hover:bg-orange-700',
   },
 ];
 

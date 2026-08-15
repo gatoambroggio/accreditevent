@@ -1,17 +1,21 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Camera, Loader2, Upload, Check, X, RotateCcw, ScanLine } from 'lucide-react';
+import { Camera, Loader2, Upload, Check, X, RotateCcw } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { toast } from '@/components/ui/use-toast';
 
 // Lector de patentes reutilizable con captura automática en bucle.
-// Al abrir la cámara, captura un frame cada ~1.5s y lo envía a readPatente.
-// Al detectar una patente válida, autoconfirma (onPatente) y detiene el bucle.
-// Mantiene subida manual y edición manual como respaldo.
-export default function PatenteScanner({ onPatente, autoConfirm = true, intervalMs = 1500 }) {
+// - Modo normal (default): detecta una patente, la muestra y detiene la cámara.
+// - Modo `continuous` (estación de control): arranca la cámara solo, reporta
+//   cada patente válida vía onPatente y sigue escaneando sin mostrar panel
+//   propio (la estación muestra el overlay verde/rojo). Evita reportar la misma
+//   patente repetidamente mientras el vehículo está quieto frente a la cámara.
+export default function PatenteScanner({ onPatente, autoConfirm = true, intervalMs = 1500, continuous = false }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const loopRef = useRef(null);
   const busyRef = useRef(false);
+  const lastPlateRef = useRef('');
+  const lastPlateAtRef = useRef(0);
   const [streaming, setStreaming] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState(null);
@@ -31,7 +35,7 @@ export default function PatenteScanner({ onPatente, autoConfirm = true, interval
     if (busyRef.current) return;
     busyRef.current = true;
     setProcessing(true);
-    setError('');
+    if (!continuous) setError('');
     try {
       const file = new File([blob], 'patente.jpg', { type: blob.type || 'image/jpeg' });
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
@@ -39,14 +43,22 @@ export default function PatenteScanner({ onPatente, autoConfirm = true, interval
       const d = res?.data ?? res;
       if (d?.error) throw new Error(d.error);
       if (d.patente && d.valido) {
+        if (continuous) {
+          const now = Date.now();
+          // Evita reportar la misma patente repetidamente (auto quieto en cámara)
+          if (d.patente === lastPlateRef.current && now - lastPlateAtRef.current < 5000) return;
+          lastPlateRef.current = d.patente;
+          lastPlateAtRef.current = now;
+          if (onPatente) onPatente(d.patente);
+          return; // sigue escaneando
+        }
         setResult(d);
         setManual(d.patente);
         stopCamera();
         if (autoConfirm && onPatente) onPatente(d.patente);
       }
-      // Si no es válida, el bucle sigue y se sobreescribe en la próxima captura
     } catch (e) {
-      setError(e.message || 'No se pudo leer la patente.');
+      if (!continuous) setError(e.message || 'No se pudo leer la patente.');
     } finally {
       setProcessing(false);
       busyRef.current = false;
@@ -70,8 +82,6 @@ export default function PatenteScanner({ onPatente, autoConfirm = true, interval
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       streamRef.current = stream;
-      // El <video> se monta en el render siguiente (streaming=true); el useEffect
-      // de abajo le asigna el stream, lo reproduce y arranca el bucle de captura.
       setStreaming(true);
     } catch (e) {
       setError('No se pudo acceder a la cámara. Usá "Subir foto".');
@@ -100,6 +110,13 @@ export default function PatenteScanner({ onPatente, autoConfirm = true, interval
     };
   }, [streaming, captureFrame, intervalMs]);
 
+  // En modo continuo, arrancar la cámara automáticamente al montar.
+  useEffect(() => {
+    if (continuous) startCamera();
+    return () => stopCamera();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [continuous]);
+
   useEffect(() => () => stopCamera(), [stopCamera]);
 
   const handleFile = (e) => {
@@ -118,6 +135,35 @@ export default function PatenteScanner({ onPatente, autoConfirm = true, interval
     toast({ title: 'Patente confirmada', description: p });
   };
 
+  // --- Modo continuo (estación de control) ---
+  if (continuous) {
+    return (
+      <div className="space-y-3">
+        <div className="relative overflow-hidden rounded-2xl bg-slate-900">
+          <video ref={videoRef} playsInline muted className="h-auto w-full" />
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="h-20 w-3/4 rounded-lg border-2 border-amber-400/80 shadow-[0_0_0_2000px_rgba(15,23,42,0.25)]" />
+          </div>
+          <div className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-slate-900/70 px-3 py-1 text-xs font-semibold text-white">
+            <Camera className="h-3.5 w-3.5 text-amber-300" /> Escaneando patentes…
+          </div>
+          {processing && (
+            <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-slate-900/60 py-2">
+              <Loader2 className="h-4 w-4 animate-spin text-amber-300" />
+              <span className="text-xs font-medium text-white">Leyendo patente…</span>
+            </div>
+          )}
+        </div>
+        {error && (
+          <div className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-700 ring-1 ring-red-200">
+            <X className="mt-0.5 h-4 w-4 shrink-0" /> {error}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // --- Modo normal (página Patentes) ---
   return (
     <div className="space-y-4">
       {!streaming && !result && (
@@ -173,7 +219,6 @@ export default function PatenteScanner({ onPatente, autoConfirm = true, interval
             </span>
           </div>
           <div className="flex items-center gap-3">
-            {/* Plato estilo patente argentina */}
             <div className="grid min-w-[140px] place-items-center rounded-md border-2 border-slate-900 bg-white px-4 py-2">
               <span className="font-mono text-2xl font-extrabold tracking-[0.15em] text-slate-900">{result.patente || '—'}</span>
               <span className="mt-0.5 text-[8px] font-semibold uppercase tracking-wider text-slate-400">Argentina</span>

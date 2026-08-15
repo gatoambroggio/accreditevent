@@ -22,7 +22,7 @@ export default function QrScanner({ onDetected, paused }) {
 
         await scanner.start(
           { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.3333 },
+          { fps: 15, qrbox: { width: 250, height: 250 }, aspectRatio: 1.3333 },
           (decodedText) => {
             if (paused) return;
             onDetected(decodedText);

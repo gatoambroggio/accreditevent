@@ -23,6 +23,11 @@ export default function AccessStation() {
   const [result, setResult] = useState(null);
   const [unlocked, setUnlocked] = useState(false);
   const [pinOpen, setPinOpen] = useState(false);
+  // Caché de acreditaciones y biometrías del evento (se precargan al iniciar la
+  // estación y se refrescan cada 30s) para que cada identificación facial sea
+  // instantánea en vez de hacer 2 llamadas API por escaneo.
+  const [eventAccreditations, setEventAccreditations] = useState([]);
+  const [eventBiometrics, setEventBiometrics] = useState([]);
   const { zones } = useZones();
   const { pdaNumber } = usePdaHeartbeat({
     enabled: phase === 'active',
@@ -109,6 +114,25 @@ export default function AccessStation() {
     setVerifying(false);
   };
 
+  // Precarga + refresco periódico de acreditaciones y biometrías del evento.
+  useEffect(() => {
+    if (phase !== 'active' || !selectedEvent) return;
+    const load = async () => {
+      try {
+        const accs = await base44.entities.Accreditation.filter({ status: 'active', event_id: selectedEvent.id }, '-created_date', 500);
+        setEventAccreditations(accs);
+      } catch {}
+      try {
+        const bios = await base44.entities.Biometric.filter({ status: 'active' }, '-created_date', 500);
+        setEventBiometrics(bios);
+      } catch {}
+    };
+    load();
+    const id = setInterval(load, 30000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, selectedEvent]);
+
   const handleCaptured = async (file, descriptor) => {
     setVerifying(true);
     setResult(null);
@@ -150,15 +174,15 @@ export default function AccessStation() {
       }
 
       // Fetch active accreditations for the SELECTED EVENT only
-      const accreditations = await base44.entities.Accreditation.filter(
-        { status: 'active', event_id: selectedEvent.id },
-        '-created_date',
-        500
-      );
+      const accreditations = eventAccreditations.length > 0
+        ? eventAccreditations
+        : await base44.entities.Accreditation.filter({ status: 'active', event_id: selectedEvent.id }, '-created_date', 500);
       const eventPersonIds = new Set(accreditations.map((a) => a.person_id));
 
-      // Fetch biometrics only for persons with active accreditations in this event
-      const bios = await base44.entities.Biometric.filter({ status: 'active' }, '-created_date', 500);
+      // Biometrics cached at station start; filter in memory by event persons
+      const bios = eventBiometrics.length > 0
+        ? eventBiometrics
+        : await base44.entities.Biometric.filter({ status: 'active' }, '-created_date', 500);
       const withDescriptors = bios.filter(
         (b) => b.face_descriptor && b.face_descriptor.length > 0 && eventPersonIds.has(b.person_id)
       );
@@ -302,7 +326,7 @@ export default function AccessStation() {
     const timer = setTimeout(() => {
       setResult(null);
       setCycle((c) => c + 1);
-    }, 2500);
+    }, 1800);
     return () => clearTimeout(timer);
   }, [result]);
 

@@ -39,6 +39,7 @@ import Settings from '@/pages/Settings';
 import ZKTecoDevices from '@/pages/ZKTecoDevices';
 import DahuaDevices from '@/pages/DahuaDevices';
 import Patentes from '@/pages/Patentes';
+import AccessPlateStation from '@/pages/AccessPlateStation';
 import Vehicles from '@/pages/Vehicles';
 import ParkingSectors from '@/pages/ParkingSectors';
 import ParkingCapacities from '@/pages/ParkingCapacities';
@@ -138,6 +139,7 @@ const AuthenticatedApp = () => {
       <Route path="/control-qr" element={<AccessQrStation mode="person" />} />
       <Route path="/control-vehicular" element={<AccessQrStation mode="vehicle" />} />
       <Route path="/control-manual" element={<AccessManual />} />
+      <Route path="/control-patentes" element={<AccessPlateStation />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

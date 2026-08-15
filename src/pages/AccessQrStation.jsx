@@ -400,7 +400,7 @@ export default function AccessQrStation({ mode = 'person' }) {
       setResult({ ok: false, type: 'unknown', message: err.message || 'Error en la verificación.' });
     } finally {
       setVerifying(false);
-      setTimeout(() => { qrCooldown.current = false; }, 1200);
+      setTimeout(() => { qrCooldown.current = false; }, 600);
     }
   };
 
@@ -411,7 +411,7 @@ export default function AccessQrStation({ mode = 'person' }) {
       const timer = setTimeout(() => {
         setResult(null);
         setCycle((c) => c + 1);
-      }, 2500);
+      }, 1800);
       return () => clearTimeout(timer);
     }
   }, [result]);
