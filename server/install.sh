@@ -138,12 +138,49 @@ sudo -u "$APP_USER" -H bash -lc "cd '$APP_HOME/server' && SEED_EMAIL=admin@accre
 ok "Servidor instalado + DB migrada + seed"
 
 # ── 5. Frontend React ─────────────────────────────────────────────────────────
-step "Frontend React: build"
+step "Frontend React: build self-hosted (air-gapped)"
 if [[ -f "$FRONTEND_DIR/package.json" ]]; then
+  # 5a. Parchear la copia local para que el build no hable con la nube de Base44.
+  #     Se sobrescriben sobre la copia clonada en disco (no se commitea al repo),
+  #     así el repo de GitHub sigue siendo compatible con el builder cloud.
+  log "Parcheando frontend para build air-gapped (base44Client + vite.config)..."
+  cat > "$FRONTEND_DIR/src/api/base44Client.js" <<'EOF'
+// [self-hosted] Apunta el SDK al servidor local Express (/api) en vez de a la nube de Base44.
+// Re-exporta el wrapper localClient que respeta la misma superficie del SDK.
+export { base44 } from '@/api/localClient';
+export { base44 as default } from '@/api/localClient';
+EOF
+
+  cat > "$FRONTEND_DIR/vite.config.js" <<'EOF'
+// [self-hosted] Vite config sin @base44/vite-plugin (que requiere manifiest cloud en build-time).
+// Solo React + alias @ -> src. @base44/sdk y @base44/vite-plugin quedan en package.json
+// pero no se importan, así no rompen el build ni el builder cloud del repo original.
+import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+export default defineConfig({
+  plugins: [react()],
+  base: './',
+  resolve: {
+    alias: { '@': path.resolve(__dirname, 'src') }
+  },
+  build: { outDir: 'dist' }
+})
+EOF
+  ok "Parches self-hosted aplicados (idempotente)"
+
   log "npm install (frontend)..."
-  sudo -u "$APP_USER" -H bash -lc "cd '$FRONTEND_DIR' && npm install" >/dev/null 2>&1 || warn "npm install del frontend tuvo warnings"
+  sudo -u "$APP_USER" -H bash -lc "cd '$FRONTEND_DIR' && npm install" || warn "npm install del frontend tuvo warnings"
+
   log "Vite build (VITE_API_URL=/api)..."
-  sudo -u "$APP_USER" -H bash -lc "cd '$FRONTEND_DIR' && VITE_API_URL=/api npm run build" >/dev/null 2>&1 || { err "Build del frontend falló"; exit 1; }
+  if ! sudo -u "$APP_USER" -H bash -lc "cd '$FRONTEND_DIR' && VITE_API_URL=/api npm run build"; then
+    err "Build del frontend falló — log arriba ↑"
+    exit 1
+  fi
   rsync -a --delete "$FRONTEND_DIR/dist/" "$APP_HOME/frontend/dist/"
   ok "Frontend compilado en $APP_HOME/frontend/dist"
 else
