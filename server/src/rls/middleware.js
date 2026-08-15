@@ -34,7 +34,12 @@ export function makeCrudRouter(entityName) {
       const where = mergeWhere(userWhere, rls);
       const sort = req.query.sort;
       const limit = Math.min(parseInt(req.query.limit || '50', 10), 500);
-      const orderBy = sort?.startsWith('-') ? { [sort.slice(1)]: 'desc' } : sort ? { [sort]: 'asc' } : undefined;
+      // Mapea nombres Base44 → nombres Prisma (created_date/updated_date son la convención del SDK).
+      const SORT_MAP = { created_date: 'created_at', updated_date: 'updated_at' };
+      const normField = (f) => SORT_MAP[f] || f;
+      const orderBy = sort?.startsWith('-')
+        ? { [normField(sort.slice(1))]: 'desc' }
+        : sort ? { [normField(sort)]: 'asc' } : undefined;
       const items = await model.findMany({ where, take: limit, orderBy });
       res.json(items);
     } catch (e) { next(e); }
