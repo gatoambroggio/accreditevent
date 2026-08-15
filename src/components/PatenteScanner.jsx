@@ -70,25 +70,35 @@ export default function PatenteScanner({ onPatente, autoConfirm = true, interval
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => {});
-      }
+      // El <video> se monta en el render siguiente (streaming=true); el useEffect
+      // de abajo le asigna el stream, lo reproduce y arranca el bucle de captura.
       setStreaming(true);
-      // Esperar a que el video tenga dimensiones reales antes de arrancar el bucle
-      const startLoop = () => {
-        if (loopRef.current) clearInterval(loopRef.current);
-        loopRef.current = setInterval(captureFrame, intervalMs);
-      };
-      if (videoRef.current && videoRef.current.readyState >= 2) {
-        startLoop();
-      } else if (videoRef.current) {
-        videoRef.current.addEventListener('loadeddata', startLoop, { once: true });
-      }
     } catch (e) {
       setError('No se pudo acceder a la cámara. Usá "Subir foto".');
     }
-  }, [captureFrame, intervalMs]);
+  }, []);
+
+  // Cuando `streaming` pasa a true, el <video> ya está en el DOM: asignamos el
+  // stream, reproducimos y arrancamos el bucle de captura automática.
+  useEffect(() => {
+    if (!streaming) return;
+    const video = videoRef.current;
+    if (!video || !streamRef.current) return;
+    video.srcObject = streamRef.current;
+    video.play().catch(() => {});
+    const startLoop = () => {
+      if (loopRef.current) clearInterval(loopRef.current);
+      loopRef.current = setInterval(captureFrame, intervalMs);
+    };
+    if (video.readyState >= 2) {
+      startLoop();
+    } else {
+      video.addEventListener('loadeddata', startLoop, { once: true });
+    }
+    return () => {
+      if (loopRef.current) { clearInterval(loopRef.current); loopRef.current = null; }
+    };
+  }, [streaming, captureFrame, intervalMs]);
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
