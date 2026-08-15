@@ -130,11 +130,14 @@ fi
 log "npm install (servidor)..."
 sudo -u "$APP_USER" -H bash -lc "cd '$APP_HOME/server' && npm install --omit=dev" >/dev/null 2>&1 || { err "npm install del servidor falló"; exit 1; }
 
-log "Prisma: generate + migrate..."
-sudo -u "$APP_USER" -H bash -lc "cd '$APP_HOME/server' && npx prisma generate && npx prisma migrate deploy" >/dev/null 2>&1 || { err "Prisma migrate falló"; exit 1; }
+log "Prisma: generate + db push (crea las tablas desde schema.prisma)..."
+sudo -u "$APP_USER" -H bash -lc "cd '$APP_HOME/server' && npx prisma generate && npx prisma db push" >/dev/null 2>&1 || { err "Prisma db push falló — ver schema.prisma y DATABASE_URL"; exit 1; }
 
 log "Seed (superadmin admin@accreditevent.local / admin123)..."
-sudo -u "$APP_USER" -H bash -lc "cd '$APP_HOME/server' && SEED_EMAIL=admin@accreditevent.local SEED_PASSWORD=admin123 npm run seed" >/dev/null 2>&1 || warn "Seed ya aplicado o falló (revisar)"
+if ! sudo -u "$APP_USER" -H bash -lc "cd '$APP_HOME/server' && SEED_EMAIL=admin@accreditevent.local SEED_PASSWORD=admin123 npm run seed" >/dev/null 2>&1; then
+  warn "Seed falló — mostrando salida:"
+  sudo -u "$APP_USER" -H bash -lc "cd '$APP_HOME/server' && SEED_EMAIL=admin@accreditevent.local SEED_PASSWORD=admin123 npm run seed" 2>&1 | tail -n 30
+fi
 ok "Servidor instalado + DB migrada + seed"
 
 # ── 5. Frontend React ─────────────────────────────────────────────────────────
