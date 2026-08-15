@@ -17,7 +17,6 @@ import { functionInvokeRouter } from './routes/functions.js';
 import { settingsRouter } from './routes/settings.js';
 import { usersRouter } from './routes/users.js';
 import { webhooksRouter } from './routes/webhooks.js';
-import { printRouter } from './routes/print.js';
 import { makeCrudRouter } from './rls/middleware.js';
 import { initRealtime, broadcast } from './realtime/ws.js';
 
@@ -48,7 +47,6 @@ export function createApp() {
   app.use('/api/patentes', requireAuth, patentesRouter);
   app.use('/api/functions', requireAuth, functionInvokeRouter);
   app.use('/api/settings', requireAuth, settingsRouter);
-  app.use('/api/print', requireAuth, printRouter);
 
   // CRUD genérico con RLS por entidad.
   app.use('/api/events', requireAuth, eventsRouter);

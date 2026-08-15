@@ -74,37 +74,6 @@ ok "PostgreSQL $(psql --version 2>/dev/null | awk '{print $3}')"
 if ! has nginx; then apt-get install -qq -y nginx >/dev/null; systemctl enable --now nginx >/dev/null 2>&1 || true; fi
 ok "Nginx $(nginx -v 2>&1 | cut -d/ -f2)"
 
-# CUPS para impresión automática de credenciales (lp -d <impresora>)
-if ! has lpstat; then
-  log "Instalando CUPS..."
-  apt-get install -qq -y cups cups-filters >/dev/null 2>&1 || warn "CUPS no se instaló (la impresión automática no funcionará)"
-  systemctl enable --now cups >/dev/null 2>&1 || true
-fi
-
-# Configurar CUPS para acceso desde la LAN (admin configura impresoras desde su PC)
-if has lpstat; then
-  log "Configurando CUPS para acceso desde LAN..."
-  CUPSD=/etc/cups/cupsd.conf
-  sed -i 's/^#\?WebInterface .*/WebInterface Yes/' "$CUPSD" 2>/dev/null || true
-  sed -i 's/^#\?Listen .*/Port 631/' "$CUPSD" 2>/dev/null || true
-  if ! grep -q "AccreditEvent LAN access" "$CUPSD" 2>/dev/null; then
-    cat >> "$CUPSD" <<'CUPSEOF'
-
-# AccreditEvent LAN access
-<Location />
-  Allow @LOCAL
-  Order allow,deny
-</Location>
-<Location /admin>
-  Allow @LOCAL
-  Order allow,deny
-</Location>
-CUPSEOF
-  fi
-  systemctl restart cups >/dev/null 2>&1 || true
-fi
-ok "CUPS $(lpstat -e 2>/dev/null | head -1 || echo 'sin impresoras configuradas')"
-
 # Libs de sistema para Tesseract (tesseract.js las usa en runtime)
 apt-get install -qq -y tesseract-ocr tesseract-ocr-spa graphicsmagick build-essential python3 >/dev/null 2>&1 || warn "Algunas libs opcionales no se instalaron (tesseract.js trae su propio worker)"
 ok "Tesseract OCR + dependencias"
@@ -114,8 +83,6 @@ step "Usuario y directorios"
 if ! id -u "$APP_USER" >/dev/null 2>&1; then
   useradd -r -m -d "$APP_HOME" -s /bin/bash "$APP_USER"
 fi
-# El usuario de servicio necesita permisos para mandar jobs a CUPS (lp).
-usermod -aG lp "$APP_USER" 2>/dev/null || true
 install -d -o "$APP_USER" -g "$APP_USER" "$APP_HOME/server" "$APP_HOME/frontend/dist" "$APP_HOME/uploads" "$APP_HOME/server/public/models"
 ok "Usuario $APP_USER + $APP_HOME"
 
@@ -444,8 +411,8 @@ if [[ "$API_CODE" == "200" && "$WEB_CODE" == "200" ]]; then
   echo -e "  Superadmin:  ${GREEN}admin@accreditevent.local${NC} / ${GREEN}admin123${NC}"
   echo -e "  Webhook Dahua:  ${GREEN}https://${LAN_IP:-127.0.0.1}/api/webhooks/dahua?key=API_KEY&sn=SERIAL${NC}"
   echo -e "  Webhook ZKTeco: ${GREEN}https://${LAN_IP:-127.0.0.1}/api/webhooks/zkteco?key=API_KEY&SN=SERIAL${NC}"
-  echo -e "  Impresoras:  Configurá las impresoras en ${GREEN}https://${LAN_IP:-127.0.0.1}:631${NC} (CUPS)"
-  echo -e "               Después asignalas en Configuración → Impresoras de credenciales"
+  echo -e "  Impresión:   Descargá el agente local en cada PC desde Configuración → Impresión"
+  echo -e "               Ejecutá: node accreditevent-print-agent.js"
   echo -e "  Logs:        journalctl -u accreditevent -f"
   echo -e "  Reiniciar:   systemctl restart accreditevent"
   echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
