@@ -48,6 +48,9 @@ ok "Ejecutando como root en $DISTRO"
 step "Dependencias del sistema (Node, Postgres, Nginx, Tesseract)"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
+# Herramientas base necesarias en imágenes mínimas (rsync para copiar código, git
+# para bajar modelos face-api, wget como fallback de descarga).
+apt-get install -qq -y rsync git wget curl ca-certificates >/dev/null 2>&1 || warn "Algunas herramientas base (rsync/git/wget) no se instalaron"
 
 # Node 20+ vía NodeSource
 if ! has node || [[ "$(node -v 2>/dev/null | cut -d. -f1 | tr -d v)" -lt 20 ]]; then
@@ -128,7 +131,9 @@ else
 fi
 
 log "npm install (servidor)..."
-sudo -u "$APP_USER" -H bash -lc "cd '$APP_HOME/server' && npm install --omit=dev" >/dev/null 2>&1 || { err "npm install del servidor falló"; exit 1; }
+# Sin --omit=dev: prisma (CLI) está en devDependencies y lo necesitamos instalado
+# para que `npx prisma generate/db push` no descargue nada de internet en re-ejecuciones air-gapped.
+sudo -u "$APP_USER" -H bash -lc "cd '$APP_HOME/server' && npm install" >/dev/null 2>&1 || { err "npm install del servidor falló"; exit 1; }
 
 log "Prisma: generate + db push (crea las tablas desde schema.prisma)..."
 sudo -u "$APP_USER" -H bash -lc "cd '$APP_HOME/server' && npx prisma generate && npx prisma db push" >/dev/null 2>&1 || { err "Prisma db push falló — ver schema.prisma y DATABASE_URL"; exit 1; }

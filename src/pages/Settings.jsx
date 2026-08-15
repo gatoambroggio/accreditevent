@@ -7,6 +7,7 @@ import { MODULES, ROLES, DEFAULT_ROLE_ACCESS } from '@/lib/modules';
 import ListEditor from '@/components/ui/list-editor';
 import { checkAgent, getAgentPrinters } from '@/lib/printAgent';
 import { downloadAgentScript } from '@/lib/printAgentFile';
+import PrinterSelect from '@/components/PrinterSelect';
 
 function Field({ label, value, onChange, type = 'text', placeholder = '', hint }) {
   return (
@@ -107,7 +108,13 @@ export default function Settings() {
     setAgentStatus('checking');
     const info = await checkAgent();
     setAgentStatus(info ? 'connected' : 'disconnected');
-    if (!info) setAgentPrinters(null);
+    if (info) {
+      // Auto-cargar las impresoras para poblar los dropdowns sin click extra.
+      const printers = await getAgentPrinters();
+      setAgentPrinters(printers);
+    } else {
+      setAgentPrinters(null);
+    }
   };
 
   const handleListPrinters = async () => {
@@ -294,35 +301,25 @@ export default function Settings() {
 
         {/* Configuración de impresoras */}
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label className="block">
-              <span className="mb-1.5 block text-xs font-semibold text-slate-600">Impresora personal (A)</span>
-              <input
-                type="text"
-                value={settings.printer_personal || ''}
-                onChange={(e) => update('printer_personal', e.target.value)}
-                placeholder="Nombre exacto de la impresora A"
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-              />
-              <p className="mt-1 text-xs text-slate-400">Para credenciales personales</p>
-            </label>
-          </div>
-          <div>
-            <label className="block">
-              <span className="mb-1.5 block text-xs font-semibold text-slate-600">Impresora vehicular (B)</span>
-              <input
-                type="text"
-                value={settings.printer_vehicular || ''}
-                onChange={(e) => update('printer_vehicular', e.target.value)}
-                placeholder="Nombre exacto de la impresora B"
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-              />
-              <p className="mt-1 text-xs text-slate-400">Para credenciales de vehículos</p>
-            </label>
-          </div>
+          <PrinterSelect
+            label="Impresora personal (A)"
+            value={settings.printer_personal}
+            onChange={(v) => update('printer_personal', v)}
+            printers={agentPrinters}
+            placeholder="Nombre exacto de la impresora A"
+            hint="Para credenciales personales"
+          />
+          <PrinterSelect
+            label="Impresora vehicular (B)"
+            value={settings.printer_vehicular}
+            onChange={(v) => update('printer_vehicular', v)}
+            printers={agentPrinters}
+            placeholder="Nombre exacto de la impresora B"
+            hint="Para credenciales de vehículos"
+          />
         </div>
 
-        {/* Listar impresoras del agente */}
+        {/* Actualizar impresoras detectadas */}
         {agentStatus === 'connected' && (
           <div className="mt-4">
             <button
@@ -331,30 +328,12 @@ export default function Settings() {
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
             >
               {loadingPrinters ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              Ver impresoras disponibles
+              Actualizar impresoras
             </button>
-            {agentPrinters && (
-              <div className="mt-3">
-                {agentPrinters.length === 0 ? (
-                  <div className="text-xs text-amber-600">
-                    <p>No se encontraron impresoras en el equipo.</p>
-                    <p className="mt-1">Abrí <code className="rounded bg-slate-100 px-1">http://localhost:9100/debug</code> en el navegador para ver qué detecta el agente.</p>
-                  </div>
-                ) : (
-                  <div className="flex flex-wrap gap-1.5">
-                    {agentPrinters.map((p) => (
-                      <button
-                        key={p}
-                        onClick={() => { navigator.clipboard?.writeText(p).catch(() => {}); }}
-                        className="rounded-md bg-slate-100 px-2 py-1 font-mono text-xs text-slate-700 transition hover:bg-slate-200"
-                        title="Copiar al portapapeles"
-                      >
-                        {p}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+            {agentPrinters && agentPrinters.length === 0 && (
+              <p className="mt-2 text-xs text-amber-600">
+                No se encontraron impresoras. Abrí <code className="rounded bg-slate-100 px-1">http://localhost:9100/debug</code> en el navegador para ver qué detecta el agente.
+              </p>
             )}
           </div>
         )}
