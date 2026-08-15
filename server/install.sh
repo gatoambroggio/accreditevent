@@ -140,6 +140,18 @@ if ! sudo -u "$APP_USER" -H bash -lc "cd '$APP_HOME/server' && SEED_EMAIL=admin@
 fi
 ok "Servidor instalado + DB migrada + seed"
 
+# ── 4b. Importación de datos desde la nube (opcional) ─────────────────────────
+step "Importación de datos (opcional)"
+IMPORT_ZIP="$APP_HOME/server/import-data.zip"
+if [[ -f "$IMPORT_ZIP" ]]; then
+  log "Detectado import-data.zip — importando datos de la nube..."
+  # Necesita adm-zip (instalado en el paso 4 como dependencia).
+  sudo -u "$APP_USER" -H bash -lc "cd '$APP_HOME/server' && npm run import:from-zip -- '$IMPORT_ZIP'" 2>&1 | tee /tmp/ae-import.log || warn "La importación tuvo errores — ver /tmp/ae-import.log"
+  ok "Importación finalizada"
+else
+  ok "Sin import-data.zip — base vacía (normal en install fresco). Copiá el ZIP exportado desde el panel de la nube para migrar tu data."
+fi
+
 # ── 5. Frontend React ─────────────────────────────────────────────────────────
 step "Frontend React: build self-hosted (air-gapped)"
 if [[ -f "$FRONTEND_DIR/package.json" ]]; then

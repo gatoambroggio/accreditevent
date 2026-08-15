@@ -11,13 +11,15 @@
     "prisma:migrate": "prisma migrate dev --name init",
     "prisma:deploy": "prisma migrate deploy",
     "seed": "node src/seed.js",
-    "migrate:from-cloud": "node src/migrate-from-cloud.js"
+    "migrate:from-cloud": "node src/migrate-from-cloud.js",
+    "import:from-zip": "node src/import-from-zip.js"
   },
   "prisma": {
     "schema": "prisma/schema.prisma"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "adm-zip": "^0.5.16",
     "@simplewebauthn/server": "^11.0.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",

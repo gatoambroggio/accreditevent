@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { Loader2, Save, Upload, ArrowRight, DatabaseZap, ShieldCheck } from 'lucide-react';
+import { useAuth } from '@/lib/AuthContext';
+import { Loader2, Save, Upload, ArrowRight, DatabaseZap, ShieldCheck, Download } from 'lucide-react';
 import { MODULES, ROLES, DEFAULT_ROLE_ACCESS } from '@/lib/modules';
 import ListEditor from '@/components/ui/list-editor';
 
@@ -53,6 +54,8 @@ const CATALOG_LINKS = [
 ];
 
 export default function Settings() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
   const [settings, setSettings] = useState(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -61,6 +64,9 @@ export default function Settings() {
   const [cleaning, setCleaning] = useState(false);
   const [cleanReport, setCleanReport] = useState(null);
   const [cleanError, setCleanError] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [exportReport, setExportReport] = useState(null);
+  const [exportError, setExportError] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -125,6 +131,35 @@ export default function Settings() {
       setCleanError(err.message);
     } finally {
       setCleaning(false);
+    }
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    setExportError('');
+    setExportReport(null);
+    try {
+      const res = await base44.functions.invoke('exportData', {});
+      const data = res?.data ?? res;
+      if (data?.error) throw new Error(data.error);
+      if (!data?.zip_base64) throw new Error('La exportación no devolvió el ZIP.');
+      const byteChars = atob(data.zip_base64);
+      const bytes = new Uint8Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
+      const blob = new Blob([bytes], { type: 'application/zip' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = data.filename || 'accreditevent-export.zip';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setExportReport(data.manifest);
+    } catch (err) {
+      setExportError(err.message);
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -397,6 +432,41 @@ export default function Settings() {
           </div>
         )}
       </Section>
+
+      {isAdmin && (
+        <Section title="Exportar datos (migración self-hosted)" description="Generá un ZIP con toda la data del sistema (eventos, personas, acreditaciones, vehículos, documentos, etc.) para migrarla al servidor local air-gapped. Descargá el ZIP, copialo al servidor en /opt/accreditevent/server/import-data.zip y volvé a correr el instalador.">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50"
+            >
+              {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              {exporting ? 'Generando ZIP…' : 'Exportar y descargar ZIP'}
+            </button>
+            <p className="text-xs text-slate-500">Incluye todas las entidades con sus IDs originales (QR y credenciales siguen siendo válidos).</p>
+          </div>
+          {exportError && (
+            <div className="mt-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">{exportError}</div>
+          )}
+          {exportReport && (
+            <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/50 p-4">
+              <div className="flex items-center gap-2 text-sm font-bold text-emerald-800">
+                <Download className="h-4 w-4" /> Exportación descargada
+              </div>
+              <p className="mt-1 text-xs text-slate-600">Copiá el ZIP a <code className="rounded bg-slate-100 px-1">/opt/accreditevent/server/import-data.zip</code> en el servidor y re-ejecutá el instalador.</p>
+              <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-slate-700 sm:grid-cols-3">
+                {Object.entries(exportReport.entities || {}).filter(([, v]) => typeof v === 'number').map(([k, v]) => (
+                  <div key={k} className="flex justify-between border-b border-emerald-100/70 pb-1">
+                    <span className="font-mono text-[10px] uppercase tracking-wide text-slate-500">{k}</span>
+                    <span className="font-bold text-slate-900">{v}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </Section>
+      )}
 
       <Section title="Catálogos" description="Acceso rápido a la gestión de catálogos del sistema">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
