@@ -23,7 +23,7 @@ const { execFile } = require('child_process');
 const { promisify } = require('util');
 
 const execFileAsync = promisify(execFile);
-const PORT = 9100;
+const PORTS = [9100, 9101, 9200, 9300, 4100];
 const PLATFORM = process.platform;
 const VERSION = '1.0.0';
 
@@ -199,18 +199,43 @@ var server = http.createServer(function (req, res) {
   sendJSON(res, 404, { error: 'Not found' });
 });
 
-server.listen(PORT, '127.0.0.1', function () {
-  console.log('AccreditEvent Print Agent escuchando en http://127.0.0.1:' + PORT);
-  console.log('Plataforma: ' + PLATFORM);
-  if (PLATFORM === 'win32') {
-    var sumatra = findSumatra();
-    if (sumatra) {
-      console.log('SumatraPDF: ' + sumatra);
-    } else {
-      console.log('ADVERTENCIA: SumatraPDF no encontrado. Ver README.md (Windows).');
+function tryListen(srv, port) {
+  return new Promise(function (resolve, reject) {
+    srv.once('listening', function () { resolve(port); });
+    srv.once('error', function (err) { reject(err); });
+    srv.listen(port, '127.0.0.1');
+  });
+}
+
+(function () {
+  var idx = 0;
+  function next() {
+    if (idx >= PORTS.length) {
+      console.error('No se pudo escuchar en ningún puerto de la lista: ' + PORTS.join(', '));
+      console.error('En Windows el puerto 9100 puede estar reservado por Hyper-V/WSL.');
+      console.error('Ejecutá como admin o liberá el puerto con: net stop winnat & net start winnat');
+      process.exit(1);
+      return;
     }
-  } else {
-    console.log('Usando: lp (CUPS)');
+    var p = PORTS[idx++];
+    tryListen(server, p).then(function () {
+      console.log('AccreditEvent Print Agent escuchando en http://127.0.0.1:' + p);
+      console.log('Plataforma: ' + PLATFORM);
+      if (PLATFORM === 'win32') {
+        var sumatra = findSumatra();
+        if (sumatra) {
+          console.log('SumatraPDF: ' + sumatra);
+        } else {
+          console.log('ADVERTENCIA: SumatraPDF no encontrado. Ver README.md (Windows).');
+        }
+      } else {
+        console.log('Usando: lp (CUPS)');
+      }
+      console.log('Presiona Ctrl+C para detener.');
+    }).catch(function (err) {
+      console.error('No se pudo usar el puerto ' + p + ' (' + (err.code || err.message) + ') — probando otro...');
+      next();
+    });
   }
-  console.log('Presiona Ctrl+C para detener.');
-});
+  next();
+})();

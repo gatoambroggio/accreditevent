@@ -1,45 +1,73 @@
-// Integración con el AccreditEvent Print Agent (localhost:9100).
-// Si el agente no está disponible, cae al diálogo del navegador (window.print()).
+// Integración con el AccreditEvent Print Agent.
+// El agente escucha en 127.0.0.1 en uno de varios puertos posibles (9100,
+// 9101, 9200, 9300, 4100) para esquivar puertos reservados en Windows.
+// Usamos 127.0.0.1 (no localhost) para evitar que macOS resuelva a IPv6 (::1)
+// mientras el agente escucha solo en IPv4. Si el agente no está disponible,
+// cae al diálogo del navegador (window.print()).
 
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
-const AGENT_URL = 'http://localhost:9100';
-const TIMEOUT_MS = 1500;
+const AGENT_HOST = '127.0.0.1';
+const AGENT_PORTS = [9100, 9101, 9200, 9300, 4100];
+let _agentPort = null;
 
-function fetchWithTimeout(url, options = {}, ms = TIMEOUT_MS) {
+function fetchWithTimeout(url, options = {}, ms = 1500) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
   return fetch(url, { ...options, signal: controller.signal })
     .finally(() => clearTimeout(timer));
 }
 
-// Verifica si el agente local está corriendo
-export async function checkAgent() {
-  try {
-    const res = await fetchWithTimeout(`${AGENT_URL}/health`, {}, TIMEOUT_MS);
-    if (res.ok) return await res.json();
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-// Lista las impresoras disponibles en el sistema operativo del agente
-export async function getAgentPrinters() {
-  try {
-    const res = await fetchWithTimeout(`${AGENT_URL}/printers`, {}, 6000);
-    if (res.ok) {
-      const data = await res.json();
-      return data.printers || [];
+// Descubre en qué puerto escucha el agente probando /health en cada candidato.
+function discoverPort() {
+  if (_agentPort) return Promise.resolve(_agentPort);
+  return (async () => {
+    for (const port of AGENT_PORTS) {
+      try {
+        const res = await fetchWithTimeout(`http://${AGENT_HOST}:${port}/health`, {}, 1500);
+        if (res.ok) { _agentPort = port; return port; }
+      } catch {}
     }
-    return [];
+    return null;
+  })();
+}
+
+async function agentUrl(path) {
+  const port = await discoverPort();
+  return port ? `http://${AGENT_HOST}:${port}${path}` : null;
+}
+
+// Verifica si el agente local está corriendo (y cachea el puerto).
+export async function checkAgent() {
+  const port = await discoverPort();
+  if (!port) return null;
+  try {
+    const res = await fetchWithTimeout(`http://${AGENT_HOST}:${port}/health`, {}, 1500);
+    if (!res.ok) { _agentPort = null; return null; }
+    return await res.json();
   } catch {
+    _agentPort = null;
+    return null;
+  }
+}
+
+// Lista las impresoras disponibles en el sistema operativo del agente.
+export async function getAgentPrinters() {
+  const url = await agentUrl('/printers');
+  if (!url) return [];
+  try {
+    const res = await fetchWithTimeout(url, {}, 6000);
+    if (!res.ok) { _agentPort = null; return []; }
+    const data = await res.json();
+    return data.printers || [];
+  } catch {
+    _agentPort = null;
     return [];
   }
 }
 
-// Genera un PDF (base64) desde un elemento DOM del badge
+// Genera un PDF (base64) desde un elemento DOM del badge.
 async function elementToPdfBase64(element) {
   const canvas = await html2canvas(element, {
     scale: 3,
@@ -48,7 +76,6 @@ async function elementToPdfBase64(element) {
     logging: false,
   });
 
-  // Convertir dimensiones del elemento a mm (1px ≈ 0.2646mm a 96 DPI)
   const wPx = element.offsetWidth || 800;
   const hPx = element.offsetHeight || 600;
   const wMm = wPx * 0.264583;
@@ -67,25 +94,26 @@ async function elementToPdfBase64(element) {
 }
 
 // Envía un elemento DOM como PDF a la impresora del agente.
-// Devuelve true si se envió, false si el agente no está disponible o falló.
 export async function printToAgent(element, printerName, copies = 1) {
   if (!printerName) return false;
+  const url = await agentUrl('/print');
+  if (!url) return false;
   try {
     const base64 = await elementToPdfBase64(element);
-    const res = await fetchWithTimeout(`${AGENT_URL}/print`, {
+    const res = await fetchWithTimeout(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ printer: printerName, pdf_base64: base64, copies }),
     }, 10000);
-    return res.ok;
+    if (!res.ok) { _agentPort = null; return false; }
+    return true;
   } catch {
+    _agentPort = null;
     return false;
   }
 }
 
 // Imprime varios elementos secuencialmente al agente.
-// onProgress(currentIndex, total) se llama después de cada intento.
-// Devuelve { sent, total, usedFallback }.
 export async function printBatchToAgent(elements, printerName, onProgress) {
   if (!printerName) {
     if (onProgress) onProgress(elements.length, elements.length);
@@ -96,12 +124,15 @@ export async function printBatchToAgent(elements, printerName, onProgress) {
     if (onProgress) onProgress(i, elements.length);
     try {
       const base64 = await elementToPdfBase64(elements[i]);
-      const res = await fetchWithTimeout(`${AGENT_URL}/print`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ printer: printerName, pdf_base64: base64, copies: 1 }),
-      }, 10000);
-      if (res.ok) sent++;
+      const url = await agentUrl('/print');
+      if (url) {
+        const res = await fetchWithTimeout(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ printer: printerName, pdf_base64: base64, copies: 1 }),
+        }, 10000);
+        if (res && res.ok) sent++;
+      }
     } catch {}
     if (i < elements.length - 1) await new Promise((r) => setTimeout(r, 500));
   }
