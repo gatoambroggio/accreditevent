@@ -285,12 +285,47 @@ systemctl restart accreditevent
 sleep 2
 if systemctl is-active --quiet accreditevent; then ok "Servicio accreditevent activo"; else err "El servicio no arrancó — ver: journalctl -u accreditevent -n 50"; fi
 
-# ── 8. Nginx ──────────────────────────────────────────────────────────────────
-step "Nginx: sitio + reverse proxy"
+# ── 8. Certificado SSL (self-signed, 10 años) ─────────────────────────────────
+# La cámara (getUserMedia) solo funciona en origins seguros (HTTPS o localhost).
+# Generamos un certificado self-signed en una carpeta propia del app para no
+# depender de /etc/ssl/private (que puede no existir en imágenes mínimas).
+step "Certificado SSL self-signed"
+SSL_DIR="$APP_HOME/ssl"
+install -d -o root -g root "$SSL_DIR"
+SSL_CRT="$SSL_DIR/ae-self.crt"
+SSL_KEY="$SSL_DIR/ae-self.key"
+if [[ ! -s "$SSL_CRT" || ! -s "$SSL_KEY" ]]; then
+  log "Generando certificado self-signed (10 años)..."
+  openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+    -keyout "$SSL_KEY" \
+    -out "$SSL_CRT" \
+    -subj "/CN=accreditevent-local" >/dev/null 2>&1 || { err "openssl falló al generar el certificado"; exit 1; }
+  chmod 600 "$SSL_KEY"
+  chmod 644 "$SSL_CRT"
+  ok "Certificado generado en $SSL_DIR"
+else
+  ok "Certificado ya existe (conservado)"
+fi
+
+# ── 9. Nginx ──────────────────────────────────────────────────────────────────
+step "Nginx: sitio HTTPS + reverse proxy + redirección HTTP→HTTPS"
 cat > /etc/nginx/sites-available/accreditevent <<EOF
+# HTTP → HTTPS (redirección forzada para que getUserMedia/cámara funcione en LAN)
 server {
     listen 80;
     server_name $DOMAIN;
+    return 301 https://\$host\$request_uri;
+}
+
+# HTTPS principal
+server {
+    listen 443 ssl;
+    server_name $DOMAIN;
+
+    ssl_certificate     $SSL_CRT;
+    ssl_certificate_key $SSL_KEY;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
     root $APP_HOME/frontend/dist;
     index index.html;
 
@@ -304,6 +339,7 @@ server {
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
         client_max_body_size 16m;
     }
 
@@ -328,9 +364,9 @@ ln -sf /etc/nginx/sites-available/accreditevent /etc/nginx/sites-enabled/accredi
 rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
 nginx -t 2>/dev/null || { err "Config de Nginx inválida — ver arriba"; exit 1; }
 systemctl reload nginx
-ok "Nginx configurado y recargado"
+ok "Nginx configurado (HTTPS + redirección) y recargado"
 
-# ── 9. Verificación ───────────────────────────────────────────────────────────
+# ── 10. Verificación ──────────────────────────────────────────────────────────
 step "Verificación"
 sleep 2
 API_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$SERVER_PORT/api/health" 2>/dev/null || echo "000")
@@ -340,19 +376,30 @@ else
   err "API no responde (HTTP $API_CODE) — ver: journalctl -u accreditevent -n 80"
 fi
 
-WEB_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1/" 2>/dev/null || echo "000")
+# El frontend se sirve por HTTPS; usamos -k para aceptar el cert self-signed.
+WEB_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "https://127.0.0.1/" 2>/dev/null || echo "000")
 if [[ "$WEB_CODE" == "200" ]]; then
-  ok "Frontend sirve en http://127.0.0.1/ (200)"
+  ok "Frontend sirve en https://127.0.0.1/ (200)"
 else
-  err "Frontend NO sirve (HTTP $WEB_CODE). Diagnóstico:"
+  err "Frontend NO sirve (HTTPS $WEB_CODE). Diagnóstico:"
   echo "    -- dist/index.html:"
   ls -la "$APP_HOME/frontend/dist/index.html" 2>/dev/null || echo "      NO EXISTE — el build no se copió"
   echo "    -- permisos en la cadena de directorios:"
   namei -l "$APP_HOME/frontend/dist/index.html" 2>/dev/null || true
   echo "    -- ¿puede www-data leer index.html?"
   if sudo -u www-data test -r "$APP_HOME/frontend/dist/index.html" 2>/dev/null; then echo "      sí"; else echo "      NO (problema de permisos)"; fi
+  echo "    -- certificado SSL:"
+  ls -la "$SSL_CRT" "$SSL_KEY" 2>/dev/null || echo "      NO EXISTEN — el paso de SSL falló"
   echo "    -- últimos errores de Nginx:"
   tail -n 20 /var/log/nginx/error.log 2>/dev/null || true
+fi
+
+# Verificar que la redirección HTTP→HTTPS funciona
+REDIR_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1/" 2>/dev/null || echo "000")
+if [[ "$REDIR_CODE" == "301" ]]; then
+  ok "Redirección HTTP→HTTPS activa (301)"
+else
+  warn "La redirección HTTP→HTTPS no responde 301 (got $REDIR_CODE) — revisar config de Nginx"
 fi
 
 LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
@@ -360,10 +407,10 @@ if [[ "$API_CODE" == "200" && "$WEB_CODE" == "200" ]]; then
   echo -e "\n${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
   echo -e "${GREEN}  AccreditEvent self-hosted instalado y corriendo${NC}"
   echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-  echo -e "  Panel:       ${GREEN}http://${LAN_IP:-127.0.0.1}/${NC}"
+  echo -e "  Panel:       ${GREEN}https://${LAN_IP:-127.0.0.1}/${NC}"
   echo -e "  Superadmin:  ${GREEN}admin@accreditevent.local${NC} / ${GREEN}admin123${NC}"
-  echo -e "  Webhook Dahua:  ${GREEN}http://${LAN_IP:-127.0.0.1}/api/webhooks/dahua?key=API_KEY&sn=SERIAL${NC}"
-  echo -e "  Webhook ZKTeco: ${GREEN}http://${LAN_IP:-127.0.0.1}/api/webhooks/zkteco?key=API_KEY&SN=SERIAL${NC}"
+  echo -e "  Webhook Dahua:  ${GREEN}https://${LAN_IP:-127.0.0.1}/api/webhooks/dahua?key=API_KEY&sn=SERIAL${NC}"
+  echo -e "  Webhook ZKTeco: ${GREEN}https://${LAN_IP:-127.0.0.1}/api/webhooks/zkteco?key=API_KEY&SN=SERIAL${NC}"
   echo -e "  Logs:        journalctl -u accreditevent -f"
   echo -e "  Reiniciar:   systemctl restart accreditevent"
   echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
