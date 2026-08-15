@@ -173,6 +173,11 @@ export default defineConfig({
 EOF
   ok "Parches self-hosted aplicados (idempotente)"
 
+  # El repo clonado quedó con owner root (sudo git clone): darle permiso de
+  # escritura al usuario de servicio para que npm install / vite puedan crear
+  # node_modules y dist.
+  chown -R "$APP_USER":"$APP_USER" "$FRONTEND_DIR" 2>/dev/null || true
+
   log "npm install (frontend)..."
   sudo -u "$APP_USER" -H bash -lc "cd '$FRONTEND_DIR' && npm install" || warn "npm install del frontend tuvo warnings"
 
