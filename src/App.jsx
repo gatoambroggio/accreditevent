@@ -38,6 +38,7 @@ import Reports from '@/pages/Reports';
 import Settings from '@/pages/Settings';
 import ZKTecoDevices from '@/pages/ZKTecoDevices';
 import DahuaDevices from '@/pages/DahuaDevices';
+import Patentes from '@/pages/Patentes';
 import Vehicles from '@/pages/Vehicles';
 import ParkingSectors from '@/pages/ParkingSectors';
 import ParkingCapacities from '@/pages/ParkingCapacities';
@@ -116,6 +117,7 @@ const AuthenticatedApp = () => {
         <Route path="/pda-id" element={<PdaId />} />
         <Route path="/zkteco-devices" element={<ZKTecoDevices />} />
         <Route path="/dahua-devices" element={<DahuaDevices />} />
+        <Route path="/patentes" element={<Patentes />} />
         <Route path="/vehicles" element={<Vehicles />} />
         <Route path="/parking-sectors" element={<ParkingSectors />} />
         <Route path="/parking-capacities" element={<ParkingCapacities />} />

@@ -25,6 +25,7 @@ import {
   Layers,
   Cpu,
   Fingerprint,
+  ScanSearch,
   ListPlus,
   Car,
   SquareParking,
@@ -69,6 +70,7 @@ const NAV_ITEMS = [
   { path: '/documents', label: 'Documentos', icon: FileText, minLevel: 1 },
   { path: '/registered-vehicles', label: 'Vehículos registrados', icon: ClipboardList, minLevel: 1 },
   { path: '/vehicles', label: 'Vehículos acreditados', icon: Car, minLevel: 1 },
+  { path: '/patentes', label: 'Lector de patentes', icon: ScanSearch, minLevel: 0 },
   { path: '/parking', label: 'Estacionamiento', icon: SquareParking, minLevel: 1, expandable: true, children: [
     { path: '/parking-sectors', label: 'Sectores de estacionamiento' },
     { path: '/parking-capacities', label: 'Capacidades por evento' },

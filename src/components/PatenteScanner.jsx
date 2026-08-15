@@ -1,0 +1,188 @@
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Camera, Loader2, Upload, Check, X, RotateCcw, ScanLine } from 'lucide-react';
+import { base44 } from '@/api/base44Client';
+import { toast } from '@/components/ui/use-toast';
+
+// Lector de patentes reutilizable. Captura con cámara (o subida de foto),
+// invoca readPatente (visión + validación) y muestra el dominio detectado con
+// edición manual. onPatente(patente) se dispara al confirmar.
+export default function PatenteScanner({ onPatente, autoConfirm = false }) {
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const [streaming, setStreaming] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [result, setResult] = useState(null);
+  const [manual, setManual] = useState('');
+  const [error, setError] = useState('');
+
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    setStreaming(false);
+  }, []);
+
+  const startCamera = useCallback(async () => {
+    setError('');
+    setResult(null);
+    setManual('');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play().catch(() => {});
+      }
+      setStreaming(true);
+    } catch (e) {
+      setError('No se pudo acceder a la cámara. Usá "Subir foto".');
+    }
+  }, []);
+
+  useEffect(() => () => stopCamera(), [stopCamera]);
+
+  const processBlob = async (blob) => {
+    setProcessing(true);
+    setError('');
+    setResult(null);
+    try {
+      const file = new File([blob], 'patente.jpg', { type: blob.type || 'image/jpeg' });
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const res = await base44.functions.invoke('readPatente', { file_url });
+      const d = res?.data ?? res;
+      if (d?.error) throw new Error(d.error);
+      setResult(d);
+      setManual(d.patente || '');
+      if (d.patente && d.valido && autoConfirm && onPatente) {
+        onPatente(d.patente);
+      }
+    } catch (e) {
+      setError(e.message || 'No se pudo leer la patente.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const capture = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => blob && processBlob(blob), 'image/jpeg', 0.92);
+  };
+
+  const handleFile = (e) => {
+    const f = e.target.files?.[0];
+    if (f) processBlob(f);
+  };
+
+  const confirm = () => {
+    const p = manual.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!p) {
+      toast({ title: 'Patente vacía', variant: 'destructive' });
+      return;
+    }
+    if (onPatente) onPatente(p);
+    toast({ title: 'Patente confirmada', description: p });
+  };
+
+  return (
+    <div className="space-y-4">
+      {!streaming && !result && (
+        <div className="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 py-10 text-center">
+          <Camera className="h-10 w-10 text-slate-300" />
+          <p className="text-sm text-slate-500">Capturá o subí una foto de la patente</p>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <button onClick={startCamera} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800">
+              <Camera className="h-4 w-4" /> Abrir cámara
+            </button>
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+              <Upload className="h-4 w-4" /> Subir foto
+              <input type="file" accept="image/*" capture="environment" onChange={handleFile} className="hidden" />
+            </label>
+          </div>
+        </div>
+      )}
+
+      {streaming && (
+        <div className="space-y-3">
+          <div className="relative overflow-hidden rounded-2xl bg-slate-900">
+            <video ref={videoRef} playsInline muted className="h-auto w-full" />
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div className="h-20 w-3/4 rounded-lg border-2 border-emerald-400/80 shadow-[0_0_0_2000px_rgba(15,23,42,0.25)]" />
+            </div>
+            {processing && (
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-900/50">
+                <Loader2 className="h-8 w-8 animate-spin text-white" />
+              </div>
+            )}
+          </div>
+          <div className="flex items-center justify-center gap-2">
+            <button onClick={capture} disabled={processing} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:opacity-50">
+              {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanLine className="h-4 w-4" />}
+              {processing ? 'Leyendo…' : 'Capturar patente'}
+            </button>
+            <button onClick={stopCamera} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+              <X className="h-4 w-4" /> Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-700 ring-1 ring-red-200">
+          <X className="mt-0.5 h-4 w-4 shrink-0" /> {error}
+        </div>
+      )}
+
+      {result && (
+        <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="flex items-center justify-between">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-emerald-600">Patente detectada</span>
+            <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset ${result.valido ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-amber-50 text-amber-700 ring-amber-200'}`}>
+              {result.valido ? 'VÁLIDA' : 'REVISAR'}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            {/* Plato estilo patente argentina */}
+            <div className="grid min-w-[140px] place-items-center rounded-md border-2 border-slate-900 bg-white px-4 py-2">
+              <span className="font-mono text-2xl font-extrabold tracking-[0.15em] text-slate-900">{result.patente || '—'}</span>
+              <span className="mt-0.5 text-[8px] font-semibold uppercase tracking-wider text-slate-400">Argentina</span>
+            </div>
+            <div className="text-xs text-slate-500">
+              <p className="font-semibold text-slate-700">{result.descripcion}</p>
+              <p className="mt-0.5">Confianza: {Math.round((result.confianza || 0) * 100)}%</p>
+              {result.formato_detectado && result.formato_detectado !== 'desconocido' && (
+                <p className="mt-0.5">Modelo: {result.formato_detectado}</p>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">Corregir manualmente</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={manual}
+                onChange={(e) => setManual(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                placeholder="AB123CD"
+                maxLength={7}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-sm uppercase tracking-widest text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+              />
+              <button onClick={confirm} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800">
+                <Check className="h-4 w-4" /> Usar
+              </button>
+            </div>
+          </div>
+
+          <button onClick={() => { setResult(null); setManual(''); startCamera(); }} className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 hover:underline">
+            <RotateCcw className="h-3.5 w-3.5" /> Escanear otra patente
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
