@@ -1,112 +1,144 @@
-# AccreditEvent — Servidor local self-hosted (Fase 1 — slice vertical)
+# AccreditEvent — Servidor self-hosted (air-gapped, LAN) — COMPLETO
 
-Servidor **air-gapped** Node/Express/PostgreSQL/Prisma que corre en la LAN de
-Ubuntu. Fase 1: módulo de acreditación completo (Eventos + Personas +
-Acreditaciones + validación de acceso por QR/facial/patentes) con el mismo
-frontend React actual servido por Nginx desde el propio servidor.
+Reimplementación **100% local** de AccreditEvent sobre Node/Express/PostgreSQL,
+sin dependencia de internet ni de la nube de Base44. Replica todas las
+entidades, las 38 funciones backend, el motor de RLS, la autenticación JWT local
+y las integraciones de hardware (Dahua/ZKTeco) por LAN.
 
 ## Stack
-- Node.js 20+, Express
-- PostgreSQL 16 + Prisma
-- JWT + bcrypt + OTP local (sin Google en air-gap)
-- RLS middleware (mismo $or/$and/user_condition que los jsonc)
-- Tesseract OCR (patentes) — sin internet
+- Node.js 20+ · Express · PostgreSQL 16 · Prisma
+- JWT + bcrypt + OTP local (sin Google/cloud)
+- RLS middleware (mismo `$or`/`$and`/`user_condition` que los jsonc)
+- Tesseract.js (patentes y OCR de seguros — sin internet)
 - face-api.js en navegador (modelos servidos desde `/models`)
 - WebSocket local (realtime, reemplaza suscripciones de Base44)
-- Nginx (sirve React + reverse proxy /api + /ws)
+- Nginx (sirve React + reverse proxy `/api` + `/ws`)
+- WebAuthn (`@simplewebauthn/server`) para credenciales biométricas
 
 ## Estructura
 ```
 server/
-  package.json
-  .env.example
-  prisma/schema.prisma     # entidades del slice
+  install.sh               # ← instalador one-click para Ubuntu
+  package.json · .env.example · prisma/schema.prisma   # 30 entidades
   src/
-    index.js               # entry
-    app.js                 # express app + montaje de rutas
-    config/env.js
-    db/prisma.js
+    index.js · app.js      # entry + montaje de rutas
+    config/env.js · db/prisma.js
     auth/                  # jwt, bcrypt, routes, middleware
     rls/                   # engine + middleware + policies (espejo jsonc)
-    routes/                # events, persons, accreditations, access, pda, files, patentes, functions, settings
-    functions/             # getEventAccessData, readPatente, faceIdentify
+    routes/                # events, persons, accreditations, access, pda, files,
+                           # patentes, functions, settings, users, webhooks
+    functions/             # ← las 38 funciones backend portadas
+    shared/                # dahuaDigest (Digest Auth MD5), webauthn-utils
     realtime/ws.js         # WebSocket
-    seed.js                # superadmin + settings + niveles + sectores
+    seed.js · migrate-from-cloud.js   # datos iniciales + migración
   nginx/accreditevent.conf
 ```
 
-## Puesta en marcha (Ubuntu)
+## Instalación one-click (Ubuntu Server)
 
 ```bash
-# 1. Postgres local
-sudo apt install postgresql-16
-sudo -u postgres createuser accreditevent --pwprompt
-sudo -u postgres createdb accreditevent -O accreditevent
-
-# 2. Servidor
+# Copiá el repo a la máquina (air-gap o no) y:
 cd server
-cp .env.example .env        # editar DATABASE_URL, JWT_SECRET, REFRESH_TOKEN_SECRET
-npm install
-npx prisma migrate dev --name init
-npm run seed                # crea superadmin admin@accreditevent.local / admin123
-npm start                   # escucha :4000
-
-# 3. Frontend (build estático)
-cd ../  # raíz del repo
-npm install
-VITE_API_URL=/api npm run build
-sudo mkdir -p /opt/accreditevent/frontend/dist
-sudo cp -r dist/* /opt/accreditevent/frontend/dist/
-
-# 4. Modelos face-api.js (descargar UNA vez con internet, luego offline)
-#    Colocar pesos en server/public/models/: face_landmark_68_model-*.bin,
-#    face_recognition_model-*.bin, tiny_face_detector_model-*.bin, ssd_mobilenetv1-*.bin
-
-# 5. Nginx
-sudo cp server/nginx/accreditevent.conf /etc/nginx/sites-available/accreditevent
-sudo ln -s /etc/nginx/sites-available/accreditevent /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl reload nginx
+sudo bash install.sh
 ```
 
-Apuntá el navegador a `http://<ip-lan>` y entrá con el superadmin del seed.
+El instalador prepara **todo**: Node 20, PostgreSQL 16, Nginx, Tesseract,
+base de datos, `.env` con secretos aleatorios, migración Prisma, seed
+(superadmin `admin@accreditevent.local` / `admin123`), build del frontend,
+descarga de modelos face-api.js, servicio systemd y Nginx.
 
-## API (slice)
-- `POST /api/auth/login` · `POST /api/auth/register` · `POST /api/auth/verify-otp` · `GET /api/auth/me`
-- `GET/POST/PUT/DELETE /api/events` · `/api/people` · `/api/accreditations` · `/api/vehicles`
-- `POST /api/access/validate` — valida acceso (badge_code o plate) contra zona/sector/fase
-- `GET /api/pda/event-data/:eventId` — datos del evento para caché offline
-- `POST /api/pda/heartbeat` · `POST /api/pda/sync-logs`
-- `POST /api/patentes/read` — Tesseract local
-- `POST /api/functions/:name` — dispatcher (getEventAccessData, readPatente, faceIdentify)
-- `POST /api/files/upload` — disco local
-- `WS /ws` — realtime
+Al terminar:
+- Panel en `http://<ip-lan>/`
+- API en `http://<ip-lan>/api/health`
+- Webhooks en `http://<ip-lan>/api/webhooks/dahua` y `/zkteco`
 
-## Frontend
-El frontend no se reescribe. Solo se reemplaza el SDK: en `src/main.jsx` cambiá
-`import { base44 } from '@/api/base44Client'` por `import { base44 } from '@/api/localClient'`
-(este archivo ya está creado en `src/api/localClient.js`). Mismas páginas, componentes,
-estilos y tema — apuntan al servidor local.
+## Frontend: apuntar al servidor local
 
-## Migración de datos del slice
-Script pendiente (`src/migrate-from-cloud.js`): exporta eventos/personas/
-acreditaciones/usuarios/access-levels/settings de Base44 cloud y los importa en
-la Postgres local preservando IDs. Se arma en la siguiente iteración del slice.
+El frontend React **no se modifica** (mismas páginas, componentes, estilos).
+Solo hay que hacer que el SDK del frontend apunte al servidor local. En el
+repo self-hosted, reemplazá el contenido de `src/api/base44Client.js` por:
 
-## Fases siguientes (fuera de esta Fase 1)
-- Extender el esquema Prisma a las 30 entidades (Dahua, ZKTeco, Documents,
-  ProviderCompany, CustomField, AuditLog, etc.).
-- Reimplementar las 38 funciones backend restantes (dahuaSyncUsers, dahuaWebhook,
-  dahuaRemoteAction, zktecoWebhook, createUser, validateInsurance,
-  cleanupBiometrics, deletePerson, etc.).
-- Integrar hardware Dahua/ZKTeco por IP local (digest auth, JSON-RPC, webhooks).
-- Migración de datos completa.
-- SMTP local para OTP/notifications.
+```js
+export { base44 } from './localClient';
+export { base44 as default } from './localClient';
+```
+
+(`src/api/localClient.js` ya está creado con la superficie completa:
+entities CRUD + subscribe, auth.me/login/register/OTP/reset/updateMe,
+users.inviteUser, integrations.Core.UploadFile, functions.invoke,
+analytics.track, asServiceRole.)
+
+Después el build del frontend (`VITE_API_URL=/api npm run build`) sirve contra
+el servidor local vía Nginx.
+
+## Migración de datos desde la nube (una vez, con internet)
+
+Antes de desconectar la LAN, exportá los datos de la app de Base44 cloud a la
+Postgres local (preserva IDs hex de 24 chars → QR/badge codes siguen válidos):
+
+```bash
+cd server
+BASE44_API_URL=https://api.base44.com \
+BASE44_ADMIN_TOKEN=<jwt-del-superadmin-cloud> \
+npm run migrate:from-cloud
+```
+
+Migra en orden de dependencia: SystemSetting → Company → Event → User →
+Person → Accreditation → Vehicle → Biometric → Document → hardware → logs.
+
+## Las 38 funciones backend (todas en /api/functions/:name)
+
+**Hardware:** dahuaSyncUsers, dahuaRemoteAction, dahuaWebhook, zktecoWebhook
+**Visión:** readPatente (Tesseract), faceIdentify, faceVerify, checkFaceDuplicate, cleanupBiometrics, clearBiometrics
+**Seguros:** validateInsurance (Tesseract + matching determinista), checkPersonDocuments, checkDocumentDuplicate, reviewDocument, notifyExpiringDocuments
+**Documentos:** createDocument, deleteDocuments, uploadDocumentBase64
+**Usuarios/operadores:** createUser, changeUserPassword, assignOperator, updateOperator, getCompanyOperators, getOperatorModules, updateCompanyOperatorModules, processPendingOperators
+**Empresa/provider:** empresaSetup, providerSetup, saveProviderBiometric, getEmpresaEmployeeStatus, getCompanyEvents, getProductoraDocuments
+**Utilidades:** getEventAccessData, deletePerson, cleanupDatabase, closeExpiredEvents
+**WebAuthn:** webauthnRegister, webauthnVerify
+
+Todas exponidas vía `POST /api/functions/:name` con el mismo contrato que
+`base44.functions.invoke(name, payload)` → el frontend las llama sin cambios.
+
+## RLS completo
+`rls/policies/index.js` espeja las políticas de TODOS los jsonc. El motor
+(`rls/engine.js`) traduce `$or`/`$and`/`user_condition`/`{{user.data.*}}`/`$in`
+a filtros Prisma. Cada CRUD genérico aplica el filtro correcto por entidad y
+operación (read/create/update/delete), igual que la plataforma.
+
+## Hardware air-gapped
+- **Dahua**: Digest Auth MD5 propio (`shared/dahuaDigest.js`) + CGI por IP LAN.
+  Sync usuarios/rostros, open door, reboot, webhook de eventos.
+- **ZKTeco**: protocolo iClock (GET options/handshake, GET polling comandos,
+  POST accesos) con api_key local.
+- Ambos crean `AccessLog` + `DahuaCommand`/`ZKTecoCommand` y actualizan `last_seen`.
+- Sin puertos abiertos hacia internet — todo por la LAN.
 
 ## Notas air-gap
-- El OTP de registro/reset se **muestra en el log del servidor** (no hay email
-  saliente). En producción, configurar SMTP local si se quiere notificación.
-- face-api.js corre en el navegador; los pesos se sirven desde el propio
-  servidor (`/models`), sin internet.
-- InvokeLLM / GenerateImage / SendEmail de integrations.Core devuelven error
-  explícito en air-gap (no hay internet). Tesseract reemplaza la lectura de
-  patentes que antes usaba un LLM de visión.
+- El OTP de registro/reset se muestra en el **log del servidor** (no hay email).
+- face-api.js corre en el navegador; pesos servidos desde `/models` (sin internet).
+- `validateInsurance` usa Tesseract + matching determinista (reemplaza el LLM
+  de visión de Base44 — sin internet, sin timeouts).
+- `InvokeLLM`/`GenerateImage`/`SendEmail` de integrations.Core devuelven error
+  explícito en air-gap (configurar SMTP local si se quiere email).
+
+## Operación
+```bash
+systemctl status accreditevent     # estado
+systemctl restart accreditevent     # reiniciar
+journalctl -u accreditevent -f      # logs
+sudo -u accreditevent psql accreditevent -c "..."   # DB
+```
+
+## Estado
+- ✅ Schema: 30 entidades en Prisma
+- ✅ RLS: 24 entidades con políticas completas
+- ✅ Funciones: 38 portadas + dispatcher
+- ✅ Auth: JWT local + OTP + roles + inviteUser + changePassword + updateMe
+- ✅ Hardware: Dahua Digest + ZKTeco iClock + webhooks
+- ✅ Realtime: WebSocket local
+- ✅ Instalador: install.sh one-click
+- ✅ Migración: migrate-from-cloud.js
+- ✅ Frontend: localClient.js (superficie completa del SDK)
+
+El sistema completo está listo para desplegar air-gapped en Ubuntu.

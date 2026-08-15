@@ -185,8 +185,10 @@ const auth = {
   async isAuthenticated() { try { await http('/auth/me'); return true; } catch { return false; } },
   async logout(redirectUrl) { await http('/auth/logout', { method: 'POST', body: { refreshToken: _refreshToken } }); setToken(null); setRefresh(null); if (redirectUrl) window.location.href = redirectUrl; },
   async updateMe(data) { return http('/auth/me', { method: 'PUT', body: data }); },
+  async changePassword({ userId, newPassword }) { return http('/auth/change-password', { method: 'POST', body: { userId, newPassword } }); },
   async redirectToLogin(nextUrl) { window.location.href = `/login${nextUrl ? `?returnTo=${encodeURIComponent(nextUrl)}` : ''}`; },
   loginViaEmailPassword: (email, password) => auth.login({ email, password }),
+  loginWithProvider() { throw new Error('login con provider no disponible en modo air-gapped.'); },
 };
 
 // --- Funciones backend (mismo contrato que base44.functions.invoke) ---
@@ -218,7 +220,7 @@ const integrations = {
 
 // --- Users (invitaciones) ---
 const users = {
-  async inviteUser(email, role) { return http('/users/invite', { method: 'POST', body: { email, role } }); },
+  async inviteUser(email, role) { return http('/auth/invite', { method: 'POST', body: { email, role } }); },
 };
 
 // --- Analytics (no-op en local; log opcional) ---
@@ -226,9 +228,15 @@ const analytics = {
   track({ eventName, properties }) { /* noop en air-gap */ },
 };
 
-// asServiceRole: para el slice, opera con el token del usuario actual (no hay
-// service-role separado en el servidor local; el RLS aplica igual).
-const asServiceRole = { entities: {}, connectors: { getConnection: async () => null } };
+// asServiceRole: en el servidor local no hay service-role separado; las
+// funciones backend que necesitan acceso total usan prisma directamente. El
+// frontend que pide asServiceRole.entities cae al mismo proxy de entidades
+// (el RLS aplica con el token del usuario actual).
+const asServiceRole = {
+  entities: new Proxy({}, { get: (_t, name) => makeEntity(name) }),
+  integrations,
+  connectors: { getConnection: async () => null },
+};
 
 export const base44 = {
   auth,

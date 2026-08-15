@@ -21,20 +21,21 @@ async function main() {
     },
   });
 
-  await prisma.systemSetting.upsert({
-    where: { id: (await prisma.systemSetting.findFirst())?.id || '__new__' },
-    update: {},
-    create: {
-      system_name: 'AccreditEvent',
-      organization_name: 'Organización',
-      zones: [{ value: 'general', label: 'General' }, { value: 'backstage', label: 'Backstage' }, { value: 'tecnica', label: 'Técnica' }, { value: 'vip', label: 'VIP' }],
-      parking_sectors: [{ value: 'general', label: 'Estacionamiento general' }, { value: 'vip', label: 'VIP' }, { value: 'carga', label: 'Carga' }],
-      event_phases: [{ value: 'armado', label: 'Armado' }, { value: 'dia_evento', label: 'Día del evento' }, { value: 'desarme', label: 'Desarme' }],
-      default_grace_hours: 4,
-      role_access: {},
-      enabled_modules: {},
-    },
-  });
+  const existingSettings = await prisma.systemSetting.findFirst();
+  if (!existingSettings) {
+    await prisma.systemSetting.create({
+      data: {
+        system_name: 'AccreditEvent',
+        organization_name: 'Organización',
+        zones: [{ value: 'general', label: 'General' }, { value: 'backstage', label: 'Backstage' }, { value: 'tecnica', label: 'Técnica' }, { value: 'vip', label: 'VIP' }],
+        parking_sectors: [{ value: 'general', label: 'Estacionamiento general' }, { value: 'vip', label: 'VIP' }, { value: 'carga', label: 'Carga' }],
+        event_phases: [{ value: 'armado', label: 'Armado' }, { value: 'dia_evento', label: 'Día del evento' }, { value: 'desarme', label: 'Desarme' }],
+        default_grace_hours: 4,
+        role_access: {},
+        enabled_modules: {},
+      },
+    });
+  }
 
   await prisma.accessLevel.upsert({ where: { value: 'general' }, update: {}, create: { value: 'general', label: 'General', badge_prefix: 'GEN' } });
   await prisma.accessLevel.upsert({ where: { value: 'backstage' }, update: {}, create: { value: 'backstage', label: 'Backstage', badge_prefix: 'BCK' } });

@@ -145,6 +145,62 @@ authRouter.post('/logout', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// --- Update me (perfil extendido: company, full_name, etc.) ---
+authRouter.put('/me', async (req, res, next) => {
+  try {
+    const auth = req.headers.authorization || '';
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+    const payload = token ? verifyAccessToken(token) : null;
+    if (!payload) return res.status(401).json({ error: 'No autenticado' });
+    const { full_name, data } = req.body;
+    const update = {};
+    if (full_name !== undefined) update.full_name = full_name;
+    if (data !== undefined) update.data = data;
+    const user = await prisma.user.update({ where: { id: payload.sub }, data: update });
+    res.json({ id: user.id, email: user.email, full_name: user.full_name, role: user.role, data: user.data });
+  } catch (e) { next(e); }
+});
+
+// --- Invite user (air-gap: crea con temp password, no envía email) ---
+authRouter.post('/invite', async (req, res, next) => {
+  try {
+    const auth = req.headers.authorization || '';
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+    const payload = token ? verifyAccessToken(token) : null;
+    if (!payload) return res.status(401).json({ error: 'No autenticado' });
+    const caller = await prisma.user.findUnique({ where: { id: payload.sub } });
+    if (!['superadmin', 'admin', 'productora'].includes(caller.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { email, role } = req.body;
+    const e = String(email || '').toLowerCase();
+    if (!e) return res.status(400).json({ error: 'Email requerido' });
+    const exists = await prisma.user.findUnique({ where: { email: e } });
+    if (exists) return res.status(409).json({ error: 'Ya existe' });
+    const created = await prisma.user.create({ data: { email: e, password_hash: hashPassword('cambiar123'), role: role || 'user', email_verified: true, data: {} } });
+    res.json({ ok: true, id: created.id, message: 'Usuario creado con contraseña temporal "cambiar123"' });
+  } catch (e) { next(e); }
+});
+
+// --- changePassword (propia o de otro con jerarquía) ---
+authRouter.post('/change-password', async (req, res, next) => {
+  try {
+    const auth = req.headers.authorization || '';
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+    const payload = token ? verifyAccessToken(token) : null;
+    if (!payload) return res.status(401).json({ error: 'No autenticado' });
+    const { userId, newPassword } = req.body;
+    if (!userId || !newPassword || newPassword.length < 6) return res.status(400).json({ error: 'userId y newPassword (min 6) obligatorios' });
+    const caller = await prisma.user.findUnique({ where: { id: payload.sub } });
+    const HIER = { superadmin: 5, admin: 4, productora: 3, coordinator: 2, control: 1, provider: 0 };
+    if (userId !== caller.id && (HIER[caller.role] ?? -1) < 4) return res.status(403).json({ error: 'Solo puedes cambiar tu propia contraseña' });
+    if (userId !== caller.id) {
+      const target = await prisma.user.findUnique({ where: { id: userId } });
+      if ((HIER[target.role] ?? -1) >= (HIER[caller.role] ?? -1)) return res.status(403).json({ error: 'No puedes cambiar la contraseña de un usuario con rol igual o superior' });
+    }
+    await prisma.user.update({ where: { id: userId }, data: { password_hash: hashPassword(newPassword) } });
+    res.json({ success: true });
+  } catch (e) { next(e); }
+});
+
 // Helper interno: crea OTP vigente.
 async function createOtp(email, purpose) {
   const code = genOtp();

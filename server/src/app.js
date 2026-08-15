@@ -15,6 +15,8 @@ import { filesRouter } from './routes/files.js';
 import { patentesRouter } from './routes/patentes.js';
 import { functionInvokeRouter } from './routes/functions.js';
 import { settingsRouter } from './routes/settings.js';
+import { usersRouter } from './routes/users.js';
+import { webhooksRouter } from './routes/webhooks.js';
 import { makeCrudRouter } from './rls/middleware.js';
 import { initRealtime, broadcast } from './realtime/ws.js';
 
@@ -36,8 +38,11 @@ export function createApp() {
   app.use('/api/health', healthRouter);
   app.use('/api/auth', authRouter);
 
-  // Todo lo demás requiere auth (adjunta user a req.user). Las rutas públicas
-  // de hardware (webhooks) se montan aparte sin requireAuth.
+  // Webhooks de hardware: públicos (la terminal Dahua/ZKTeco no tiene token).
+  // Se autentican por api_key en query.
+  app.use('/api/webhooks', webhooksRouter);
+
+  // Todo lo demás requiere auth (adjunta user a req.user).
   app.use('/api/files', requireAuth, filesRouter);
   app.use('/api/patentes', requireAuth, patentesRouter);
   app.use('/api/functions', requireAuth, functionInvokeRouter);
@@ -49,6 +54,7 @@ export function createApp() {
   app.use('/api/accreditations', requireAuth, accreditationsRouter);
   app.use('/api/access', requireAuth, accessRouter);
   app.use('/api/pda', requireAuth, pdaRouter);
+  app.use('/api/users', requireAuth, usersRouter);
 
   // CRUD genéricos con RLS para el resto del slice.
   app.use('/api/vehicles', requireAuth, makeCrudRouter('Vehicle'));
@@ -58,6 +64,19 @@ export function createApp() {
   app.use('/api/biometrics', requireAuth, makeCrudRouter('Biometric'));
   app.use('/api/pda-stations', requireAuth, makeCrudRouter('PdaStation'));
   app.use('/api/access-logs', requireAuth, makeCrudRouter('AccessLog'));
+  app.use('/api/documents', requireAuth, makeCrudRouter('Document'));
+  app.use('/api/document-types', requireAuth, makeCrudRouter('DocumentType'));
+  app.use('/api/provider-companies', requireAuth, makeCrudRouter('ProviderCompany'));
+  app.use('/api/custom-fields', requireAuth, makeCrudRouter('CustomField'));
+  app.use('/api/event-company-approvals', requireAuth, makeCrudRouter('EventCompanyApproval'));
+  app.use('/api/provider-requests', requireAuth, makeCrudRouter('ProviderRequest'));
+  app.use('/api/requirement-items', requireAuth, makeCrudRouter('RequirementItem'));
+  app.use('/api/audit-logs', requireAuth, makeCrudRouter('AuditLog'));
+  app.use('/api/pending-operators', requireAuth, makeCrudRouter('PendingOperator'));
+  app.use('/api/dahua-devices', requireAuth, makeCrudRouter('DahuaDevice'));
+  app.use('/api/dahua-commands', requireAuth, makeCrudRouter('DahuaCommand'));
+  app.use('/api/zkteco-devices', requireAuth, makeCrudRouter('ZKTecoDevice'));
+  app.use('/api/zkteco-commands', requireAuth, makeCrudRouter('ZKTecoCommand'));
 
   // attachUser para rutas que quizá necesiten user sin requerir auth (webhooks)
   app.use(attachUser);

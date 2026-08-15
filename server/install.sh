@@ -1,0 +1,264 @@
+#!/usr/bin/env bash
+# =============================================================================
+# AccreditEvent Self-Hosted — Instalador one-click para Ubuntu Server (air-gapped)
+# =============================================================================
+# Prepara todo el stack en una sola corrida:
+#   - Node 20+, PostgreSQL 16, Nginx, libs de Tesseract
+#   - Base de datos + migración Prisma + seed (superadmin)
+#   - Build del frontend React + servido por Nginx
+#   - Modelos de face-api.js locales (sin internet)
+#   - .env con secretos aleatorios
+#   - Servicio systemd + Nginx reverse proxy (/api + /ws)
+#
+# Uso:  sudo bash install.sh
+# Re-ejecutable: detecta lo ya instalado y continúa desde donde falta.
+# =============================================================================
+set -euo pipefail
+
+# ── Configuración (editable) ─────────────────────────────────────────────────
+APP_USER="${APP_USER:-accreditevent}"
+APP_HOME="${APP_HOME:-/opt/accreditevent}"
+DB_NAME="${DB_NAME:-accreditevent}"
+DB_USER="${DB_USER:-accreditevent}"
+DB_PASS="${DB_PASS:-accreditevent}"
+SERVER_PORT="${SERVER_PORT:-4000}"
+DOMAIN="${DOMAIN:-_}"   # IP o dominio; "_" = cualquiera
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+FRONTEND_DIR="${FRONTEND_DIR:-$REPO_DIR}"   # raíz con package.json del frontend
+
+# ── Helpers ──────────────────────────────────────────────────────────────────
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
+log()  { echo -e "${GREEN}▶ $1${NC}"; }
+warn() { echo -e "${YELLOW}⚠ $1${NC}"; }
+err()  { echo -e "${RED}✗ $1${NC}" >&2; }
+step() { echo -e "\n${GREEN}═══ $1 ═══${NC}"; }
+ok()   { echo -e "${GREEN}✓ $1${NC}"; }
+has()  { command -v "$1" >/dev/null 2>&1; }
+rand() { openssl rand -hex 24; }
+
+# ── Prechecks ─────────────────────────────────────────────────────────────────
+step "Prechecks"
+if [[ $EUID -ne 0 ]]; then err "Ejecutá con sudo: sudo bash install.sh"; exit 1; fi
+if ! has lsb_release; then apt-get update -qq && apt-get install -qq -y lsb-release >/dev/null; fi
+DISTRO="$(lsb_release -is 2>/dev/null || echo Ubuntu)"
+if [[ "$DISTRO" != "Ubuntu" ]]; then warn "Distro detectado: $DISTRO (script pensado para Ubuntu; continuando igual)"; fi
+ok "Ejecutando como root en $DISTRO"
+
+# ── 1. Dependencias del sistema ──────────────────────────────────────────────
+step "Dependencias del sistema (Node, Postgres, Nginx, Tesseract)"
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq
+
+# Node 20+ vía NodeSource
+if ! has node || [[ "$(node -v 2>/dev/null | cut -d. -f1 | tr -d v)" -lt 20 ]]; then
+  log "Instalando Node 20 LTS..."
+  curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null 2>&1 || true
+  apt-get install -qq -y nodejs >/dev/null
+fi
+ok "Node $(node -v)"
+
+# PostgreSQL 16
+if ! has psql; then
+  log "Instalando PostgreSQL 16..."
+  apt-get install -qq -y curl ca-certificates gnupg >/dev/null
+  install -d /usr/share/postgresql-common/pgdg
+  curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc >/dev/null 2>&1 || true
+  echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list 2>/dev/null || true
+  apt-get update -qq
+  apt-get install -qq -y postgresql-16 >/dev/null 2>&1 || apt-get install -qq -y postgresql >/dev/null
+  systemctl enable --now postgresql >/dev/null 2>&1 || true
+fi
+ok "PostgreSQL $(psql --version 2>/dev/null | awk '{print $3}')"
+
+# Nginx
+if ! has nginx; then apt-get install -qq -y nginx >/dev/null; systemctl enable --now nginx >/dev/null 2>&1 || true; fi
+ok "Nginx $(nginx -v 2>&1 | cut -d/ -f2)"
+
+# Libs de sistema para Tesseract (tesseract.js las usa en runtime)
+apt-get install -qq -y tesseract-ocr tesseract-ocr-spa graphicsmagick build-essential python3 >/dev/null 2>&1 || warn "Algunas libs opcionales no se instalaron (tesseract.js trae su propio worker)"
+ok "Tesseract OCR + dependencias"
+
+# ── 2. Usuario de servicio + directorios ─────────────────────────────────────
+step "Usuario y directorios"
+if ! id -u "$APP_USER" >/dev/null 2>&1; then
+  useradd -r -m -d "$APP_HOME" -s /bin/bash "$APP_USER"
+fi
+install -d -o "$APP_USER" -g "$APP_USER" "$APP_HOME/server" "$APP_HOME/frontend/dist" "$APP_HOME/uploads" "$APP_HOME/server/public/models"
+ok "Usuario $APP_USER + $APP_HOME"
+
+# ── 3. Base de datos ──────────────────────────────────────────────────────────
+step "PostgreSQL: base de datos y usuario"
+DB_EXISTS=$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'" 2>/dev/null || echo "")
+if [[ "$DB_EXISTS" != "1" ]]; then
+  sudo -u postgres psql -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASS';" >/dev/null
+  sudo -u postgres psql -c "CREATE DATABASE $DB_NAME OWNER $DB_USER;" >/dev/null
+  sudo -u postgres psql -c "ALTER USER $DB_USER WITH SUPERUSER;" >/dev/null 2>&1 || true
+  ok "Base $DB_NAME + usuario $DB_USER creados"
+else
+  ok "Base $DB_NAME ya existe"
+fi
+
+# ── 4. Copiar código del servidor ────────────────────────────────────────────
+step "Servidor: código + dependencias"
+rsync -a --delete --exclude node_modules --exclude uploads "$REPO_DIR/server/" "$APP_HOME/server/"
+chown -R "$APP_USER":"$APP_USER" "$APP_HOME/server"
+
+# .env con secretos aleatorios
+if [[ ! -f "$APP_HOME/server/.env" ]]; then
+  JWT_SECRET=$(rand); REFRESH_SECRET=$(rand)
+  cat > "$APP_HOME/server/.env" <<EOF
+NODE_ENV=production
+PORT=$SERVER_PORT
+DATABASE_URL=postgresql://$DB_USER:$DB_PASS@127.0.0.1:5432/$DB_NAME?schema=public
+JWT_SECRET=$JWT_SECRET
+REFRESH_TOKEN_SECRET=$REFRESH_SECRET
+JWT_EXPIRES_IN=8h
+REFRESH_TOKEN_EXPIRES_IN=30d
+OTP_TTL_MINUTES=10
+LAN_BASE_URL=http://127.0.0.1:$SERVER_PORT
+UPLOAD_DIR=./uploads
+MAX_UPLOAD_MB=15
+TESSERACT_LANG=spa
+EOF
+  chmod 600 "$APP_HOME/server/.env"
+  chown "$APP_USER":"$APP_USER" "$APP_HOME/server/.env"
+  ok ".env generado con secretos aleatorios"
+else
+  ok ".env ya existe (conservado)"
+fi
+
+log "npm install (servidor)..."
+sudo -u "$APP_USER" -H bash -lc "cd '$APP_HOME/server' && npm install --omit=dev" >/dev/null 2>&1 || { err "npm install del servidor falló"; exit 1; }
+
+log "Prisma: generate + migrate..."
+sudo -u "$APP_USER" -H bash -lc "cd '$APP_HOME/server' && npx prisma generate && npx prisma migrate deploy" >/dev/null 2>&1 || { err "Prisma migrate falló"; exit 1; }
+
+log "Seed (superadmin admin@accreditevent.local / admin123)..."
+sudo -u "$APP_USER" -H bash -lc "cd '$APP_HOME/server' && SEED_EMAIL=admin@accreditevent.local SEED_PASSWORD=admin123 npm run seed" >/dev/null 2>&1 || warn "Seed ya aplicado o falló (revisar)"
+ok "Servidor instalado + DB migrada + seed"
+
+# ── 5. Frontend React ─────────────────────────────────────────────────────────
+step "Frontend React: build"
+if [[ -f "$FRONTEND_DIR/package.json" ]]; then
+  log "npm install (frontend)..."
+  sudo -u "$APP_USER" -H bash -lc "cd '$FRONTEND_DIR' && npm install" >/dev/null 2>&1 || warn "npm install del frontend tuvo warnings"
+  log "Vite build (VITE_API_URL=/api)..."
+  sudo -u "$APP_USER" -H bash -lc "cd '$FRONTEND_DIR' && VITE_API_URL=/api npm run build" >/dev/null 2>&1 || { err "Build del frontend falló"; exit 1; }
+  rsync -a --delete "$FRONTEND_DIR/dist/" "$APP_HOME/frontend/dist/"
+  ok "Frontend compilado en $APP_HOME/frontend/dist"
+else
+  warn "No se encontró frontend en $FRONTEND_DIR (se salta el build — copialo manualmente)"
+fi
+
+# ── 6. Modelos face-api.js (offline) ──────────────────────────────────────────
+step "Modelos face-api.js (servidos locales, sin internet)"
+MODELS_DIR="$APP_HOME/server/public/models"
+NEED_MODELS=0
+for f in tiny_face_detector_model-1.bin face_landmark_68_model-1.bin face_recognition_model-1.bin ssd_mobilenetv1_model-1.bin; do
+  [[ -f "$MODELS_DIR/$f" ]] || NEED_MODELS=1
+done
+if [[ $NEED_MODELS -eq 1 ]]; then
+  warn "Faltan modelos de face-api.js en $MODELS_DIR"
+  warn "Descargá (con internet UNA vez) y copialos a $MODELS_DIR desde:"
+  warn "  https://github.com/justadudewhohacks/face-api.js/tree/master/weights"
+  warn "O desde @vladmandic/face-api: node_modules/@vladmandic/face-api/weights/*.bin"
+  # Intento automático si hay internet:
+  if has wget; then
+    log "Intentando descarga automática (requiere internet esta vez)..."
+    BASE="https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights"
+    for f in tiny_face_detector_model-1.bin face_landmark_68_model-1.bin face_recognition_model-1.bin ssd_mobilenetv1_model-1.bin; do
+      wget -q -O "$MODELS_DIR/$f" "$BASE/$f" 2>/dev/null || warn "No se pudo descargar $f"
+    done
+    chown -R "$APP_USER":"$APP_USER" "$MODELS_DIR"
+  fi
+else
+  ok "Modelos de face-api.js presentes"
+fi
+
+# ── 7. systemd ────────────────────────────────────────────────────────────────
+step "Servicio systemd"
+cat > /etc/systemd/system/accreditevent.service <<EOF
+[Unit]
+Description=AccreditEvent self-hosted server
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=$APP_USER
+WorkingDirectory=$APP_HOME/server
+EnvironmentFile=$APP_HOME/server/.env
+ExecStart=$(which node) src/index.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable accreditevent >/dev/null 2>&1
+systemctl restart accreditevent
+sleep 2
+if systemctl is-active --quiet accreditevent; then ok "Servicio accreditevent activo"; else err "El servicio no arrancó — ver: journalctl -u accreditevent -n 50"; fi
+
+# ── 8. Nginx ──────────────────────────────────────────────────────────────────
+step "Nginx: sitio + reverse proxy"
+cat > /etc/nginx/sites-available/accreditevent <<EOF
+server {
+    listen 80;
+    server_name $DOMAIN;
+    root $APP_HOME/frontend/dist;
+    index index.html;
+
+    location / {
+        try_files \$uri \$uri/ /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:$SERVER_PORT;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        client_max_body_size 16m;
+    }
+
+    location /ws {
+        proxy_pass http://127.0.0.1:$SERVER_PORT;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 86400;
+    }
+
+    location /uploads/ {
+        alias $APP_HOME/server/uploads/;
+    }
+
+    location /models/ {
+        alias $APP_HOME/server/public/models/;
+    }
+}
+EOF
+ln -sf /etc/nginx/sites-available/accreditevent /etc/nginx/sites-enabled/accreditevent
+rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
+nginx -t 2>/dev/null || { err "Config de Nginx inválida — ver arriba"; exit 1; }
+systemctl reload nginx
+ok "Nginx configurado y recargado"
+
+# ── 9. Verificación ───────────────────────────────────────────────────────────
+step "Verificación"
+sleep 1
+if curl -sf "http://127.0.0.1:$SERVER_PORT/api/health" >/dev/null 2>&1; then ok "API responde en :$SERVER_PORT/api/health"; else err "API no responde"; fi
+if curl -sf "http://127.0.0.1/" >/dev/null 2>&1; then ok "Frontend sirve en http://127.0.0.1/"; else warn "Frontend aún no sirve (¿falta build?)"; fi
+
+LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+echo -e "\n${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${GREEN}  AccreditEvent self-hosted instalado y corriendo${NC}"
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "  Panel:       ${GREEN}http://${LAN_IP:-127.0.0.1}/${NC}"
+echo -e "  Superadmin:  ${GREEN}admin@accreditevent.local${NC} / ${GREEN}admin123${NC}"
+echo -e "  Webhook Dahua:  ${GREEN}http://${LAN_IP:-127.0.0.1}/api/webhooks/dahua?key=API_KEY&sn=SERIAL${NC}"
+echo -e "  Webhook ZKTeco: ${GREEN}http://${LAN_IP:-127.0.0.1}/api/webhooks/zkteco?key=API_KEY&SN=SERIAL${NC}"
+echo -e "  Logs:        journalctl -u accreditevent -f"
+echo -e "  Reiniciar:   systemctl restart accreditevent"
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
