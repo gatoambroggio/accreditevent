@@ -1,0 +1,306 @@
+// AccreditEvent self-hosted — Fase 1 (slice vertical).
+// Modela las entidades del slice con sus campos RLS-relevantes (denormalizados:
+// company, event_id, person_email, etc.) para que el middleware de RLS pueda
+// filtrar por ellos exactamente como los jsonc de Base44.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// IDs son String (24 hex lowercase, como Base44) para preservar IDs al migrar.
+// created_date/updated_date mapean a created_at/updated_at internamente.
+
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  password_hash   String
+  full_name       String?
+  role            String   @default("user")
+  // Datos extendidos del usuario (company, assigned_event_ids, etc.)
+  data            Json     @default("{}")
+  email_verified  Boolean  @default(false)
+  blocked         Boolean  @default(false)
+  created_by_id   String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@map("users")
+}
+
+// OTP pendientes de verificación (registro sin email en air-gap).
+model OtpCode {
+  id         String   @id @default(cuid())
+  email      String
+  code       String
+  purpose    String   @default("register") // register | reset
+  expires_at DateTime
+  consumed   Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  @@index([email, purpose])
+  @@map("otp_codes")
+}
+
+model RefreshToken {
+  id         String   @id @default(cuid())
+  user_id    String
+  token      String   @unique
+  expires_at DateTime
+  revoked    Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  @@index([user_id])
+  @@map("refresh_tokens")
+}
+
+model Company {
+  id                   String   @id @default(cuid())
+  name                 String
+  slug                 String?  @unique
+  description          String?
+  logo_url             String?
+  operator_allowed_paths String[] @default([])
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  @@map("companies")
+}
+
+model Event {
+  id              String   @id @default(cuid())
+  name            String
+  venue           String?
+  logo_url        String?
+  company         String?
+  start_at        DateTime?
+  end_at          DateTime?
+  show_days       Int      @default(1)
+  armado_start    DateTime?
+  armado_end      DateTime?
+  desarme_start   DateTime?
+  desarme_end     DateTime?
+  status          String   @default("draft") // draft | active | closed
+  pickup_date     DateTime?
+  pickup_address  String?
+  // JSON: capacidades de parking por sector, custom_fields, cláusulas de seguro
+  parking_capacities Json?  @default("{}")
+  custom_fields      Json?  @default("{}")
+  insurance_non_repetition_clauses String[] @default([])
+  insurance_insured_amount Float?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@map("events")
+}
+
+model AccessLevel {
+  id          String   @id @default(cuid())
+  value       String   @unique
+  label       String
+  description String?
+  badge_prefix String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@map("access_levels")
+}
+
+model Person {
+  id            String   @id @default(cuid())
+  full_name     String
+  document      String?
+  tipo_vinculo  String   @default("empresa") // empresa | autonomo
+  company       String?
+  productora    String?
+  phone         String?
+  email         String?
+  person_type   String   @default("provider")
+  employment_type String  @default("fijo")
+  access_area    String?
+  event_phases  String[] @default([])
+  event_id      String?
+  event_ids     String[] @default([])
+  event_names   String[] @default([])
+  status        String   @default("active")
+  notes         String?
+  custom_fields Json?    @default("{}")
+  created_by_id String?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@index([event_id])
+  @@index([company])
+  @@map("people")
+}
+
+model Accreditation {
+  id            String   @id @default(cuid())
+  event_id      String
+  event_name    String?
+  company       String?
+  person_id     String
+  person_name   String?
+  person_type   String?
+  person_email  String?
+  badge_code    String   @unique
+  area          String?
+  access_level  String   @default("general")
+  event_phases  String[] @default([])
+  status        String   @default("active") // active | blocked | revoked
+  block_reason  String?
+  has_biometric Boolean  @default(false)
+  delivered_personal  Boolean @default(false)
+  delivered_vehicular Boolean @default(false)
+  custom_fields Json?   @default("{}")
+  created_by_id String?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@index([event_id])
+  @@index([person_id])
+  @@index([company])
+  @@index([person_email])
+  @@map("accreditations")
+}
+
+model Vehicle {
+  id            String   @id @default(cuid())
+  person_id     String
+  person_name   String?
+  company       String?
+  vehicle_type  String   @default("auto")
+  brand         String
+  model         String
+  plate         String
+  color         String?
+  parking_sector String?
+  event_ids     String[] @default([])
+  event_names   String[] @default([])
+  status        String   @default("pending") // approved | pending | rejected
+  notes         String?
+  custom_fields Json?    @default("{}")
+  created_by_id String?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@index([plate])
+  @@map("vehicles")
+}
+
+model AccessLog {
+  id              String   @id @default(cuid())
+  accreditation_id String
+  person_name     String?
+  badge_code      String?
+  event_id        String?
+  event_name      String?
+  company         String?
+  verified_by     String?
+  pda_number      String?
+  method          String   @default("manual") // biometric | manual
+  resource_type   String   @default("person") // person | vehicle
+  zone            String?
+  door            String?
+  result          String   @default("granted") // granted | denied
+  denied_reason   String   @default("")
+  access_level    String?
+  created_at      DateTime @default(now())
+
+  @@index([event_id])
+  @@index([created_at])
+  @@map("access_logs")
+}
+
+model ParkingSector {
+  id    String @id @default(cuid())
+  value String @unique
+  label String
+  capacity Int?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("parking_sectors")
+}
+
+model SystemSetting {
+  id            String   @id @default(cuid())
+  system_name   String?
+  organization_name String?
+  logo_url      String?
+  theme         Json?    @default("{}")
+  mail_from     String?
+  zones         Json?     // [{value,label}]
+  doors         Json?
+  event_phases  Json?
+  parking_sectors Json?
+  default_grace_hours Int @default(4)
+  role_access   Json?    @default("{}")
+  enabled_modules Json?  @default("{}")
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@map("system_settings")
+}
+
+model PdaStation {
+  id              String   @id @default(cuid())
+  station_number  String   @unique
+  label           String?
+  assigned_event_id String?
+  assigned_zone   String?
+  assigned_sectors String[] @default([])
+  event_id        String?
+  event_name      String?
+  company         String?
+  operator_name   String?
+  mode            String   @default("person")
+  last_seen       DateTime?
+  pending_sync    Int      @default(0)
+  battery_level   Int?
+  admin_pin       String   @default("1234")
+  created_by_id   String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@map("pda_stations")
+}
+
+// Cola de logs de acceso generados offline en la PDA; se sincronizan al volver
+// a la LAN. payload guarda el AccessLog completo a crear.
+model OfflineAccessQueue {
+  id        String   @id @default(cuid())
+  pda_number String?
+  payload   Json
+  synced    Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  @@index([pda_number, synced])
+  @@map("offline_access_queue")
+}
+
+// Biometricos (descriptor facial de face-api.js). El reconocimiento facial
+// corre en el navegador; acá guardamos los descriptores para identificación
+// del lado del servidor cuando se necesita.
+model Biometric {
+  id            String   @id @default(cuid())
+  person_id     String
+  person_name   String?
+  event_id      String?
+  company       String?
+  accreditation_id String?
+  face_photo_url String?
+  face_descriptor Float[]
+  status        String   @default("pending") // pending | active | revoked
+  created_by_id String?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@index([person_id])
+  @@index([event_id])
+  @@map("biometrics")
+}
