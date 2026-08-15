@@ -22,7 +22,17 @@ export const AuthProvider = ({ children }) => {
     try {
       setIsLoadingPublicSettings(true);
       setAuthError(null);
-      
+
+      // Air-gapped (self-hosted): sin app-id de la nube, no existe el endpoint
+      // de public-settings local. Saltamos directo a la sesión local (el token
+      // JWT vive en localStorage) y cargamos el usuario real con su rol.
+      if (!appParams.appId) {
+        setAppPublicSettings(null);
+        setIsLoadingPublicSettings(false);
+        await checkUserAuth();
+        return;
+      }
+
       // First, check app public settings (with token if available)
       // This will tell us if auth is required, user not registered, etc.
       const appClient = createAxiosClient({
