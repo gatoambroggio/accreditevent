@@ -100,7 +100,7 @@ fi
 
 # ── 4. Copiar código del servidor ────────────────────────────────────────────
 step "Servidor: código + dependencias"
-rsync -a --delete --exclude node_modules --exclude uploads "$REPO_DIR/server/" "$APP_HOME/server/"
+rsync -a --delete --exclude node_modules --exclude uploads --exclude public/models --exclude .env "$REPO_DIR/server/" "$APP_HOME/server/"
 chown -R "$APP_USER":"$APP_USER" "$APP_HOME/server"
 
 # .env con secretos aleatorios
@@ -202,29 +202,50 @@ fi
 # ── 6. Modelos face-api.js (offline) ──────────────────────────────────────────
 step "Modelos face-api.js (servidos locales, sin internet)"
 MODELS_DIR="$APP_HOME/server/public/models"
-NEED_MODELS=0
-for f in tiny_face_detector_model-1.bin face_landmark_68_model-1.bin face_recognition_model-1.bin ssd_mobilenetv1_model-1.bin; do
-  [[ -f "$MODELS_DIR/$f" ]] || NEED_MODELS=1
-done
-# Asegurar que el dir de modelos exista (el rsync --delete del paso 4 puede
-# haberlo borrado si no está en el repo).
+MODELS=(tiny_face_detector_model-1.bin face_landmark_68_model-1.bin face_recognition_model-1.bin ssd_mobilenetv1_model-1.bin)
 install -d -o "$APP_USER" -g "$APP_USER" "$MODELS_DIR"
-if [[ $NEED_MODELS -eq 1 ]]; then
-  warn "Faltan modelos de face-api.js en $MODELS_DIR"
-  warn "Descargá (con internet UNA vez) y copialos a $MODELS_DIR desde:"
-  warn "  https://github.com/justadudewhohacks/face-api.js/tree/master/weights"
-  warn "O desde @vladmandic/face-api: node_modules/@vladmandic/face-api/weights/*.bin"
-  # Intento automático si hay internet:
-  if has wget; then
-    log "Intentando descarga automática (requiere internet esta vez)..."
-    BASE="https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights"
-    for f in tiny_face_detector_model-1.bin face_landmark_68_model-1.bin face_recognition_model-1.bin ssd_mobilenetv1_model-1.bin; do
-      wget -q -O "$MODELS_DIR/$f" "$BASE/$f" 2>/dev/null || warn "No se pudo descargar $f"
-    done
-    chown -R "$APP_USER":"$APP_USER" "$MODELS_DIR" 2>/dev/null || true
+
+need_models() {
+  for f in "${MODELS[@]}"; do [[ -s "$MODELS_DIR/$f" ]] || return 0; done
+  return 1
+}
+
+if need_models; then
+  log "Bajando modelos de face-api.js (git, mismo transporte que ya funcionó)..."
+  TMP=$(mktemp -d)
+  # Estrategia 1: sparse-checkout del repo de pesos (vladmandic fork incluye /weights)
+  if git clone --depth 1 --filter=blob:none --sparse https://github.com/vladmandic/face-api.git "$TMP/faceapi" >/dev/null 2>&1; then
+    (cd "$TMP/faceapi" && git sparse-checkout set weights) >/dev/null 2>&1
+    for f in "${MODELS[@]}"; do [[ -s "$TMP/faceapi/weights/$f" ]] && cp "$TMP/faceapi/weights/$f" "$MODELS_DIR/$f"; done
   fi
+  rm -rf "$TMP"
+
+  # Estrategia 2 (fallback): wget a raw.githubusercontent si git falló
+  if need_models; then
+    log "Faltan algunos modelos — probando descarga directa (wget)..."
+    for BASE in \
+      "https://raw.githubusercontent.com/vladmandic/face-api/master/weights" \
+      "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights"; do
+      need_models || break
+      for f in "${MODELS[@]}"; do
+        [[ -s "$MODELS_DIR/$f" ]] && continue
+        wget -q -O "$MODELS_DIR/$f" "$BASE/$f" 2>/dev/null || rm -f "$MODELS_DIR/$f"
+      done
+    done
+  fi
+
+  chown -R "$APP_USER":"$APP_USER" "$MODELS_DIR" 2>/dev/null || true
+fi
+
+if need_models; then
+  err "No se pudieron descargar los modelos de face-api.js (sin internet a GitHub)."
+  echo "    Copialos a mano a $MODELS_DIR desde cualquier PC con internet:"
+  echo "      https://github.com/vladmandic/face-api/tree/master/weights"
+  echo "    Archivos necesarios: ${MODELS[*]}"
+  echo "    El reconocimiento facial no funcionará hasta que estén presentes."
+  exit 1
 else
-  ok "Modelos de face-api.js presentes"
+  ok "Modelos de face-api.js presentes (${#MODELS[@]} archivos)"
 fi
 
 # ── 7. systemd ────────────────────────────────────────────────────────────────
