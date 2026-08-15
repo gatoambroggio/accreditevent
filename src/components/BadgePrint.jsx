@@ -1,15 +1,27 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { X, Printer } from 'lucide-react';
-import { printBadge } from '@/lib/printBadge';
+import { X, Printer, Loader2 } from 'lucide-react';
+import { printToAgent } from '@/lib/printAgent';
+import { printBadge as printBadgeFallback } from '@/lib/printBadge';
 import { base44 } from '@/api/base44Client';
 
-export default function BadgePrint({ accreditation, event, onClose }) {
-  const handlePrint = () => {
-    printBadge();
+export default function BadgePrint({ accreditation, event, printerName, onClose }) {
+  const [printing, setPrinting] = useState(false);
+
+  const handlePrint = async () => {
+    setPrinting(true);
+    const badge = document.querySelector('.badge-print');
+    let sent = false;
+    if (badge) {
+      sent = await printToAgent(badge, printerName, 1);
+    }
+    if (!sent) {
+      printBadgeFallback();
+    }
     if (accreditation?.id) {
       base44.entities.Accreditation.update(accreditation.id, { delivered_personal: true }).catch(() => {});
     }
+    setTimeout(() => setPrinting(false), 1000);
   };
 
   return (
@@ -20,10 +32,11 @@ export default function BadgePrint({ accreditation, event, onClose }) {
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
-              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700"
+              disabled={printing}
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
             >
-              <Printer className="h-4 w-4" />
-              Imprimir
+              {printing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+              {printing ? 'Imprimiendo…' : 'Imprimir'}
             </button>
             <button
               onClick={onClose}

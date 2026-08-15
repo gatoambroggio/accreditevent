@@ -478,6 +478,7 @@ export default function Accreditations() {
         <BadgePrint
           accreditation={badgeAccred}
           event={events.find((e) => e.id === badgeAccred.event_id)}
+          printerName={settings?.printer_personal}
           onClose={() => setBadgeAccred(null)}
         />
       )}
@@ -492,6 +493,7 @@ export default function Accreditations() {
           settings={settings}
           events={events}
           sectors={sectors}
+          printerName={settings?.printer_vehicular}
           onClose={() => setVehicleBatchPrint(null)}
         />
       )}

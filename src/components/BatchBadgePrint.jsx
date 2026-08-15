@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { X, Printer } from 'lucide-react';
-import { printBadges } from '@/lib/printBadge';
+import { X, Printer, Loader2 } from 'lucide-react';
+import { printBatchToAgent } from '@/lib/printAgent';
+import { printBadges as printBadgesFallback } from '@/lib/printBadge';
 
 function BadgeCard({ accreditation, event }) {
   return (
@@ -110,12 +111,28 @@ function BadgeCard({ accreditation, event }) {
   );
 }
 
-export default function BatchBadgePrint({ accreditations, events, onClose }) {
+export default function BatchBadgePrint({ accreditations, events, printerName, onClose }) {
+  const [printing, setPrinting] = useState(false);
+  const [progress, setProgress] = useState(null);
+
   const eventMap = React.useMemo(() => {
     const map = {};
     events.forEach((e) => { map[e.id] = e; });
     return map;
   }, [events]);
+
+  const handlePrint = async () => {
+    setPrinting(true);
+    const badges = document.querySelectorAll('.badge-batch-print .badge-print');
+    const result = await printBatchToAgent(Array.from(badges), printerName, (current, total) => {
+      setProgress({ current, total });
+    });
+    if (result.usedFallback) {
+      printBadgesFallback();
+    }
+    setPrinting(false);
+    setTimeout(() => setProgress(null), 2000);
+  };
 
   return (
     <div className="badge-overlay fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-sm sm:p-6">
@@ -123,19 +140,24 @@ export default function BatchBadgePrint({ accreditations, events, onClose }) {
         <div className="no-print mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-white">Impresión masiva</h2>
-            <p className="text-sm text-slate-300">{accreditations.length} credenciales seleccionadas</p>
+            <p className="text-sm text-slate-300">
+              {accreditations.length} credenciales seleccionadas
+              {progress && printing && ` — enviando ${progress.current + 1} de ${progress.total}`}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={printBadges}
-              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700"
+              onClick={handlePrint}
+              disabled={printing}
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
             >
-              <Printer className="h-4 w-4" />
-              Imprimir todo
+              {printing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+              {printing ? 'Imprimiendo…' : 'Imprimir todo'}
             </button>
             <button
               onClick={onClose}
-              className="rounded-lg bg-white/10 p-2 text-white hover:bg-white/20"
+              disabled={printing}
+              className="rounded-lg bg-white/10 p-2 text-white hover:bg-white/20 disabled:opacity-50"
             >
               <X className="h-5 w-5" />
             </button>

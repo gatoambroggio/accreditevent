@@ -308,6 +308,7 @@ export default function AccreditationFacial() {
         <BadgePrint
           accreditation={printAccred}
           event={selectedEvent}
+          printerName={settings?.printer_personal}
           onClose={() => setPrintAccred(null)}
         />
       )}
@@ -318,6 +319,7 @@ export default function AccreditationFacial() {
           settings={settings}
           events={events}
           sectors={sectors}
+          printerName={settings?.printer_vehicular}
           onClose={() => setVehicleBatchPrint(null)}
         />
       )}

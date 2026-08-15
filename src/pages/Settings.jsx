@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { Loader2, Save, Upload, ArrowRight, DatabaseZap, ShieldCheck, Download, Printer } from 'lucide-react';
+import { Loader2, Save, Upload, ArrowRight, DatabaseZap, ShieldCheck, Download, Printer, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { MODULES, ROLES, DEFAULT_ROLE_ACCESS } from '@/lib/modules';
 import ListEditor from '@/components/ui/list-editor';
+import { checkAgent, getAgentPrinters } from '@/lib/printAgent';
+import { downloadAgentScript } from '@/lib/printAgentFile';
 
 function Field({ label, value, onChange, type = 'text', placeholder = '', hint }) {
   return (
@@ -67,6 +69,9 @@ export default function Settings() {
   const [exporting, setExporting] = useState(false);
   const [exportReport, setExportReport] = useState(null);
   const [exportError, setExportError] = useState('');
+  const [agentStatus, setAgentStatus] = useState('checking'); // checking | connected | disconnected
+  const [agentPrinters, setAgentPrinters] = useState(null); // null | [string, ...]
+  const [loadingPrinters, setLoadingPrinters] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -95,7 +100,22 @@ export default function Settings() {
         setError(err.message);
       }
     })();
+    checkAgentStatus();
   }, []);
+
+  const checkAgentStatus = async () => {
+    setAgentStatus('checking');
+    const info = await checkAgent();
+    setAgentStatus(info ? 'connected' : 'disconnected');
+    if (!info) setAgentPrinters(null);
+  };
+
+  const handleListPrinters = async () => {
+    setLoadingPrinters(true);
+    const printers = await getAgentPrinters();
+    setAgentPrinters(printers);
+    setLoadingPrinters(false);
+  };
 
   const update = (field, value) => setSettings((s) => ({ ...s, [field]: value }));
 
@@ -242,13 +262,103 @@ export default function Settings() {
         </div>
       </Section>
 
-      <Section title="Impresión de credenciales" description="La impresión usa el diálogo nativo del navegador. Al presionar «Imprimir» se abre la ventana de impresión del navegador donde podés seleccionar la impresora y la cantidad de copias. No requiere configuración previa — funciona igual en ambos sistemas.">
-        <div className="flex items-start gap-3 rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
-          <Printer className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
-          <div>
-            <p className="font-semibold text-slate-900">Selección de impresora desde el navegador</p>
-            <p className="mt-0.5">Los navegadores no permiten listar ni pre-seleccionar impresoras desde una página web por seguridad. Al imprimir, el diálogo del sistema operativo muestra todas las impresoras instaladas para que elijas la correcta.</p>
+      <Section title="Impresión automática de credenciales" description="Instalá el agente local en cada estación de trabajo para imprimir credenciales directo a la impresora sin diálogo. Las credenciales personales van a la impresora A y las vehiculares a la impresora B.">
+        {/* Estado del agente */}
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <div className="flex items-center gap-2">
+            {agentStatus === 'checking' && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
+            {agentStatus === 'connected' && <Wifi className="h-4 w-4 text-emerald-600" />}
+            {agentStatus === 'disconnected' && <WifiOff className="h-4 w-4 text-red-500" />}
+            <span className="text-sm font-semibold text-slate-900">
+              {agentStatus === 'checking' && 'Verificando agente…'}
+              {agentStatus === 'connected' && 'Agente conectado'}
+              {agentStatus === 'disconnected' && 'Agente no detectado'}
+            </span>
           </div>
+          <button onClick={checkAgentStatus} className="text-xs text-emerald-600 hover:underline">Re-verificar</button>
+          {agentStatus === 'disconnected' && (
+            <p className="text-xs text-amber-600">El agente no está corriendo. Descargalo abajo y ejecutalo con <code className="rounded bg-slate-100 px-1">node accreditevent-print-agent.js</code></p>
+          )}
+        </div>
+
+        {/* Descarga del agente */}
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button
+            onClick={downloadAgentScript}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+          >
+            <Download className="h-4 w-4" /> Descargar agente local
+          </button>
+          <span className="text-xs text-slate-500">Guardá el archivo en cada PC, instalá Node.js y ejecutá: <code className="rounded bg-slate-100 px-1">node accreditevent-print-agent.js</code></span>
+        </div>
+
+        {/* Configuración de impresoras */}
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold text-slate-600">Impresora personal (A)</span>
+              <input
+                type="text"
+                value={settings.printer_personal || ''}
+                onChange={(e) => update('printer_personal', e.target.value)}
+                placeholder="Nombre exacto de la impresora A"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+              />
+              <p className="mt-1 text-xs text-slate-400">Para credenciales personales</p>
+            </label>
+          </div>
+          <div>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold text-slate-600">Impresora vehicular (B)</span>
+              <input
+                type="text"
+                value={settings.printer_vehicular || ''}
+                onChange={(e) => update('printer_vehicular', e.target.value)}
+                placeholder="Nombre exacto de la impresora B"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+              />
+              <p className="mt-1 text-xs text-slate-400">Para credenciales de vehículos</p>
+            </label>
+          </div>
+        </div>
+
+        {/* Listar impresoras del agente */}
+        {agentStatus === 'connected' && (
+          <div className="mt-4">
+            <button
+              onClick={handleListPrinters}
+              disabled={loadingPrinters}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              {loadingPrinters ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              Ver impresoras disponibles
+            </button>
+            {agentPrinters && (
+              <div className="mt-3">
+                {agentPrinters.length === 0 ? (
+                  <p className="text-xs text-amber-600">No se encontraron impresoras en el equipo.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {agentPrinters.map((p) => (
+                      <button
+                        key={p}
+                        onClick={() => { navigator.clipboard?.writeText(p).catch(() => {}); }}
+                        className="rounded-md bg-slate-100 px-2 py-1 font-mono text-xs text-slate-700 transition hover:bg-slate-200"
+                        title="Copiar al portapapeles"
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="mt-3 flex items-start gap-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
+          <Printer className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
+          <p>Si el agente no está corriendo o no configuraste las impresoras, al imprimir se abrirá el diálogo del navegador como fallback. Windows requiere SumatraPDF (ver instrucciones en el archivo del agente).</p>
         </div>
       </Section>
 

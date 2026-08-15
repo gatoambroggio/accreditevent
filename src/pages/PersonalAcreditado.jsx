@@ -343,6 +343,7 @@ export default function PersonalAcreditado() {
         <BadgePrint
           accreditation={printingPersonal}
           event={events.find((e) => e.id === printingPersonal.event_id)}
+          printerName={settings?.printer_personal}
           onClose={() => { const id = printingPersonal.id; setPrintingPersonal(null); refreshAccred(id); }}
         />
       )}
@@ -354,6 +355,7 @@ export default function PersonalAcreditado() {
           events={events.filter((e) => printingVehicular.event_ids?.includes(e.id))}
           parkingSectors={sectors}
           accreditationId={vehicularAccredId}
+          printerName={settings?.printer_vehicular}
           onClose={() => { const id = vehicularAccredId; setPrintingVehicular(null); setVehicularAccredId(null); if (id) refreshAccred(id); }}
         />
       )}

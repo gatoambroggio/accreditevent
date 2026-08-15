@@ -1,15 +1,27 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { X, Printer, Car } from 'lucide-react';
-import { printBadge } from '@/lib/printBadge';
+import { X, Printer, Car, Loader2 } from 'lucide-react';
+import { printToAgent } from '@/lib/printAgent';
+import { printBadge as printBadgeFallback } from '@/lib/printBadge';
 import { base44 } from '@/api/base44Client';
 
-export default function VehicleBadgePrint({ vehicle, settings, events = [], parkingSectors = [], accreditationId, onClose }) {
-  const handlePrint = () => {
-    printBadge();
+export default function VehicleBadgePrint({ vehicle, settings, events = [], parkingSectors = [], accreditationId, printerName, onClose }) {
+  const [printing, setPrinting] = useState(false);
+
+  const handlePrint = async () => {
+    setPrinting(true);
+    const badge = document.querySelector('.badge-print');
+    let sent = false;
+    if (badge) {
+      sent = await printToAgent(badge, printerName, 1);
+    }
+    if (!sent) {
+      printBadgeFallback();
+    }
     if (accreditationId) {
       base44.entities.Accreditation.update(accreditationId, { delivered_vehicular: true }).catch(() => {});
     }
+    setTimeout(() => setPrinting(false), 1000);
   };
 
   const orgName = settings?.organization_name || 'Acceso Eventos';
@@ -38,10 +50,11 @@ export default function VehicleBadgePrint({ vehicle, settings, events = [], park
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
-              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700"
+              disabled={printing}
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
             >
-              <Printer className="h-4 w-4" />
-              Imprimir
+              {printing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+              {printing ? 'Imprimiendo…' : 'Imprimir'}
             </button>
             <button
               onClick={onClose}
