@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { Loader2, Save, Upload, ArrowRight, DatabaseZap, ShieldCheck, Download } from 'lucide-react';
 import { MODULES, ROLES, DEFAULT_ROLE_ACCESS } from '@/lib/modules';
 import ListEditor from '@/components/ui/list-editor';
+import PrinterSelect from '@/components/PrinterSelect';
 
 function Field({ label, value, onChange, type = 'text', placeholder = '', hint }) {
   return (
@@ -242,10 +243,10 @@ export default function Settings() {
         </div>
       </Section>
 
-      <Section title="Impresoras de credenciales" description="Definí qué impresora se usa para cada tipo de credencial. El sistema indicará la impresora asignada al momento de imprimir.">
+      <Section title="Impresoras de credenciales" description="Asigná una impresora CUPS a cada tipo de credencial. En modo self-hosted el sistema imprime automáticamente en la impresora asignada (sin diálogo). En modo cloud solo se muestra como indicación. Si no ve impresoras en el dropdown, instalá CUPS en el servidor (sudo apt install cups) y agregue las impresoras en http://localhost:631.">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Impresora para acreditaciones personales" value={settings.printer_personal} onChange={(v) => update('printer_personal', v)} placeholder="Ej: Impresora B" hint="Credenciales personales (8×10cm)" />
-          <Field label="Impresora para estacionamiento / vehicular" value={settings.printer_vehicular} onChange={(v) => update('printer_vehicular', v)} placeholder="Ej: Impresora A" hint="Credenciales de vehículo (A5)" />
+          <PrinterSelect label="Impresora para acreditaciones personales" value={settings.printer_personal} onChange={(v) => update('printer_personal', v)} hint="Credenciales personales (8×10cm) — impresión automática" />
+          <PrinterSelect label="Impresora para estacionamiento / vehicular" value={settings.printer_vehicular} onChange={(v) => update('printer_vehicular', v)} hint="Credenciales de vehículo (A5) — impresión automática" />
         </div>
       </Section>
 

@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { X, Printer, Car } from 'lucide-react';
-import { printBadges } from '@/lib/printBadge';
+import { X, Printer, Car, Loader2 } from 'lucide-react';
+import { printBadges, autoPrintBatch } from '@/lib/printBadge';
 
 function VehicleCard({ vehicle, settings, eventMap, sectors }) {
   const orgName = settings?.organization_name || 'Acceso Eventos';
@@ -98,6 +98,8 @@ function VehicleCard({ vehicle, settings, eventMap, sectors }) {
 }
 
 export default function BatchVehicleBadgePrint({ vehicles, settings, events, sectors, onClose }) {
+  const [printing, setPrinting] = useState(false);
+  const printerVehicular = settings?.printer_vehicular || '';
   const eventMap = React.useMemo(() => {
     const map = {};
     events.forEach((e) => { map[e.id] = e; });
@@ -119,10 +121,28 @@ export default function BatchVehicleBadgePrint({ vehicles, settings, events, sec
               </span>
             )}
             <button
-              onClick={printBadges}
-              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700"
+              onClick={async () => {
+                setPrinting(true);
+                try {
+                  if (printerVehicular) {
+                    const els = document.querySelectorAll('.badge-batch-print .badge-print');
+                    if (els.length > 0) {
+                      await autoPrintBatch([...els], printerVehicular, { width_mm: 210, height_mm: 148 });
+                      return;
+                    }
+                  }
+                  throw new Error('Sin impresora');
+                } catch {
+                  printBadges();
+                } finally {
+                  setPrinting(false);
+                }
+              }}
+              disabled={printing}
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
             >
-              <Printer className="h-4 w-4" /> Imprimir todo
+              {printing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+              {printing ? 'Imprimiendo…' : 'Imprimir todo'}
             </button>
             <button
               onClick={onClose}
