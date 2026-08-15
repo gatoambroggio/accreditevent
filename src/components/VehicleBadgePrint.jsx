@@ -1,29 +1,14 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { X, Printer, Car, Loader2 } from 'lucide-react';
-import { printBadge, autoPrint } from '@/lib/printBadge';
+import { X, Printer, Car } from 'lucide-react';
+import { printBadge } from '@/lib/printBadge';
 import { base44 } from '@/api/base44Client';
 
 export default function VehicleBadgePrint({ vehicle, settings, events = [], parkingSectors = [], accreditationId, onClose }) {
-  const [printing, setPrinting] = useState(false);
-  const printerVehicular = settings?.printer_vehicular || '';
-
-  const handlePrint = async () => {
-    setPrinting(true);
-    const badgeEl = document.querySelector('.badge-print');
-    try {
-      if (printerVehicular && badgeEl) {
-        await autoPrint(badgeEl, printerVehicular, { width_mm: 210, height_mm: 148 });
-      } else {
-        throw new Error('Sin impresora configurada');
-      }
-    } catch {
-      printBadge();
-    } finally {
-      setPrinting(false);
-      if (accreditationId) {
-        base44.entities.Accreditation.update(accreditationId, { delivered_vehicular: true }).catch(() => {});
-      }
+  const handlePrint = () => {
+    printBadge();
+    if (accreditationId) {
+      base44.entities.Accreditation.update(accreditationId, { delivered_vehicular: true }).catch(() => {});
     }
   };
 
@@ -51,18 +36,12 @@ export default function VehicleBadgePrint({ vehicle, settings, events = [], park
         <div className="no-print mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold text-white">Credencial de vehículo</h2>
           <div className="flex items-center gap-2">
-            {settings?.printer_vehicular && (
-              <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white">
-                <Printer className="h-3.5 w-3.5" /> {settings.printer_vehicular}
-              </span>
-            )}
             <button
               onClick={handlePrint}
-              disabled={printing}
-              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700"
             >
-              {printing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
-              {printing ? 'Imprimiendo…' : 'Imprimir'}
+              <Printer className="h-4 w-4" />
+              Imprimir
             </button>
             <button
               onClick={onClose}

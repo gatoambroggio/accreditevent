@@ -1,30 +1,14 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { X, Printer, Loader2 } from 'lucide-react';
-import { printBadge, autoPrint } from '@/lib/printBadge';
-import { usePrinterSettings } from '@/lib/usePrinterSettings';
+import { X, Printer } from 'lucide-react';
+import { printBadge } from '@/lib/printBadge';
 import { base44 } from '@/api/base44Client';
 
 export default function BadgePrint({ accreditation, event, onClose }) {
-  const { printerPersonal } = usePrinterSettings();
-  const [printing, setPrinting] = useState(false);
-
-  const handlePrint = async () => {
-    setPrinting(true);
-    const badgeEl = document.querySelector('.badge-print');
-    try {
-      if (printerPersonal && badgeEl) {
-        await autoPrint(badgeEl, printerPersonal, { width_mm: 80, height_mm: 100 });
-      } else {
-        throw new Error('Sin impresora configurada');
-      }
-    } catch {
-      printBadge();
-    } finally {
-      setPrinting(false);
-      if (accreditation?.id) {
-        base44.entities.Accreditation.update(accreditation.id, { delivered_personal: true }).catch(() => {});
-      }
+  const handlePrint = () => {
+    printBadge();
+    if (accreditation?.id) {
+      base44.entities.Accreditation.update(accreditation.id, { delivered_personal: true }).catch(() => {});
     }
   };
 
@@ -34,18 +18,12 @@ export default function BadgePrint({ accreditation, event, onClose }) {
         <div className="no-print mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold text-white">Credencial</h2>
           <div className="flex items-center gap-2">
-            {printerPersonal && (
-              <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white">
-                <Printer className="h-3.5 w-3.5" /> {printerPersonal}
-              </span>
-            )}
             <button
               onClick={handlePrint}
-              disabled={printing}
-              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700"
             >
-              {printing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
-              {printing ? 'Imprimiendo…' : 'Imprimir'}
+              <Printer className="h-4 w-4" />
+              Imprimir
             </button>
             <button
               onClick={onClose}

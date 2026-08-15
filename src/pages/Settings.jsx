@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { Loader2, Save, Upload, ArrowRight, DatabaseZap, ShieldCheck, Download } from 'lucide-react';
+import { Loader2, Save, Upload, ArrowRight, DatabaseZap, ShieldCheck, Download, Printer } from 'lucide-react';
 import { MODULES, ROLES, DEFAULT_ROLE_ACCESS } from '@/lib/modules';
 import ListEditor from '@/components/ui/list-editor';
-import PrinterSelect from '@/components/PrinterSelect';
 
 function Field({ label, value, onChange, type = 'text', placeholder = '', hint }) {
   return (
@@ -243,10 +242,13 @@ export default function Settings() {
         </div>
       </Section>
 
-      <Section title="Impresoras de credenciales" description="Asigná una impresora CUPS a cada tipo de credencial. En modo self-hosted el sistema imprime automáticamente en la impresora asignada (sin diálogo). En modo cloud solo se muestra como indicación. Si no ve impresoras en el dropdown, instalá CUPS en el servidor (sudo apt install cups) y agregue las impresoras en http://localhost:631.">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <PrinterSelect label="Impresora para acreditaciones personales" value={settings.printer_personal} onChange={(v) => update('printer_personal', v)} hint="Credenciales personales (8×10cm) — impresión automática" />
-          <PrinterSelect label="Impresora para estacionamiento / vehicular" value={settings.printer_vehicular} onChange={(v) => update('printer_vehicular', v)} hint="Credenciales de vehículo (A5) — impresión automática" />
+      <Section title="Impresión de credenciales" description="La impresión usa el diálogo nativo del navegador. Al presionar «Imprimir» se abre la ventana de impresión del navegador donde podés seleccionar la impresora y la cantidad de copias. No requiere configuración previa — funciona igual en ambos sistemas.">
+        <div className="flex items-start gap-3 rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
+          <Printer className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
+          <div>
+            <p className="font-semibold text-slate-900">Selección de impresora desde el navegador</p>
+            <p className="mt-0.5">Los navegadores no permiten listar ni pre-seleccionar impresoras desde una página web por seguridad. Al imprimir, el diálogo del sistema operativo muestra todas las impresoras instaladas para que elijas la correcta.</p>
+          </div>
         </div>
       </Section>
 

@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { X, Printer, Loader2 } from 'lucide-react';
-import { printBadges, autoPrintBatch } from '@/lib/printBadge';
-import { usePrinterSettings } from '@/lib/usePrinterSettings';
+import { X, Printer } from 'lucide-react';
+import { printBadges } from '@/lib/printBadge';
 
 function BadgeCard({ accreditation, event }) {
   return (
@@ -112,8 +111,6 @@ function BadgeCard({ accreditation, event }) {
 }
 
 export default function BatchBadgePrint({ accreditations, events, onClose }) {
-  const { printerPersonal } = usePrinterSettings();
-  const [printing, setPrinting] = useState(false);
   const eventMap = React.useMemo(() => {
     const map = {};
     events.forEach((e) => { map[e.id] = e; });
@@ -129,34 +126,12 @@ export default function BatchBadgePrint({ accreditations, events, onClose }) {
             <p className="text-sm text-slate-300">{accreditations.length} credenciales seleccionadas</p>
           </div>
           <div className="flex items-center gap-2">
-            {printerPersonal && (
-              <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white">
-                <Printer className="h-3.5 w-3.5" /> {printerPersonal}
-              </span>
-            )}
             <button
-              onClick={async () => {
-                setPrinting(true);
-                try {
-                  if (printerPersonal) {
-                    const els = document.querySelectorAll('.badge-batch-print .badge-print');
-                    if (els.length > 0) {
-                      await autoPrintBatch([...els], printerPersonal, { width_mm: 80, height_mm: 100 });
-                      return;
-                    }
-                  }
-                  throw new Error('Sin impresora');
-                } catch {
-                  printBadges();
-                } finally {
-                  setPrinting(false);
-                }
-              }}
-              disabled={printing}
-              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+              onClick={printBadges}
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700"
             >
-              {printing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
-              {printing ? 'Imprimiendo…' : 'Imprimir todo'}
+              <Printer className="h-4 w-4" />
+              Imprimir todo
             </button>
             <button
               onClick={onClose}
