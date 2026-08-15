@@ -199,6 +199,9 @@ NEED_MODELS=0
 for f in tiny_face_detector_model-1.bin face_landmark_68_model-1.bin face_recognition_model-1.bin ssd_mobilenetv1_model-1.bin; do
   [[ -f "$MODELS_DIR/$f" ]] || NEED_MODELS=1
 done
+# Asegurar que el dir de modelos exista (el rsync --delete del paso 4 puede
+# haberlo borrado si no está en el repo).
+install -d -o "$APP_USER" -g "$APP_USER" "$MODELS_DIR"
 if [[ $NEED_MODELS -eq 1 ]]; then
   warn "Faltan modelos de face-api.js en $MODELS_DIR"
   warn "Descargá (con internet UNA vez) y copialos a $MODELS_DIR desde:"
@@ -211,7 +214,7 @@ if [[ $NEED_MODELS -eq 1 ]]; then
     for f in tiny_face_detector_model-1.bin face_landmark_68_model-1.bin face_recognition_model-1.bin ssd_mobilenetv1_model-1.bin; do
       wget -q -O "$MODELS_DIR/$f" "$BASE/$f" 2>/dev/null || warn "No se pudo descargar $f"
     done
-    chown -R "$APP_USER":"$APP_USER" "$MODELS_DIR"
+    chown -R "$APP_USER":"$APP_USER" "$MODELS_DIR" 2>/dev/null || true
   fi
 else
   ok "Modelos de face-api.js presentes"
