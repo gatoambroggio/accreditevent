@@ -187,6 +187,10 @@ EOF
     exit 1
   fi
   rsync -a --delete "$FRONTEND_DIR/dist/" "$APP_HOME/frontend/dist/"
+  # Nginx corre como www-data: necesita atravesar toda la cadena de directorios
+  # hasta dist/ y leer index.html. Le damos x (atravesar) a los padres y rX a dist.
+  chmod a+x "$APP_HOME" "$APP_HOME/frontend" 2>/dev/null || true
+  chmod -R a+rX "$APP_HOME/frontend/dist" 2>/dev/null || true
   ok "Frontend compilado en $APP_HOME/frontend/dist"
 else
   warn "No se encontró frontend en $FRONTEND_DIR (se salta el build — copialo manualmente)"
@@ -292,18 +296,44 @@ ok "Nginx configurado y recargado"
 
 # ── 9. Verificación ───────────────────────────────────────────────────────────
 step "Verificación"
-sleep 1
-if curl -sf "http://127.0.0.1:$SERVER_PORT/api/health" >/dev/null 2>&1; then ok "API responde en :$SERVER_PORT/api/health"; else err "API no responde"; fi
-if curl -sf "http://127.0.0.1/" >/dev/null 2>&1; then ok "Frontend sirve en http://127.0.0.1/"; else warn "Frontend aún no sirve (¿falta build?)"; fi
+sleep 2
+API_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$SERVER_PORT/api/health" 2>/dev/null || echo "000")
+if [[ "$API_CODE" == "200" ]]; then
+  ok "API responde en :$SERVER_PORT/api/health (200)"
+else
+  err "API no responde (HTTP $API_CODE) — ver: journalctl -u accreditevent -n 80"
+fi
+
+WEB_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1/" 2>/dev/null || echo "000")
+if [[ "$WEB_CODE" == "200" ]]; then
+  ok "Frontend sirve en http://127.0.0.1/ (200)"
+else
+  err "Frontend NO sirve (HTTP $WEB_CODE). Diagnóstico:"
+  echo "    -- dist/index.html:"
+  ls -la "$APP_HOME/frontend/dist/index.html" 2>/dev/null || echo "      NO EXISTE — el build no se copió"
+  echo "    -- permisos en la cadena de directorios:"
+  namei -l "$APP_HOME/frontend/dist/index.html" 2>/dev/null || true
+  echo "    -- ¿puede www-data leer index.html?"
+  if sudo -u www-data test -r "$APP_HOME/frontend/dist/index.html" 2>/dev/null; then echo "      sí"; else echo "      NO (problema de permisos)"; fi
+  echo "    -- últimos errores de Nginx:"
+  tail -n 20 /var/log/nginx/error.log 2>/dev/null || true
+fi
 
 LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
-echo -e "\n${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}  AccreditEvent self-hosted instalado y corriendo${NC}"
-echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "  Panel:       ${GREEN}http://${LAN_IP:-127.0.0.1}/${NC}"
-echo -e "  Superadmin:  ${GREEN}admin@accreditevent.local${NC} / ${GREEN}admin123${NC}"
-echo -e "  Webhook Dahua:  ${GREEN}http://${LAN_IP:-127.0.0.1}/api/webhooks/dahua?key=API_KEY&sn=SERIAL${NC}"
-echo -e "  Webhook ZKTeco: ${GREEN}http://${LAN_IP:-127.0.0.1}/api/webhooks/zkteco?key=API_KEY&SN=SERIAL${NC}"
-echo -e "  Logs:        journalctl -u accreditevent -f"
-echo -e "  Reiniciar:   systemctl restart accreditevent"
-echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+if [[ "$API_CODE" == "200" && "$WEB_CODE" == "200" ]]; then
+  echo -e "\n${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "${GREEN}  AccreditEvent self-hosted instalado y corriendo${NC}"
+  echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "  Panel:       ${GREEN}http://${LAN_IP:-127.0.0.1}/${NC}"
+  echo -e "  Superadmin:  ${GREEN}admin@accreditevent.local${NC} / ${GREEN}admin123${NC}"
+  echo -e "  Webhook Dahua:  ${GREEN}http://${LAN_IP:-127.0.0.1}/api/webhooks/dahua?key=API_KEY&sn=SERIAL${NC}"
+  echo -e "  Webhook ZKTeco: ${GREEN}http://${LAN_IP:-127.0.0.1}/api/webhooks/zkteco?key=API_KEY&SN=SERIAL${NC}"
+  echo -e "  Logs:        journalctl -u accreditevent -f"
+  echo -e "  Reiniciar:   systemctl restart accreditevent"
+  echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+else
+  echo -e "\n${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  err "Instalación INCOMPLETA (API=$API_CODE, Frontend=$WEB_CODE). Corregí lo de arriba y volvé a correr: sudo bash $APP_HOME/server/install.sh"
+  echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  exit 1
+fi
