@@ -117,6 +117,13 @@ function findSumatra() {
       if (fs.existsSync(candidates[i])) return candidates[i];
     } catch (e) {}
   }
+  // Buscar por nombre parcial al lado del agente (SumatraPDF-3.6.1-64.exe, etc.)
+  try {
+    var files = fs.readdirSync(APP_DIR);
+    for (var j = 0; j < files.length; j++) {
+      if (/^sumatra.*\.exe$/i.test(files[j])) return path.join(APP_DIR, files[j]);
+    }
+  } catch (e) {}
   return null;
 }
 
@@ -142,11 +149,48 @@ function httpsDownload(url, dest) {
   });
 }
 
+// En air-gap el agente no puede bajar SumatraPDF de internet. Antes de probar
+// la red, intenta traerlo del servidor de AccreditEvent por LAN (mismo origen
+// del que se descargó este agente). Se configura con AE_SERVER_URL (ej:
+// https://192.168.2.100). Si no está configurado o falla, y tampoco hay internet,
+// el usuario debe colocar SumatraPDF.exe al lado del agente manualmente.
+function getServerUrl() {
+  return process.env.AE_SERVER_URL || '';
+}
+
+async function downloadFromServer(url, dest) {
+  return new Promise(function (resolve, reject) {
+    var lib = url.indexOf('https') === 0 ? https : http;
+    var req = lib.get(url, function (res) {
+      if (res.statusCode !== 200) { res.resume(); return reject(new Error('HTTP ' + res.statusCode)); }
+      var file = fs.createWriteStream(dest);
+      res.pipe(file);
+      file.on('finish', function () { file.close(function () { resolve(); }); });
+      file.on('error', reject);
+    });
+    req.on('error', reject);
+  });
+}
+
 async function ensureSumatra() {
   var existing = findSumatra();
   if (existing) return existing;
   if (PLATFORM !== 'win32') return null;
   var dest = path.join(APP_DIR, 'SumatraPDF.exe');
+
+  // 1) Servidor AccreditEvent por LAN (air-gap friendly)
+  var serverUrl = getServerUrl();
+  if (serverUrl) {
+    try {
+      console.log('Buscando SumatraPDF en el servidor AccreditEvent (' + serverUrl + ')...');
+      await downloadFromServer(serverUrl.replace(/\/$/, '') + '/api/downloads/sumatrapdf', dest);
+      if (fs.existsSync(dest)) { console.log('SumatraPDF descargado del servidor: ' + dest); return dest; }
+    } catch (e) {
+      console.error('No se pudo bajar SumatraPDF del servidor: ' + e.message);
+    }
+  }
+
+  // 2) Internet (funciona solo si la estación tiene salida a internet)
   var zipPath = path.join(os.tmpdir(), 'sumatra-portable.zip');
   try {
     console.log('Descargando SumatraPDF portable...');
@@ -159,9 +203,18 @@ async function ensureSumatra() {
     try { fs.unlinkSync(zipPath); } catch (e) {}
     if (fs.existsSync(dest)) { console.log('SumatraPDF instalado en ' + dest); return dest; }
   } catch (e) {
-    console.error('No se pudo descargar SumatraPDF: ' + e.message);
+    console.error('No se pudo descargar SumatraPDF de internet: ' + e.message);
     try { fs.unlinkSync(zipPath); } catch (x) {}
   }
+  console.error('==== MODO AIR-GAP ====');
+  console.error('SumatraPDF no está disponible. Para imprimir en Windows necesitás:');
+  console.error('  Opción A (rápida): descargá SumatraPDF.exe desde el panel de AccreditEvent');
+  console.error('    (Configuración → Impresión → "SumatraPDF (Windows)") y ponelo al lado');
+  console.error('    de accreditevent-print-agent.exe en la estación.');
+  console.error('  Opción B (auto):  set AE_SERVER_URL=https://192.168.2.100  antes de');
+  console.error('    ejecutar el agente, y subí SumatraPDF.exe al servidor en');
+  console.error('    /opt/accreditevent/server/print-agent/dist/SumatraPDF.exe');
+  console.error('=======================');
   return null;
 }
 
@@ -288,11 +341,11 @@ function tryListen(srv, port) {
         if (sumatra) {
           console.log('SumatraPDF: ' + sumatra);
         } else {
-          console.log('SumatraPDF no encontrado. Descargando automáticamente...');
+          console.log('SumatraPDF no encontrado. Buscando (servidor LAN / internet)...');
           ensureSumatra().then(function (s) {
             if (s) console.log('SumatraPDF listo: ' + s);
-            else console.log('No se pudo descargar SumatraPDF. Descargalo manualmente de sumatrapdfreader.org.');
-          }).catch(function () {});
+            else console.log('SumatraPDF no disponible. Mirá las instrucciones de arriba (modo air-gapped).');
+          }).catch(function (e) { console.error('Error buscando SumatraPDF: ' + e.message); });
         }
       } else {
         console.log('Usando: lp (CUPS)');

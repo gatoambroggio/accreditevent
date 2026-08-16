@@ -378,6 +378,12 @@ export default function Settings() {
           >
             <Download className="h-4 w-4" /> macOS (Intel)
           </button>
+          <button
+            onClick={() => handleDownloadBinary('sumatrapdf')}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100"
+          >
+            <Download className="h-4 w-4" /> SumatraPDF (Windows)
+          </button>
           <button onClick={downloadAgentScript} className="text-xs text-slate-500 underline hover:text-slate-700">
             o script .js (requiere Node)
           </button>
