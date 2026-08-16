@@ -77,6 +77,25 @@ export default function Settings() {
   const [savingPrinters, setSavingPrinters] = useState(false);
   const [printersSaved, setPrintersSaved] = useState(false);
 
+  const [binUnavailable, setBinUnavailable] = useState(false);
+
+  // Descarga del binario portable del agente. Verifica primero si el backend
+  // self-hosted lo sirve (/api/downloads/...); si responde, dispara la descarga.
+  // Si el backend no existe (preview de Base44) o el binario no se construyó,
+  // cae al script .js embebido para no mostrar "Page Not Found".
+  const handleDownloadBinary = async (which) => {
+    const url = `/api/downloads/${which}`;
+    try {
+      const res = await fetch(url, { method: 'HEAD' });
+      if (res.ok && res.headers.get('content-type') && res.headers.get('content-type').indexOf('text/') !== 0) {
+        window.location.href = url;
+        return;
+      }
+    } catch {}
+    setBinUnavailable(true);
+    downloadAgentScript();
+  };
+
   const handleSavePrinters = async () => {
     setSavingPrinters(true);
     try {
@@ -305,30 +324,35 @@ export default function Settings() {
           )}
         </div>
 
-        {/* Descarga del agente — ejecutables portable servidos desde el backend */}
+        {/* Descarga del agente — ejecutables portable servidos desde el backend self-hosted */}
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <a
-            href="/api/downloads/print-agent-win"
+          <button
+            onClick={() => handleDownloadBinary('print-agent-win')}
             className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
           >
             <Download className="h-4 w-4" /> Windows (.exe)
-          </a>
-          <a
-            href="/api/downloads/print-agent-mac-arm"
+          </button>
+          <button
+            onClick={() => handleDownloadBinary('print-agent-mac-arm')}
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
           >
             <Download className="h-4 w-4" /> macOS (Apple Silicon)
-          </a>
-          <a
-            href="/api/downloads/print-agent-mac-x64"
+          </button>
+          <button
+            onClick={() => handleDownloadBinary('print-agent-mac-x64')}
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
           >
             <Download className="h-4 w-4" /> macOS (Intel)
-          </a>
+          </button>
           <button onClick={downloadAgentScript} className="text-xs text-slate-500 underline hover:text-slate-700">
             o script .js (requiere Node)
           </button>
         </div>
+        {binUnavailable && (
+          <p className="mt-2 text-xs text-amber-600">
+            Los ejecutables portable (.exe / macOS) solo se sirven desde el <b>servidor Ubuntu self-hosted</b> (donde <code className="rounded bg-slate-100 px-1">install.sh</code> copió los binarios). En este entorno de preview no existen, así que te descargué el script .js. Construí los binarios con <code className="rounded bg-slate-100 px-1">{"cd print-agent && npm run build"}</code> en una PC con internet y volvé a correr el install.sh.
+          </p>
+        )}
         <p className="mt-2 text-xs text-slate-500">
           <b>Windows:</b> descargá el .exe y ejecutalo con doble clic (instala SumatraPDF solo la primera vez).<br/>
           <b>macOS:</b> según tu chip (Apple Silicon = M1/M2/M3, Intel = Macs anteriores), luego en Terminal: <code className="rounded bg-slate-100 px-1">chmod +x archivo</code> y <code className="rounded bg-slate-100 px-1">./archivo</code>. La primera vez: clic derecho → Abrir para saltear Gatekeeper.
