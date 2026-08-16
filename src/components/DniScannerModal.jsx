@@ -73,7 +73,7 @@ export default function DniScannerModal({ open, onClose, onScanned }) {
       ]);
 
       if (ocrResult.status === 'rejected') {
-        throw new Error('No se pudo realizar el OCR del DNI.');
+        throw new Error(ocrResult.reason?.message || 'No se pudo realizar el OCR del DNI.');
       }
 
       const ocr = ocrResult.value?.data ?? ocrResult.value ?? {};

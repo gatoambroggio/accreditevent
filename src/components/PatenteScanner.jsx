@@ -68,10 +68,19 @@ export default function PatenteScanner({ onPatente, autoConfirm = true, interval
   const captureFrame = useCallback(() => {
     const video = videoRef.current;
     if (!video || video.readyState < 2) return;
+    const vw = video.videoWidth || 640;
+    const vh = video.videoHeight || 480;
+    // Recortar al centro (donde está la guía): así Tesseract recibe la patente
+    // grande en vez de un cuadro lejano completo, que es por lo que la cámara
+    // "no leía nada" aunque la foto subida sí funcionara.
+    const cw = Math.round(vw * 0.86);
+    const ch = Math.round(vh * 0.38);
+    const cx = Math.round((vw - cw) / 2);
+    const cy = Math.round((vh - ch) / 2);
     const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.width = cw;
+    canvas.height = ch;
+    canvas.getContext('2d').drawImage(video, cx, cy, cw, ch, 0, 0, cw, ch);
     canvas.toBlob((blob) => blob && processBlob(blob), 'image/jpeg', 0.92);
   }, [processBlob]);
 
