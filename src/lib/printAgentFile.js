@@ -51,7 +51,7 @@ async function listPrinters() {
         '-NoProfile', '-NoLogo', '-Command',
         'Get-Printer | Select-Object -ExpandProperty Name'
       ]);
-      return stdout.split('\\n').map(function (s) { return s.trim(); }).filter(Boolean);
+      return stdout.stdout.split('\\n').map(function (s) { return s.trim(); }).filter(Boolean);
     } catch (e) {
       return [];
     }
@@ -65,13 +65,13 @@ async function listPrinters() {
     // Intento 1: lpstat -e (destinos, uno por linea)
     try {
       var out = await execFileAsync('lpstat', ['-e']);
-      out.split('\\n').forEach(function (s) { add(s.trim()); });
+      out.stdout.split('\\n').forEach(function (s) { add(s.trim()); });
     } catch (e) {}
     if (found.length > 0) return found;
     // Intento 2: lpstat -p ("printer NAME is ...")
     try {
       var out2 = await execFileAsync('lpstat', ['-p']);
-      out2.split('\\n').forEach(function (line) {
+      out2.stdout.split('\\n').forEach(function (line) {
         var parts = line.trim().split(' ').filter(Boolean);
         if (parts[0] === 'printer' && parts[1]) add(parts[1]);
       });
@@ -80,7 +80,7 @@ async function listPrinters() {
     // Intento 3: lpstat -v ("device for NAME: ...")
     try {
       var out3 = await execFileAsync('lpstat', ['-v']);
-      out3.split('\\n').forEach(function (line) {
+      out3.stdout.split('\\n').forEach(function (line) {
         var parts = line.trim().split(' ').filter(Boolean);
         if (parts[0] === 'device' && parts[1] === 'for' && parts[2]) {
           var name = parts[2];
@@ -93,7 +93,7 @@ async function listPrinters() {
     // Intento 4: lpstat -a (primera palabra de cada linea = destino)
     try {
       var out4 = await execFileAsync('lpstat', ['-a']);
-      out4.split('\\n').forEach(function (line) {
+      out4.stdout.split('\\n').forEach(function (line) {
         var parts = line.trim().split(' ').filter(Boolean);
         if (parts[0]) add(parts[0]);
       });
