@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Camera, Loader2, Upload, Check, X, RotateCcw } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { toast } from '@/components/ui/use-toast';
+import { enhanceImage } from '@/lib/ocrPreprocess';
 
 // Lector de patentes reutilizable con captura automática en bucle.
 // - Modo normal (default): detecta una patente, la muestra y detiene la cámara.
@@ -37,7 +38,11 @@ export default function PatenteScanner({ onPatente, autoConfirm = true, interval
     setProcessing(true);
     if (!continuous) setError('');
     try {
-      const file = new File([blob], 'patente.jpg', { type: blob.type || 'image/jpeg' });
+      // Preprocesar en el navegador (grises + contraste + upscale) antes de
+      // subir: Tesseract lee mucho mejor una placa con alto contraste que la
+      // foto cruda de la cámara, que es por lo que "no leía nada".
+      const enhanced = await enhanceImage(blob, { grayscale: true, contrast: 1.8 });
+      const file = new File([enhanced], 'patente.png', { type: 'image/png' });
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       const res = await base44.functions.invoke('readPatente', { file_url });
       const d = res?.data ?? res;

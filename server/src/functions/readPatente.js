@@ -35,29 +35,33 @@ function validarPatente(p) {
 export async function recognize(imageInput, _opts = {}) {
   const filePath = resolveLocalPath(imageInput);
 
-  // PSM 7 (una sola línea de texto) + whitelist alfanumérica mayúscula:
-  // mejora mucho la precisión vs. OCR genérico para placas.
-  const text = await runTesseract(filePath, {
-    psm: 7,
-    whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
-  });
-  const clean = normalize(text);
-
-  // Solo aceptar patentes cuyo formato coincida con un patrón argentino válido.
-  // Si Tesseract no encuentra nada que calce, devolvemos vacío (el usuario
-  // puede escribir la patente a mano en el panel) en vez de devolver basura.
-  const candidates = clean.match(PLATE_RE) || [];
-  for (const c of candidates) {
-    const v = validarPatente(c);
-    if (v.valido) {
-      return {
-        patente: c,
-        valido: true,
-        descripcion: v.descripcion,
-        confianza: 0.9,
-        formato_detectado: v.formato,
-        raw_text: text.slice(0, 120),
-      };
+  // Multi-PSM: la placa puede leerse con PSM 7 (línea única), PSM 8 (palabra),
+  // PSM 13 (línea cruda) o PSM 6 (bloque). Probamos en orden y devolvemos el
+  // primer candidato que calce un formato argentino válido — mucho más robusto
+  // sobre fotos de cámara que un solo PSM. Si ninguno calza, devolvemos vacío.
+  const PSMS = [7, 8, 13, 6];
+  let rawAll = '';
+  for (const psm of PSMS) {
+    let text;
+    try {
+      text = await runTesseract(filePath, { psm, whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789' });
+    } catch {
+      continue;
+    }
+    rawAll += (rawAll ? '\n' : '') + `[psm${psm}] ${text}`.slice(0, 120);
+    const candidates = normalize(text).match(PLATE_RE) || [];
+    for (const c of candidates) {
+      const v = validarPatente(c);
+      if (v.valido) {
+        return {
+          patente: c,
+          valido: true,
+          descripcion: v.descripcion,
+          confianza: 0.9,
+          formato_detectado: v.formato,
+          raw_text: rawAll,
+        };
+      }
     }
   }
 
@@ -67,6 +71,6 @@ export async function recognize(imageInput, _opts = {}) {
     descripcion: 'No se detectó una patente válida',
     confianza: 0,
     formato_detectado: 'desconocido',
-    raw_text: text.slice(0, 120),
+    raw_text: rawAll.slice(0, 240),
   };
 }

@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { Upload, Loader2, ScanLine, X, Check, AlertCircle } from 'lucide-react';
 import * as faceapi from '@vladmandic/face-api';
 import { loadModels } from '@/lib/faceRecognition';
+import { enhanceImage } from '@/lib/ocrPreprocess';
 
 export default function DniScannerModal({ open, onClose, onScanned }) {
   const [dniFile, setDniFile] = useState(null);
@@ -37,7 +38,12 @@ export default function DniScannerModal({ open, onClose, onScanned }) {
     setError('');
     setResult(null);
     try {
-      const { file_url: dniImageUrl } = await base44.integrations.Core.UploadFile({ file: dniFile });
+      // Preprocesar la imagen para OCR (grises + contraste + escala) antes de
+      // subirla: Tesseract lee mucho mejor un DNI con alto contraste que la
+      // foto cruda. La detección de rostro sigue usando la imagen original.
+      const enhancedBlob = await enhanceImage(dniFile, { grayscale: true, contrast: 1.6 });
+      const enhancedFile = new File([enhancedBlob], 'dni-ocr.png', { type: 'image/png' });
+      const { file_url: dniImageUrl } = await base44.integrations.Core.UploadFile({ file: enhancedFile });
 
       const [ocrResult, faceResult] = await Promise.allSettled([
         base44.functions.invoke('readDni', { file_url: dniImageUrl }),
