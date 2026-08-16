@@ -122,6 +122,14 @@ LAN_BASE_URL=http://127.0.0.1:$SERVER_PORT
 UPLOAD_DIR=./uploads
 MAX_UPLOAD_MB=15
 TESSERACT_LANG=spa
+# OCR por LLM de visión (opcional). Si lo configurás, el lector de DNI y
+# patentes usa un modelo multimodal (igual que Base44 cloud) en vez de
+# Tesseract — calidad muy superior sobre fotos de cámara. Sin esto, cae
+# automáticamente a Tesseract local. Funciona con cualquier endpoint
+# OpenAI-compatible (OpenAI, Azure OpenAI, Groq, Ollama, etc.).
+# VISION_API_KEY=sk-...
+# VISION_BASE_URL=https://api.openai.com/v1/chat/completions
+# VISION_MODEL=gpt-4o-mini
 EOF
   chmod 600 "$APP_HOME/server/.env"
   chown "$APP_USER":"$APP_USER" "$APP_HOME/server/.env"

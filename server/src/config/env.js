@@ -25,4 +25,12 @@ export const env = {
   maxUploadBytes: (parseInt(process.env.MAX_UPLOAD_MB || '15', 10)) * 1024 * 1024,
   tesseractLang: process.env.TESSERACT_LANG || 'eng',
   smtpEnabled: process.env.SMTP_ENABLED === 'true',
+  // OCR por LLM de visión (OpenAI-compatible). Opcional: si está configurado,
+  // readPatente/readDni usan un modelo multimodal (igual que Base44 cloud) en
+  // vez de Tesseract. Sin key → fallback automático a Tesseract local.
+  vision: {
+    apiKey: process.env.VISION_API_KEY || '',
+    baseUrl: process.env.VISION_BASE_URL || 'https://api.openai.com/v1/chat/completions',
+    model: process.env.VISION_MODEL || 'gpt-4o-mini',
+  },
 };

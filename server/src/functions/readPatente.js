@@ -1,22 +1,18 @@
-// Lectura de patentes con el binario `tesseract` del sistema (100% local, sin
-// internet). Recibe un path local o un file_url del servidor y devuelve la
-// patente normalizada y validada con formato argentino
-// (AAA999 | AA999AA | AA999A | A999AAA).
+// Lectura de patentes argentina.
+// 1) Si hay VISION_API_KEY: usa un LLM de visión (igual que Base44 cloud con
+//    InvokeLLM) — máxima calidad sobre fotos de cámara.
+// 2) Si no: cae a Tesseract local (offline, menor calidad pero sin dependencias).
+// Devuelve la patente normalizada + validada con formato argentino.
 
 import { resolveLocalPath, runTesseract } from './_ocr.js';
+import { visionExtract, visionAvailable } from './_visionOcr.js';
 
 // ── Formatos válidos de patente argentina (sin espacios) ────────────────────
-//   Auto Mercosur (2016+): AA999AA   -> [A-Z]{2}\d{3}[A-Z]{2}
-//   Auto antiguo:          AAA999    -> [A-Z]{3}\d{3}
-//   Moto Mercosur:         AA999A    -> [A-Z]{2}\d{3}[A-Z]
-//   Moto antigua:          A999AAA   -> [A-Z]\d{3}[A-Z]{3}
 const MERCOSUR_AUTO = /^[A-Z]{2}\d{3}[A-Z]{2}$/;
 const ANTIGUO_AUTO  = /^[A-Z]{3}\d{3}$/;
 const MOTO_MERCOSUR = /^[A-Z]{2}\d{3}[A-Z]$/;
 const MOTO_ANTIGUA  = /^[A-Z]\d{3}[A-Z]{3}$/;
 
-// Regex de extracción: busca candidatos a patente en el texto OCR (ordenado
-// de más específico a más corto para evitar cortar patentes largas).
 const PLATE_RE = /([A-Z]{2}\d{3}[A-Z]{2}|[A-Z]{2}\d{3}[A-Z]|[A-Z]{3}\d{3}|[A-Z]\d{3}[A-Z]{3}|\d{3}[A-Z]{2}\d{2})/g;
 
 function normalize(raw) {
@@ -32,13 +28,34 @@ function validarPatente(p) {
   return { valido: false, formato: 'desconocido', descripcion: 'Formato no reconocido como patente argentina' };
 }
 
-export async function recognize(imageInput, _opts = {}) {
-  const filePath = resolveLocalPath(imageInput);
+// ── Camino 1: LLM de visión ─────────────────────────────────────────────────
+async function recognizeWithVision(filePath) {
+  const prompt = `Leé la patente (dominio) visible en la imagen. Es una patente argentina.
+Formatos válidos: AA999AA (auto Mercosur), AAA999 (auto antiguo), AA999A (moto).
+Devolvé un JSON: {"patente":"AB123CD","formato":"mercosur_auto","confianza":0.9}.
+- patente en MAYÚSCULAS sin espacios ni guiones.
+- formato uno de: mercosur_auto, antiguo_auto, mercosur_moto, antiguo_moto, desconocido.
+- Si no hay patente legible, devolvé {"patente":"","formato":"desconocido","confianza":0}.`;
+  const content = await visionExtract(filePath, { prompt, jsonSchema: { properties: { patente: {}, formato: {}, confianza: {} } } });
+  // Extraer el JSON del contenido (puede venir con fences de markdown).
+  const match = content.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  let parsed;
+  try { parsed = JSON.parse(match[0]); } catch { return null; }
+  const patente = normalize(parsed.patente);
+  const v = validarPatente(patente);
+  return {
+    patente,
+    valido: v.valido,
+    descripcion: v.descripcion,
+    confianza: Number(parsed.confianza) || 0,
+    formato_detectado: parsed.formato || v.formato,
+    raw_text: `[vision] ${content.slice(0, 200)}`,
+  };
+}
 
-  // Multi-PSM: la placa puede leerse con PSM 7 (línea única), PSM 8 (palabra),
-  // PSM 13 (línea cruda) o PSM 6 (bloque). Probamos en orden y devolvemos el
-  // primer candidato que calce un formato argentino válido — mucho más robusto
-  // sobre fotos de cámara que un solo PSM. Si ninguno calza, devolvemos vacío.
+// ── Camino 2: Tesseract local (offline) ─────────────────────────────────────
+async function recognizeWithTesseract(filePath) {
   const PSMS = [7, 8, 13, 6];
   let rawAll = '';
   for (const psm of PSMS) {
@@ -64,7 +81,6 @@ export async function recognize(imageInput, _opts = {}) {
       }
     }
   }
-
   return {
     patente: '',
     valido: false,
@@ -73,4 +89,21 @@ export async function recognize(imageInput, _opts = {}) {
     formato_detectado: 'desconocido',
     raw_text: rawAll.slice(0, 240),
   };
+}
+
+export async function recognize(imageInput, _opts = {}) {
+  const filePath = resolveLocalPath(imageInput);
+
+  // Visión primero (si está configurada): calidad "igual que Base44".
+  if (visionAvailable()) {
+    try {
+      const r = await recognizeWithVision(filePath);
+      if (r && r.patente) return r;
+      // Si la visión no encontró patente, probamos tesseract antes de rendirnos.
+    } catch (e) {
+      console.warn('[readPatente] visión falló, fallback a tesseract:', e.message);
+    }
+  }
+
+  return recognizeWithTesseract(filePath);
 }
