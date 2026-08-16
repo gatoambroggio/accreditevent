@@ -42,21 +42,24 @@ export default function PatenteScanner({ onPatente, autoConfirm = true, interval
       const res = await base44.functions.invoke('readPatente', { file_url });
       const d = res?.data ?? res;
       if (d?.error) throw new Error(d.error);
-      if (d.patente && d.valido) {
-        if (continuous) {
+      if (continuous) {
+        // En estación solo reportamos patentes válidas y seguimos escaneando.
+        if (d.patente && d.valido) {
           const now = Date.now();
-          // Evita reportar la misma patente repetidamente (auto quieto en cámara)
           if (d.patente === lastPlateRef.current && now - lastPlateAtRef.current < 5000) return;
           lastPlateRef.current = d.patente;
           lastPlateAtRef.current = now;
           if (onPatente) onPatente(d.patente);
-          return; // sigue escaneando
         }
-        setResult(d);
-        setManual(d.patente);
-        stopCamera();
-        if (autoConfirm && onPatente) onPatente(d.patente);
+        return;
       }
+      // Modo normal: mostrar siempre el resultado (valido o no) para que el
+      // usuario vea qué detectó Tesseract y pueda corregir a mano. Antes, si
+      // la patente no calzaba el formato exacto, no se mostraba nada ("no anda").
+      setResult(d);
+      setManual(d.patente || '');
+      stopCamera();
+      if (autoConfirm && d.patente && d.valido && onPatente) onPatente(d.patente);
     } catch (e) {
       if (!continuous) setError(e.message || 'No se pudo leer la patente.');
     } finally {
@@ -257,6 +260,13 @@ export default function PatenteScanner({ onPatente, autoConfirm = true, interval
               </button>
             </div>
           </div>
+
+          {!result.valido && (
+            <details className="rounded-lg bg-slate-100 p-2">
+              <summary className="cursor-pointer text-xs font-semibold text-slate-500">Texto OCR crudo (para diagnosticar)</summary>
+              <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap text-[10px] text-slate-600">{result.raw_text || '(vacío — Tesseract no devolvió texto)'}</pre>
+            </details>
+          )}
 
           <button onClick={() => { setResult(null); setManual(''); startCamera(); }} className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 hover:underline">
             <RotateCcw className="h-3.5 w-3.5" /> Escanear otra patente

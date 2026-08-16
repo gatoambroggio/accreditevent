@@ -83,6 +83,7 @@ export default function DniScannerModal({ open, onClose, onScanned }) {
         nombre: ocr.nombre || '',
         apellido: ocr.apellido || '',
         dni: ocr.dni || '',
+        raw_text: ocr.raw_text || '',
         faceUrl: face?.faceUrl || null,
         faceDescriptor: face?.descriptor || null,
         faceError: faceResult.status === 'rejected' ? faceResult.reason?.message : null,
@@ -189,6 +190,12 @@ export default function DniScannerModal({ open, onClose, onScanned }) {
                       <p className="text-xs text-amber-600">{result.faceError || 'No se pudo extraer la foto.'}</p>
                     )}
                   </div>
+                  {(!result.apellido && !result.nombre && !result.dni) && (
+                    <details className="rounded-lg bg-slate-100 p-2">
+                      <summary className="cursor-pointer text-xs font-semibold text-slate-500">Texto OCR crudo (para diagnosticar)</summary>
+                      <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap text-[10px] text-slate-600">{result.raw_text || '(vacío — Tesseract no devolvió texto)'}</pre>
+                    </details>
+                  )}
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-10 text-center">

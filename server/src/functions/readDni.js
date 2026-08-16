@@ -10,7 +10,13 @@ import { resolveLocalPath, runTesseract } from './_ocr.js';
 
 export async function readDni({ file_url } = {}) {
   const filePath = resolveLocalPath(file_url);
-  const text = await runTesseract(filePath, { psm: 6 });
+  // PSM 6 (bloque uniforme) primero; si devuelve texto vacío o muy corto
+  // (DNI con diseño atípico), reintentar con PSM 3 (automático) que es más
+  // tolerante. Sin esto, muchas fotos de DNI devuelven campos vacíos.
+  let text = await runTesseract(filePath, { psm: 6 });
+  if (!text || text.trim().length < 3) {
+    try { text = await runTesseract(filePath, { psm: 3 }); } catch {}
+  }
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
 
   // DNI: primera línea con 7-8 dígitos (acepta puntos/espacios intermedios).

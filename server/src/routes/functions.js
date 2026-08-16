@@ -63,5 +63,5 @@ functionInvokeRouter.post('/:name', async (req, res, next) => {
     if (req.params.name === 'webauthnRegister' || req.params.name === 'webauthnVerify') payload._headers = req.headers;
     const out = await handler(payload, { user: req.user, prisma });
     res.json({ data: out });
-  } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
+  } catch (e) { console.error(`[function ${req.params.name}]`, e.message); res.status(e.status || 500).json({ error: e.message }); }
 });
