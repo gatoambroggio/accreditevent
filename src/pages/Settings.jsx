@@ -57,7 +57,7 @@ const CATALOG_LINKS = [
 ];
 
 export default function Settings() {
-  const { user } = useAuth();
+  const { user, checkUserAuth } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
   const [settings, setSettings] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -73,6 +73,23 @@ export default function Settings() {
   const [agentStatus, setAgentStatus] = useState('checking'); // checking | connected | disconnected
   const [agentPrinters, setAgentPrinters] = useState(null); // null | [string, ...]
   const [loadingPrinters, setLoadingPrinters] = useState(false);
+  const [userPrinters, setUserPrinters] = useState({ personal: user?.data?.printer_personal || '', vehicular: user?.data?.printer_vehicular || '' });
+  const [savingPrinters, setSavingPrinters] = useState(false);
+  const [printersSaved, setPrintersSaved] = useState(false);
+
+  const handleSavePrinters = async () => {
+    setSavingPrinters(true);
+    try {
+      await base44.auth.updateMe({ data: { ...(user?.data || {}), printer_personal: userPrinters.personal, printer_vehicular: userPrinters.vehicular } });
+      await checkUserAuth();
+      setPrintersSaved(true);
+      setTimeout(() => setPrintersSaved(false), 3000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSavingPrinters(false);
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -269,7 +286,7 @@ export default function Settings() {
         </div>
       </Section>
 
-      <Section title="Impresión automática de credenciales" description="Instalá el agente local en cada estación de trabajo para imprimir credenciales directo a la impresora sin diálogo. Las credenciales personales van a la impresora A y las vehiculares a la impresora B.">
+      <Section title="Impresión automática de credenciales" description="Configurás la impresora por usuario/puesto: cada operador define sus impresoras A (personal) y B (vehicular), guardadas en su perfil. Instalá el agente local en cada estación para imprimir sin diálogo.">
         {/* Estado del agente */}
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
           <div className="flex items-center gap-2">
@@ -303,20 +320,34 @@ export default function Settings() {
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <PrinterSelect
             label="Impresora personal (A)"
-            value={settings.printer_personal}
-            onChange={(v) => update('printer_personal', v)}
+            value={userPrinters.personal}
+            onChange={(v) => setUserPrinters((p) => ({ ...p, personal: v }))}
             printers={agentPrinters}
             placeholder="Nombre exacto de la impresora A"
             hint="Para credenciales personales"
           />
           <PrinterSelect
             label="Impresora vehicular (B)"
-            value={settings.printer_vehicular}
-            onChange={(v) => update('printer_vehicular', v)}
+            value={userPrinters.vehicular}
+            onChange={(v) => setUserPrinters((p) => ({ ...p, vehicular: v }))}
             printers={agentPrinters}
             placeholder="Nombre exacto de la impresora B"
             hint="Para credenciales de vehículos"
           />
+        </div>
+
+        {/* Guardar impresoras por usuario */}
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button
+            onClick={handleSavePrinters}
+            disabled={savingPrinters}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50"
+          >
+            {savingPrinters ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {savingPrinters ? 'Guardando…' : 'Guardar mis impresoras'}
+          </button>
+          {printersSaved && <span className="text-xs font-medium text-emerald-700">Impresoras guardadas en tu perfil.</span>}
+          <span className="text-xs text-slate-500">Se guardan por usuario. Cada puesto define las suyas (confirmado en el backend al guardar).</span>
         </div>
 
         {/* Actualizar impresoras detectadas */}
@@ -340,7 +371,7 @@ export default function Settings() {
 
         <div className="mt-3 flex items-start gap-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
           <Printer className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
-          <p>Si el agente no está corriendo o no configuraste las impresoras, al imprimir se abrirá el diálogo del navegador como fallback. Windows requiere SumatraPDF (ver instrucciones en el archivo del agente).</p>
+          <p>Si el agente no está corriendo o no configuraste las impresoras, al imprimir se abrirá el diálogo del navegador como fallback. En Windows el agente descarga SumatraPDF automáticamente la primera vez (requiere internet esa vez).</p>
         </div>
       </Section>
 

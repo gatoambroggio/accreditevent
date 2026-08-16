@@ -3,6 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { X, Printer, Loader2 } from 'lucide-react';
 import { printBatchToAgent } from '@/lib/printAgent';
 import { printBadges as printBadgesFallback } from '@/lib/printBadge';
+import { useAuth } from '@/lib/AuthContext';
 
 function BadgeCard({ accreditation, event }) {
   return (
@@ -112,6 +113,7 @@ function BadgeCard({ accreditation, event }) {
 }
 
 export default function BatchBadgePrint({ accreditations, events, printerName, onClose }) {
+  const { user } = useAuth();
   const [printing, setPrinting] = useState(false);
   const [progress, setProgress] = useState(null);
 
@@ -124,7 +126,8 @@ export default function BatchBadgePrint({ accreditations, events, printerName, o
   const handlePrint = async () => {
     setPrinting(true);
     const badges = document.querySelectorAll('.badge-batch-print .badge-print');
-    const result = await printBatchToAgent(Array.from(badges), printerName, (current, total) => {
+    const printer = user?.data?.printer_personal || printerName;
+    const result = await printBatchToAgent(Array.from(badges), printer, (current, total) => {
       setProgress({ current, total });
     });
     if (result.usedFallback) {

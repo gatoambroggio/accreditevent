@@ -113,13 +113,59 @@ function findSumatra() {
   return null;
 }
 
+function httpsDownload(url, dest) {
+  return new Promise(function (resolve, reject) {
+    var follow = function (u, depth) {
+      if (depth > 5) return reject(new Error('too many redirects'));
+      var lib = u.indexOf('https') === 0 ? require('https') : require('http');
+      var req = lib.get(u, function (res) {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          res.resume();
+          return follow(res.headers.location, depth + 1);
+        }
+        if (res.statusCode !== 200) { res.resume(); return reject(new Error('HTTP ' + res.statusCode)); }
+        var file = fs.createWriteStream(dest);
+        res.pipe(file);
+        file.on('finish', function () { file.close(function () { resolve(); }); });
+        file.on('error', reject);
+      });
+      req.on('error', reject);
+    };
+    follow(url, 0);
+  });
+}
+
+async function ensureSumatra() {
+  var existing = findSumatra();
+  if (existing) return existing;
+  if (PLATFORM !== 'win32') return null;
+  var dest = path.join(__dirname, 'SumatraPDF.exe');
+  var zipPath = path.join(os.tmpdir(), 'sumatra-portable.zip');
+  try {
+    console.log('Descargando SumatraPDF portable...');
+    await httpsDownload('https://www.sumatrapdfreader.org/dl/rel/3.6.1/SumatraPDF-3.6.1-64.zip', zipPath);
+    try {
+      await execFileAsync('tar', ['-xf', zipPath, '-C', __dirname]);
+    } catch (e) {
+      await execFileAsync('powershell.exe', ['-NoProfile', '-Command', "Expand-Archive -Path '" + zipPath + "' -DestinationPath '" + __dirname + "' -Force"]);
+    }
+    try { fs.unlinkSync(zipPath); } catch (e) {}
+    if (fs.existsSync(dest)) { console.log('SumatraPDF instalado en ' + dest); return dest; }
+  } catch (e) {
+    console.error('No se pudo descargar SumatraPDF: ' + e.message);
+    try { fs.unlinkSync(zipPath); } catch (x) {}
+  }
+  return null;
+}
+
 // Enviar PDF a la impresora
 async function printPDF(filePath, printer, copies) {
   copies = Math.max(1, Math.min(copies || 1, 99));
 
   if (PLATFORM === 'win32') {
     // Windows: usar SumatraPDF (impresión silenciosa de PDF)
-    var sumatra = findSumatra() || 'SumatraPDF.exe';
+    var sumatra = await ensureSumatra();
+    if (!sumatra) throw new Error('No se pudo obtener SumatraPDF (sin internet). Descargalo de sumatrapdfreader.org y ponelo junto al agente.');
     var args = ['-print-to', printer, '-silent', '-nosplash', '-exit-when-done'];
     if (copies > 1) args.push('-print-settings', String(copies) + 'x');
     args.push(filePath);
@@ -235,7 +281,11 @@ function tryListen(srv, port) {
         if (sumatra) {
           console.log('SumatraPDF: ' + sumatra);
         } else {
-          console.log('ADVERTENCIA: SumatraPDF no encontrado. Ver README.md (Windows).');
+          console.log('SumatraPDF no encontrado. Descargando automáticamente...');
+          ensureSumatra().then(function (s) {
+            if (s) console.log('SumatraPDF listo: ' + s);
+            else console.log('No se pudo descargar SumatraPDF. Descargalo manualmente de sumatrapdfreader.org.');
+          }).catch(function () {});
         }
       } else {
         console.log('Usando: lp (CUPS)');

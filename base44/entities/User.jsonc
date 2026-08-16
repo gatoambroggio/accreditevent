@@ -38,6 +38,14 @@
     "company": {
       "type": "string",
       "description": "Empresa a la que pertenece el usuario"
+    },
+    "printer_personal": {
+      "type": "string",
+      "description": "Impresora para credenciales personales (configuraci\u00f3n por usuario/puesto)"
+    },
+    "printer_vehicular": {
+      "type": "string",
+      "description": "Impresora para credenciales vehiculares (configuraci\u00f3n por usuario/puesto)"
     }
   },
   "required": [

@@ -4,16 +4,19 @@ import { X, Printer, Loader2 } from 'lucide-react';
 import { printToAgent } from '@/lib/printAgent';
 import { printBadge as printBadgeFallback } from '@/lib/printBadge';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function BadgePrint({ accreditation, event, printerName, onClose }) {
+  const { user } = useAuth();
   const [printing, setPrinting] = useState(false);
 
   const handlePrint = async () => {
     setPrinting(true);
     const badge = document.querySelector('.badge-print');
+    const printer = user?.data?.printer_personal || printerName;
     let sent = false;
     if (badge) {
-      sent = await printToAgent(badge, printerName, 1);
+      sent = await printToAgent(badge, printer, 1);
     }
     if (!sent) {
       printBadgeFallback();

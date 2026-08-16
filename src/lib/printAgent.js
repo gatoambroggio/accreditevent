@@ -106,7 +106,7 @@ export async function printToAgent(element, printerName, copies = 1) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ printer: printerName, pdf_base64: base64, copies }),
-    }, 10000);
+    }, 60000);
     if (!res.ok) { _agentBase = null; return false; }
     return true;
   } catch {
@@ -132,7 +132,7 @@ export async function printBatchToAgent(elements, printerName, onProgress) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ printer: printerName, pdf_base64: base64, copies: 1 }),
-        }, 10000);
+        }, 60000);
         if (res && res.ok) sent++;
       }
     } catch {}
