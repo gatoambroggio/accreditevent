@@ -55,28 +55,30 @@ export async function recognize(imageInput, _opts = {}) {
   const text = data?.text || '';
   const clean = normalize(text);
 
-  // Buscar el mejor candidato a patente en todo el texto OCR (primer match válido).
+  // Solo aceptar patentes cuyo formato coincida con un patrón argentino válido.
+  // Si Tesseract no encuentra nada que calce, devolvemos vacío (el usuario
+  // puede escribir la patente a mano en el panel) en vez de devolver basura.
   const candidates = clean.match(PLATE_RE) || [];
-  let best = null;
   for (const c of candidates) {
     const v = validarPatente(c);
-    if (v.valido) { best = { patente: c, ...v, confianza: 0.9 }; break; }
-  }
-
-  // Fallback: si no hay match válido, usar los primeros 7 chars normalizados
-  // (el usuario puede corregir manualmente en el panel).
-  if (!best) {
-    const guess = clean.slice(0, 7);
-    const v = validarPatente(guess);
-    best = { patente: guess, ...v, confianza: v.valido ? 0.8 : 0.4 };
+    if (v.valido) {
+      return {
+        patente: c,
+        valido: true,
+        descripcion: v.descripcion,
+        confianza: 0.9,
+        formato_detectado: v.formato,
+        raw_text: text.slice(0, 120),
+      };
+    }
   }
 
   return {
-    patente: best.patente,
-    valido: best.valido,
-    descripcion: best.valido ? best.descripcion : 'Formato a verificar',
-    confianza: best.confianza,
-    formato_detectado: best.formato,
+    patente: '',
+    valido: false,
+    descripcion: 'No se detectó una patente válida',
+    confianza: 0,
+    formato_detectado: 'desconocido',
     raw_text: text.slice(0, 120),
   };
 }
