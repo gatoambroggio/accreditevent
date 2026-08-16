@@ -315,12 +315,9 @@ if need_models; then
 fi
 
 if need_models; then
-  warn "No se pudieron descargar los modelos de face-api.js (sin internet a GitHub)."
-  echo "    Copialos a mano a $MODELS_DIR desde cualquier PC con internet:"
-  echo "      https://github.com/vladmandic/face-api/tree/master/weights"
-  echo "    Archivos necesarios: ${MODELS[*]}"
-  echo "    El reconocimiento facial no funcionará hasta que estén presentes."
-  echo "    El resto del sistema funciona normalmente — solo biometría queda en espera."
+  log "Sin internet a GitHub y sin modelos bundled: biometría facial queda en espera."
+  log "Se habilitará automáticamente en la próxima instalación con conectividad (no requiere acción manual)."
+  log "El resto del sistema funciona normalmente."
 else
   ok "Modelos de face-api.js presentes (${#MODELS[@]} archivos)"
 fi
