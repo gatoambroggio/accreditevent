@@ -16,6 +16,7 @@ import { patentesRouter } from './routes/patentes.js';
 import { functionInvokeRouter } from './routes/functions.js';
 import { settingsRouter } from './routes/settings.js';
 import { downloadsRouter } from './routes/downloads.js';
+import { importRouter } from './routes/import.js';
 import { usersRouter } from './routes/users.js';
 import { webhooksRouter } from './routes/webhooks.js';
 import { makeCrudRouter } from './rls/middleware.js';
@@ -50,6 +51,7 @@ export function createApp() {
   app.use('/api/patentes', requireAuth, patentesRouter);
   app.use('/api/functions', requireAuth, functionInvokeRouter);
   app.use('/api/settings', requireAuth, settingsRouter);
+  app.use('/api/import', requireAuth, importRouter);
 
   // CRUD genérico con RLS por entidad.
   app.use('/api/events', requireAuth, eventsRouter);

@@ -70,6 +70,40 @@ export default function Settings() {
   const [exporting, setExporting] = useState(false);
   const [exportReport, setExportReport] = useState(null);
   const [exportError, setExportError] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importReport, setImportReport] = useState(null);
+  const [importError, setImportError] = useState('');
+  const importFileRef = React.useRef(null);
+
+  const handleImport = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!confirm('La importación REEMPLAZA todos los datos locales con los del ZIP. ¿Continuar?')) {
+      e.target.value = '';
+      return;
+    }
+    setImporting(true);
+    setImportError('');
+    setImportReport(null);
+    try {
+      const token = localStorage.getItem('ae_access_token');
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/import', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Importación fallida');
+      setImportReport(data.data?.output || 'Importación completada.');
+    } catch (err) {
+      setImportError(err.message);
+    } finally {
+      setImporting(false);
+      e.target.value = '';
+    }
+  };
   const [agentStatus, setAgentStatus] = useState('checking'); // checking | connected | disconnected
   const [agentPrinters, setAgentPrinters] = useState(null); // null | [string, ...]
   const [loadingPrinters, setLoadingPrinters] = useState(false);
@@ -600,6 +634,41 @@ export default function Settings() {
           </div>
         )}
       </Section>
+
+      {isAdmin && (
+        <Section title="Importar datos (migración self-hosted)" description="Subí el ZIP exportado desde la nube para cargar toda tu data (eventos, personas, acreditaciones, vehículos, documentos, etc.) en este servidor. ⚠️ REEMPLAZA todos los datos locales con los del ZIP — las credenciales y QR del ZIP siguen siendo válidos porque se conservan los IDs originales.">
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              ref={importFileRef}
+              type="file"
+              accept=".zip,application/zip"
+              onChange={handleImport}
+              className="hidden"
+            />
+            <button
+              onClick={() => importFileRef.current?.click()}
+              disabled={importing}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50"
+            >
+              {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              {importing ? 'Importando…' : 'Seleccionar ZIP e importar'}
+            </button>
+            <p className="text-xs text-slate-500">Solo disponible para administradores. La importación puede tardar varios minutos según el volumen de datos.</p>
+          </div>
+          {importError && (
+            <div className="mt-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">{importError}</div>
+          )}
+          {importReport && (
+            <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/50 p-4">
+              <div className="flex items-center gap-2 text-sm font-bold text-emerald-800">
+                <DatabaseZap className="h-4 w-4" /> Importación completada
+              </div>
+              <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-900 p-3 text-xs text-emerald-200">{importReport}</pre>
+              <p className="mt-2 text-xs text-slate-600">Recargá la página (o cerrá y volvé a entrar) para ver los datos importados en los listados.</p>
+            </div>
+          )}
+        </Section>
+      )}
 
       {isAdmin && (
         <Section title="Exportar datos (migración self-hosted)" description="Generá un ZIP con toda la data del sistema (eventos, personas, acreditaciones, vehículos, documentos, etc.) para migrarla al servidor local air-gapped. Descargá el ZIP, copialo al servidor en /opt/accreditevent/server/import-data.zip y volvé a correr el instalador.">
