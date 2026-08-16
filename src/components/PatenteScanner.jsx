@@ -42,8 +42,10 @@ export default function PatenteScanner({ onPatente, autoConfirm = true, interval
       const res = await base44.functions.invoke('readPatente', { file_url });
       const d = res?.data ?? res;
       if (d?.error) throw new Error(d.error);
-      if (d.patente && d.valido) {
+      if (d.patente) {
         if (continuous) {
+          // En estación: solo reportar patentes válidas (evita falsos positivos).
+          if (!d.valido) return;
           const now = Date.now();
           // Evita reportar la misma patente repetidamente (auto quieto en cámara)
           if (d.patente === lastPlateRef.current && now - lastPlateAtRef.current < 5000) return;
@@ -52,10 +54,11 @@ export default function PatenteScanner({ onPatente, autoConfirm = true, interval
           if (onPatente) onPatente(d.patente);
           return; // sigue escaneando
         }
+        // Modo normal: mostrar cualquier candidato para corrección manual.
         setResult(d);
         setManual(d.patente);
         stopCamera();
-        if (autoConfirm && onPatente) onPatente(d.patente);
+        if (autoConfirm && d.valido && onPatente) onPatente(d.patente);
       }
     } catch (e) {
       if (!continuous) setError(e.message || 'No se pudo leer la patente.');
