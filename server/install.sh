@@ -157,6 +157,23 @@ else
   ok "Sin import-data.zip — base vacía (normal en install fresco). Copiá el ZIP exportado desde el panel de la nube para migrar tu data."
 fi
 
+# ── 4c. Binarios del agente de impresión portable ─────────────────────────────
+step "Agente de impresión portable (Windows .exe + macOS)"
+if [[ -d "$REPO_DIR/print-agent/dist" ]] && ls "$REPO_DIR/print-agent/dist/"*.exe "$REPO_DIR/print-agent/dist/"accreditevent-print-agent-mac-* >/dev/null 2>&1; then
+  install -d -o "$APP_USER" -g "$APP_USER" "$APP_HOME/server/print-agent/dist"
+  rsync -a "$REPO_DIR/print-agent/dist/" "$APP_HOME/server/print-agent/dist/"
+  chown -R "$APP_USER":"$APP_USER" "$APP_HOME/server/print-agent"
+  ok "Binarios del agente copiados a $APP_HOME/server/print-agent/dist"
+  echo "    Se sirven desde el panel en Configuración → Impresión (descarga directa, sin Node)."
+else
+  warn "Sin print-agent/dist/ — los binarios portable no se construyeron en este checkout."
+  echo "    Opciones para construirlos (necesitás internet una sola vez):"
+  echo "      1) En una PC con internet:  cd print-agent && npm install && npm run build"
+  echo "         y volvé a correr este install.sh para copiarlos al servidor."
+  echo "      2) Descargá los binarios ya compilados desde GitHub Releases y ponelos en print-agent/dist/"
+  echo "    El agente .js (requiere Node) siempre está disponible como fallback."
+fi
+
 # ── 5. Frontend React ─────────────────────────────────────────────────────────
 step "Frontend React: build self-hosted (air-gapped)"
 if [[ -f "$FRONTEND_DIR/package.json" ]]; then

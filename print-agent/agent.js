@@ -16,6 +16,7 @@
 // =============================================================================
 
 const http = require('http');
+const https = require('https');
 const os = require('os');
 const fs = require('fs');
 const path = require('path');
@@ -26,6 +27,12 @@ const execFileAsync = promisify(execFile);
 const PORTS = [9100, 9101, 9200, 9300, 4100];
 const PLATFORM = process.platform;
 const VERSION = '1.0.0';
+
+// pkg empaqueta __dirname dentro de un FS de solo lectura; para escribir archivos
+// (SumatraPDF.exe descargado) usamos el directorio del binario real (.exe).
+const IS_PKG = __dirname.indexOf('/snapshot') === 0 ||
+  process.execPath.toLowerCase().indexOf('accreditevent-print-agent') >= 0;
+const APP_DIR = IS_PKG ? path.dirname(process.execPath) : __dirname;
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -101,7 +108,7 @@ async function listPrinters() {
 // Buscar SumatraPDF (Windows) para impresión silenciosa de PDF
 function findSumatra() {
   var candidates = [
-    path.join(__dirname, 'SumatraPDF.exe'),
+    path.join(APP_DIR, 'SumatraPDF.exe'),
     'C:\\Program Files\\SumatraPDF\\SumatraPDF.exe',
     'C:\\Program Files (x86)\\SumatraPDF\\SumatraPDF.exe',
   ];
@@ -117,7 +124,7 @@ function httpsDownload(url, dest) {
   return new Promise(function (resolve, reject) {
     var follow = function (u, depth) {
       if (depth > 5) return reject(new Error('too many redirects'));
-      var lib = u.indexOf('https') === 0 ? require('https') : require('http');
+      var lib = u.indexOf('https') === 0 ? https : http;
       var req = lib.get(u, function (res) {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           res.resume();
@@ -139,15 +146,15 @@ async function ensureSumatra() {
   var existing = findSumatra();
   if (existing) return existing;
   if (PLATFORM !== 'win32') return null;
-  var dest = path.join(__dirname, 'SumatraPDF.exe');
+  var dest = path.join(APP_DIR, 'SumatraPDF.exe');
   var zipPath = path.join(os.tmpdir(), 'sumatra-portable.zip');
   try {
     console.log('Descargando SumatraPDF portable...');
     await httpsDownload('https://www.sumatrapdfreader.org/dl/rel/3.6.1/SumatraPDF-3.6.1-64.zip', zipPath);
     try {
-      await execFileAsync('tar', ['-xf', zipPath, '-C', __dirname]);
+      await execFileAsync('tar', ['-xf', zipPath, '-C', APP_DIR]);
     } catch (e) {
-      await execFileAsync('powershell.exe', ['-NoProfile', '-Command', "Expand-Archive -Path '" + zipPath + "' -DestinationPath '" + __dirname + "' -Force"]);
+      await execFileAsync('powershell.exe', ['-NoProfile', '-Command', "Expand-Archive -Path '" + zipPath + "' -DestinationPath '" + APP_DIR + "' -Force"]);
     }
     try { fs.unlinkSync(zipPath); } catch (e) {}
     if (fs.existsSync(dest)) { console.log('SumatraPDF instalado en ' + dest); return dest; }

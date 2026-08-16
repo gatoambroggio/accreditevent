@@ -15,6 +15,7 @@ import { filesRouter } from './routes/files.js';
 import { patentesRouter } from './routes/patentes.js';
 import { functionInvokeRouter } from './routes/functions.js';
 import { settingsRouter } from './routes/settings.js';
+import { downloadsRouter } from './routes/downloads.js';
 import { usersRouter } from './routes/users.js';
 import { webhooksRouter } from './routes/webhooks.js';
 import { makeCrudRouter } from './rls/middleware.js';
@@ -36,6 +37,8 @@ export function createApp() {
 
   // Health + auth (públicos)
   app.use('/api/health', healthRouter);
+  // Descargas de binarios del agente de impresión (.exe Windows, binarios macOS, .js)
+  app.use('/api/downloads', downloadsRouter);
   app.use('/api/auth', authRouter);
 
   // Webhooks de hardware: públicos (la terminal Dahua/ZKTeco no tiene token).

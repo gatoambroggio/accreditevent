@@ -1,0 +1,15 @@
+{
+  "name": "accreditevent-print-agent",
+  "version": "1.0.0",
+  "description": "AccreditEvent local print agent — portable executables (no Node required to run)",
+  "bin": "agent.js",
+  "scripts": {
+    "start": "node agent.js",
+    "build": "node build.js all",
+    "build:win": "node build.js win",
+    "build:mac": "node build.js mac"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^5.16.0"
+  }
+}

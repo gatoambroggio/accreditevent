@@ -301,20 +301,38 @@ export default function Settings() {
           </div>
           <button onClick={checkAgentStatus} className="text-xs text-emerald-600 hover:underline">Re-verificar</button>
           {agentStatus === 'disconnected' && (
-            <p className="text-xs text-amber-600">El agente no está corriendo. Descargalo abajo y ejecutalo con <code className="rounded bg-slate-100 px-1">node accreditevent-print-agent.js</code></p>
+            <p className="text-xs text-amber-600">El agente no está corriendo. Descargá el ejecutable de abajo y ejecutalo (no necesita Node).</p>
           )}
         </div>
 
-        {/* Descarga del agente */}
+        {/* Descarga del agente — ejecutables portable servidos desde el backend */}
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <button
-            onClick={downloadAgentScript}
+          <a
+            href="/api/downloads/print-agent-win"
             className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
           >
-            <Download className="h-4 w-4" /> Descargar agente local
+            <Download className="h-4 w-4" /> Windows (.exe)
+          </a>
+          <a
+            href="/api/downloads/print-agent-mac-arm"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          >
+            <Download className="h-4 w-4" /> macOS (Apple Silicon)
+          </a>
+          <a
+            href="/api/downloads/print-agent-mac-x64"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          >
+            <Download className="h-4 w-4" /> macOS (Intel)
+          </a>
+          <button onClick={downloadAgentScript} className="text-xs text-slate-500 underline hover:text-slate-700">
+            o script .js (requiere Node)
           </button>
-          <span className="text-xs text-slate-500">Guardá el archivo en cada PC, instalá Node.js y ejecutá: <code className="rounded bg-slate-100 px-1">node accreditevent-print-agent.js</code></span>
         </div>
+        <p className="mt-2 text-xs text-slate-500">
+          <b>Windows:</b> descargá el .exe y ejecutalo con doble clic (instala SumatraPDF solo la primera vez).<br/>
+          <b>macOS:</b> según tu chip (Apple Silicon = M1/M2/M3, Intel = Macs anteriores), luego en Terminal: <code className="rounded bg-slate-100 px-1">chmod +x archivo</code> y <code className="rounded bg-slate-100 px-1">./archivo</code>. La primera vez: clic derecho → Abrir para saltear Gatekeeper.
+        </p>
 
         {/* Configuración de impresoras */}
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">

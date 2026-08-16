@@ -2,7 +2,89 @@
 
 Agente local para impresión automática de credenciales sin diálogo del navegador.
 
-## Instalación
+## Binarios portable (sin Node.js) — recomendado
+
+Las estaciones de trabajo **no necesitan instalar Node.js**: usá los ejecutables standalone
+(Node embebido vía [@yao-pkg/pkg](https://github.com/yao-pkg/pkg)):
+
+- **Windows:** `accreditevent-print-agent.exe` — doble clic para correr.
+- **macOS Apple Silicon (M1/M2/M3):** `accreditevent-print-agent-mac-arm64`
+- **macOS Intel:** `accreditevent-print-agent-mac-x64`
+
+Los binarios se descargan **desde el panel** (Configuración → Impresión), servidos por el
+backend en `/api/downloads/print-agent-win`, `/api/downloads/print-agent-mac-arm`,
+`/api/downloads/print-agent-mac-x64`.
+
+### Construir los binarios (una sola vez, en una PC con internet)
+
+```bash
+cd print-agent
+npm install      # instala @yao-pkg/pkg
+npm run build    # genera dist/accreditevent-print-agent.exe + los dos binarios macOS
+```
+
+Después copiá la carpeta `print-agent/dist/` al servidor y volvé a correr `install.sh`
+(la copia a `$APP_HOME/server/print-agent/dist/` y el backend la sirve al panel).
+
+> El servidor air-gapped **no construye** los binarios (no tiene internet). Se construyen
+> en una PC con internet y se copian. El script `.js` (requiere Node) queda siempre como fallback.
+
+### macOS: permisos del binario
+
+```bash
+chmod +x accreditevent-print-agent-mac-arm64
+./accreditevent-print-agent-mac-arm64
+```
+
+La primera vez Gatekeeper lo bloquea: clic derecho sobre el archivo → **Abrir** → **Abrir** de todos modos.
+
+### CI: auto-build en GitHub Actions
+
+> El builder de la app no puede escribir en `.github/workflows/` (sin permiso). Creá este
+> archivo a mano en el repo para que cada tag `print-agent-v*` compile y publique los binarios:
+
+`.github/workflows/build-print-agent.yml`
+
+```yaml
+name: Build Print Agent
+on:
+  push:
+    tags: ['print-agent-v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: |
+          cd print-agent
+          npm install
+          npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: print-agent-binaries
+          path: |
+            print-agent/dist/accreditevent-print-agent.exe
+            print-agent/dist/accreditevent-print-agent-mac-x64
+            print-agent/dist/accreditevent-print-agent-mac-arm64
+      - if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            print-agent/dist/accreditevent-print-agent.exe
+            print-agent/dist/accreditevent-print-agent-mac-x64
+            print-agent/dist/accreditevent-print-agent-mac-arm64
+```
+
+Para publicar una release: `git tag print-agent-v1.0.0 && git push --tags`.
+
+---
+
+## Alternativa: script .js (requiere Node)
 
 ### Requisitos previos
 
