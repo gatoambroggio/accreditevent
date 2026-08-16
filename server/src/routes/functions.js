@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../db/prisma.js';
 import { recognize } from '../functions/readPatente.js';
+import { readDni } from '../functions/readDni.js';
 import { getEventAccessData } from '../functions/getEventAccessData.js';
 import { faceIdentify } from '../functions/faceIdentify.js';
 import { faceVerify } from '../functions/faceVerify.js';
@@ -42,6 +43,7 @@ export const functionInvokeRouter = Router();
 // Dispatcher de las 38 funciones — mismo contrato que base44.functions.invoke(name, payload).
 const handlers = {
   readPatente: async (p) => recognize(p.file_url || p.fileUrl, p),
+  readDni: async (p) => readDni({ file_url: p.file_url || p.fileUrl }),
   getEventAccessData, faceIdentify, faceVerify, checkFaceDuplicate, cleanupBiometrics, clearBiometrics,
   validateInsurance, checkPersonDocuments, checkDocumentDuplicate, reviewDocument, notifyExpiringDocuments,
   createDocument, deleteDocuments, uploadDocumentBase64,

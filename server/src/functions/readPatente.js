@@ -1,11 +1,9 @@
-// Lectura de patentes con Tesseract OCR (100% local, sin internet).
-// Recibe una URL de imagen local o un path y devuelve la patente normalizada
-// y validada con formato argentino (AAA999 | AA999AA | AA999A | A999AAA).
+// Lectura de patentes con el binario `tesseract` del sistema (100% local, sin
+// internet). Recibe un path local o un file_url del servidor y devuelve la
+// patente normalizada y validada con formato argentino
+// (AAA999 | AA999AA | AA999A | A999AAA).
 
-import Tesseract from 'tesseract.js';
-import fs from 'node:fs';
-import path from 'node:path';
-import { env } from '../config/env.js';
+import { resolveLocalPath, runTesseract } from './_ocr.js';
 
 // ── Formatos válidos de patente argentina (sin espacios) ────────────────────
 //   Auto Mercosur (2016+): AA999AA   -> [A-Z]{2}\d{3}[A-Z]{2}
@@ -35,24 +33,14 @@ function validarPatente(p) {
 }
 
 export async function recognize(imageInput, _opts = {}) {
-  // imageInput puede ser: path local, o file_url tipo http://<lan>/uploads/x.jpg
-  let filePath = imageInput;
-  if (typeof imageInput === 'string' && imageInput.startsWith('http')) {
-    // descargar de uploads locales
-    const rel = imageInput.replace(env.lanBaseUrl, '');
-    const cand = path.resolve(rel.replace(/^\//, ''));
-    filePath = fs.existsSync(cand) ? cand : path.join(env.uploadDir, path.basename(rel));
-  }
-  if (!fs.existsSync(filePath)) throw new Error(`Imagen no encontrada: ${filePath}`);
+  const filePath = resolveLocalPath(imageInput);
 
-  // Tesseract con config para placas: PSM 7 (una sola línea de texto) + whitelist
-  // alfanumérica mayúscula. Mejora mucho la precisión vs. el OCR genérico.
-  const { data } = await Tesseract.recognize(filePath, env.tesseractLang, {
-    logger: () => {},
-    tessedit_pageseg_mode: '7',
-    tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+  // PSM 7 (una sola línea de texto) + whitelist alfanumérica mayúscula:
+  // mejora mucho la precisión vs. OCR genérico para placas.
+  const text = await runTesseract(filePath, {
+    psm: 7,
+    whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
   });
-  const text = data?.text || '';
   const clean = normalize(text);
 
   // Solo aceptar patentes cuyo formato coincida con un patrón argentino válido.

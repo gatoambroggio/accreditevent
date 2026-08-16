@@ -40,26 +40,7 @@ export default function DniScannerModal({ open, onClose, onScanned }) {
       const { file_url: dniImageUrl } = await base44.integrations.Core.UploadFile({ file: dniFile });
 
       const [ocrResult, faceResult] = await Promise.allSettled([
-        base44.integrations.Core.InvokeLLM({
-          prompt:
-            'Sos un sistema de OCR para documentos de identidad argentinos (DNI).\n' +
-            'Analizá la imagen del DNI y extraé:\n' +
-            '- nombre: primer nombre (o nombres de pila)\n' +
-            '- apellido: apellido(s)\n' +
-            '- dni: número de documento (solo dígitos, sin puntos ni guiones)\n\n' +
-            'Si algún campo no es legible, devolvé string vacío en ese campo.\n' +
-            'Respondé únicamente con el JSON.',
-          file_urls: [dniImageUrl],
-          response_json_schema: {
-            type: 'object',
-            properties: {
-              nombre: { type: 'string' },
-              apellido: { type: 'string' },
-              dni: { type: 'string' },
-            },
-            required: ['nombre', 'apellido', 'dni'],
-          },
-        }),
+        base44.functions.invoke('readDni', { file_url: dniImageUrl }),
         (async () => {
           const img = document.createElement('img');
           img.src = dniUrl;
@@ -95,7 +76,7 @@ export default function DniScannerModal({ open, onClose, onScanned }) {
         throw new Error('No se pudo realizar el OCR del DNI.');
       }
 
-      const ocr = ocrResult.value;
+      const ocr = ocrResult.value?.data ?? ocrResult.value ?? {};
       const face = faceResult.status === 'fulfilled' ? faceResult.value : null;
 
       setResult({
@@ -129,7 +110,7 @@ export default function DniScannerModal({ open, onClose, onScanned }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-sm sm:p-6">
+    <div className="allow-lowercase fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-sm sm:p-6">
       <div className="my-8 w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200">
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
           <div>
@@ -185,18 +166,21 @@ export default function DniScannerModal({ open, onClose, onScanned }) {
                 </div>
               ) : result ? (
                 <div className="space-y-2.5">
-                  <div className="rounded-lg bg-slate-50 p-2.5">
-                    <p className="text-xs font-semibold text-slate-500">Nombre</p>
-                    <p className="text-sm font-bold text-slate-900">{result.nombre || '—'}</p>
-                  </div>
-                  <div className="rounded-lg bg-slate-50 p-2.5">
-                    <p className="text-xs font-semibold text-slate-500">Apellido</p>
-                    <p className="text-sm font-bold text-slate-900">{result.apellido || '—'}</p>
-                  </div>
-                  <div className="rounded-lg bg-slate-50 p-2.5">
-                    <p className="text-xs font-semibold text-slate-500">N° de DNI</p>
-                    <p className="font-mono text-sm font-bold text-slate-900">{result.dni || '—'}</p>
-                  </div>
+                  {[
+                    { key: 'apellido', label: 'Apellido' },
+                    { key: 'nombre', label: 'Nombre' },
+                    { key: 'dni', label: 'N° de DNI', mono: true },
+                  ].map((f) => (
+                    <div key={f.key} className="rounded-lg bg-slate-50 p-2.5">
+                      <p className="text-xs font-semibold text-slate-500">{f.label}</p>
+                      <input
+                        type="text"
+                        value={result[f.key] || ''}
+                        onChange={(e) => setResult((r) => ({ ...r, [f.key]: e.target.value }))}
+                        className={`w-full rounded border border-slate-200 bg-white px-2 py-1 text-sm font-bold text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 ${f.mono ? 'font-mono' : ''}`}
+                      />
+                    </div>
+                  ))}
                   <div>
                     <p className="mb-1 text-xs font-semibold text-slate-500">Foto</p>
                     {result.faceUrl ? (
