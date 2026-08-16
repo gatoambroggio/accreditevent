@@ -159,11 +159,15 @@ fi
 
 # ── 4c. Binarios del agente de impresión portable ─────────────────────────────
 step "Agente de impresión portable (Windows .exe + macOS)"
-if [[ -d "$REPO_DIR/print-agent/dist" ]] && ls "$REPO_DIR/print-agent/dist/"*.exe "$REPO_DIR/print-agent/dist/"accreditevent-print-agent-mac-* >/dev/null 2>&1; then
+PA_DIST=""
+for c in "$REPO_DIR/print-agent/dist" "$REPO_DIR/../print-agent/dist" "$APP_HOME/server/print-agent/dist" "$HOME/accreditevent/print-agent/dist" "/opt/accreditevent-repo/print-agent/dist"; do
+  if [[ -d "$c" ]] && ls "$c/"*.exe "$c/"accreditevent-print-agent-mac-* >/dev/null 2>&1; then PA_DIST="$c"; break; fi
+done
+if [[ -n "$PA_DIST" ]]; then
   install -d -o "$APP_USER" -g "$APP_USER" "$APP_HOME/server/print-agent/dist"
-  rsync -a "$REPO_DIR/print-agent/dist/" "$APP_HOME/server/print-agent/dist/"
+  rsync -a "$PA_DIST/" "$APP_HOME/server/print-agent/dist/"
   chown -R "$APP_USER":"$APP_USER" "$APP_HOME/server/print-agent"
-  ok "Binarios del agente copiados a $APP_HOME/server/print-agent/dist"
+  ok "Binarios del agente copiados a $APP_HOME/server/print-agent/dist (desde $PA_DIST)"
   echo "    Se sirven desde el panel en Configuración → Impresión (descarga directa, sin Node)."
 else
   warn "Sin print-agent/dist/ — los binarios portable no se construyeron en este checkout."
@@ -176,19 +180,46 @@ fi
 
 # ── 5. Frontend React ─────────────────────────────────────────────────────────
 step "Frontend React: build self-hosted (air-gapped)"
-if [[ -f "$FRONTEND_DIR/package.json" ]]; then
-  # 5a. Parchear la copia local para que el build no hable con la nube de Base44.
-  #     Se sobrescriben sobre la copia clonada en disco (no se commitea al repo),
-  #     así el repo de GitHub sigue siendo compatible con el builder cloud.
+FRONTEND_PERSIST="$APP_HOME/frontend-src"
+
+# Descubrir el código fuente del frontend. Puede estar en el repo clonado
+# (junto a server/) o ya persistido en $FRONTEND_PERSIST de una corrida
+# anterior. Sin este código no se puede compilar el panel, así que lo
+# buscamos en varios lugares para que el instalador funcione solo.
+FE_SRC=""
+for c in "$FRONTEND_DIR" "$REPO_DIR" "$REPO_DIR/.." "$PWD" "$FRONTEND_PERSIST" "$HOME/accreditevent" "$HOME/accreditevent-repo" "/opt/accreditevent-repo" "/srv/accreditevent"; do
+  [[ -z "$c" ]] && continue
+  if [[ -f "$c/package.json" && -f "$c/src/App.jsx" ]]; then FE_SRC="$c"; break; fi
+done
+# Buscar hacia arriba desde el repo (por si install.sh está anidado)
+if [[ -z "$FE_SRC" ]]; then
+  _p="$REPO_DIR"
+  for _ in 1 2 3 4 5 6; do
+    if [[ -f "$_p/package.json" && -f "$_p/src/App.jsx" ]]; then FE_SRC="$_p"; break; fi
+    _p="$(dirname "$_p")"; [[ "$_p" == "/" ]] && break
+  done
+fi
+
+if [[ -n "$FE_SRC" ]]; then
+  ok "Frontend fuente encontrado en $FE_SRC"
+  # Persistir el código en el server para que re-runs (incluso desde
+  # /opt/accreditevent/server) puedan reconstruir sin needing el repo original.
+  if [[ "$FE_SRC" != "$FRONTEND_PERSIST" ]]; then
+    log "Copiando fuente del frontend a $FRONTEND_PERSIST (persistente para re-runs)..."
+    rsync -a --delete --exclude node_modules --exclude dist "$FE_SRC/" "$FRONTEND_PERSIST/"
+  fi
+  chown -R "$APP_USER":"$APP_USER" "$FRONTEND_PERSIST" 2>/dev/null || true
+
+  # Parchear la copia persistente para que el build no hable con la nube de Base44.
   log "Parcheando frontend para build air-gapped (base44Client + vite.config)..."
-  cat > "$FRONTEND_DIR/src/api/base44Client.js" <<'EOF'
+  cat > "$FRONTEND_PERSIST/src/api/base44Client.js" <<'EOF'
 // [self-hosted] Apunta el SDK al servidor local Express (/api) en vez de a la nube de Base44.
 // Re-exporta el wrapper localClient que respeta la misma superficie del SDK.
 export { base44 } from '@/api/localClient';
 export { base44 as default } from '@/api/localClient';
 EOF
 
-  cat > "$FRONTEND_DIR/vite.config.js" <<'EOF'
+  cat > "$FRONTEND_PERSIST/vite.config.js" <<'EOF'
 // [self-hosted] Vite config sin @base44/vite-plugin (que requiere manifiest cloud en build-time).
 // Solo React + alias @ -> src. @base44/sdk y @base44/vite-plugin quedan en package.json
 // pero no se importan, así no rompen el build ni el builder cloud del repo original.
@@ -210,27 +241,27 @@ export default defineConfig({
 EOF
   ok "Parches self-hosted aplicados (idempotente)"
 
-  # El repo clonado quedó con owner root (sudo git clone): darle permiso de
-  # escritura al usuario de servicio para que npm install / vite puedan crear
-  # node_modules y dist.
-  chown -R "$APP_USER":"$APP_USER" "$FRONTEND_DIR" 2>/dev/null || true
-
   log "npm install (frontend)..."
-  sudo -u "$APP_USER" -H bash -lc "cd '$FRONTEND_DIR' && npm install" || warn "npm install del frontend tuvo warnings"
+  sudo -u "$APP_USER" -H bash -lc "cd '$FRONTEND_PERSIST' && npm install" || warn "npm install del frontend tuvo warnings"
 
   log "Vite build (VITE_API_URL=/api)..."
-  if ! sudo -u "$APP_USER" -H bash -lc "cd '$FRONTEND_DIR' && VITE_API_URL=/api npm run build"; then
+  if ! sudo -u "$APP_USER" -H bash -lc "cd '$FRONTEND_PERSIST' && VITE_API_URL=/api npm run build"; then
     err "Build del frontend falló — log arriba ↑"
     exit 1
   fi
-  rsync -a --delete "$FRONTEND_DIR/dist/" "$APP_HOME/frontend/dist/"
+  rsync -a --delete "$FRONTEND_PERSIST/dist/" "$APP_HOME/frontend/dist/"
   # Nginx corre como www-data: necesita atravesar toda la cadena de directorios
   # hasta dist/ y leer index.html. Le damos x (atravesar) a los padres y rX a dist.
   chmod a+x "$APP_HOME" "$APP_HOME/frontend" 2>/dev/null || true
   chmod -R a+rX "$APP_HOME/frontend/dist" 2>/dev/null || true
   ok "Frontend compilado en $APP_HOME/frontend/dist"
 else
-  warn "No se encontró frontend en $FRONTEND_DIR (se salta el build — copialo manualmente)"
+  err "No se encontró el código fuente del frontend en ningún lado."
+  echo "    El instalador necesita el frontend (carpeta con package.json + src/App.jsx)."
+  echo "    Desde una PC con el repo, copialo al servidor (una sola vez):"
+  echo "      scp -r ./accreditevent gato@ubuntudahua:/opt/accreditevent-repo"
+  echo "    Y luego ejecutá:  sudo bash /opt/accreditevent-repo/server/install.sh"
+  echo "    (En re-runs posteriores el código ya queda persistido en $FRONTEND_PERSIST y no hace falta el repo.)"
 fi
 
 # ── 6. Modelos face-api.js (offline) ──────────────────────────────────────────
@@ -243,6 +274,18 @@ need_models() {
   for f in "${MODELS[@]}"; do [[ -s "$MODELS_DIR/$f" ]] || return 0; done
   return 1
 }
+
+# Estrategia 0: copiar desde el repo si vienen bundled (air-gapped, sin internet)
+if need_models; then
+  for bundled in "$REPO_DIR/server/public/models" "$REPO_DIR/.." "$REPO_DIR/print-agent/weights" "$FRONTEND_PERSIST/public/models"; do
+    [[ -d "$bundled" ]] || continue
+    for f in "${MODELS[@]}"; do
+      [[ -s "$MODELS_DIR/$f" ]] && continue
+      [[ -s "$bundled/$f" ]] && cp "$bundled/$f" "$MODELS_DIR/$f"
+    done
+  done
+  chown -R "$APP_USER":"$APP_USER" "$MODELS_DIR" 2>/dev/null || true
+fi
 
 if need_models; then
   log "Bajando modelos de face-api.js (git, mismo transporte que ya funcionó)..."
