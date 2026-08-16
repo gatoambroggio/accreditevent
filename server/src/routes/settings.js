@@ -6,7 +6,7 @@ export const settingsRouter = Router();
 settingsRouter.get('/', async (_req, res, next) => {
   try {
     const s = await prisma.systemSetting.findFirst();
-    res.json(s || {});
+    res.json(s ? [s] : []);
   } catch (e) { next(e); }
 });
 
