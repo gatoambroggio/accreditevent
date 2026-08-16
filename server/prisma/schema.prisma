@@ -178,6 +178,7 @@ model SystemSetting {
   default_grace_hours Int @default(4)
   role_access   Json?    @default("{}")
   enabled_modules Json? @default("{}")
+  vision_ocr    Json?    @default("{}")  // {api_key, base_url, model} — OCR por LLM de visión
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
 

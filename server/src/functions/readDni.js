@@ -63,7 +63,7 @@ async function readDniWithTesseract(filePath) {
 export async function readDni({ file_url } = {}) {
   const filePath = resolveLocalPath(file_url);
 
-  if (visionAvailable()) {
+  if (await visionAvailable()) {
     try {
       const r = await readDniWithVision(filePath);
       if (r && (r.nombre || r.apellido || r.dni)) return r;

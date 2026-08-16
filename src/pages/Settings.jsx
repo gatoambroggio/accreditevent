@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { Loader2, Save, Upload, ArrowRight, DatabaseZap, ShieldCheck, Download, Printer, Wifi, WifiOff, RefreshCw } from 'lucide-react';
+import { Loader2, Save, Upload, ArrowRight, DatabaseZap, ShieldCheck, Download, Printer, Wifi, WifiOff, RefreshCw, ScanLine } from 'lucide-react';
 import { MODULES, ROLES, DEFAULT_ROLE_ACCESS } from '@/lib/modules';
 import ListEditor from '@/components/ui/list-editor';
 import { checkAgent, getAgentPrinters } from '@/lib/printAgent';
@@ -286,6 +286,7 @@ export default function Settings() {
         enabled_modules: settings.enabled_modules,
         printer_personal: settings.printer_personal,
         printer_vehicular: settings.printer_vehicular,
+        vision_ocr: settings.vision_ocr,
       });
       setSettings(updated);
       setSuccess(true);
@@ -522,6 +523,20 @@ export default function Settings() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Token de acceso" type="password" value={settings.whatsapp_token} onChange={(v) => update('whatsapp_token', v)} placeholder="EAAxxxxxxxxx" />
           <Field label="Phone Number ID" value={settings.whatsapp_phone_id} onChange={(v) => update('whatsapp_phone_id', v)} placeholder="123456789" />
+        </div>
+      </Section>
+
+      <Section title="OCR por Visión (LLM)" description="Configurá un modelo de visión (OpenAI-compatible) para que el lector de DNI y patentes use IA multimodal — igual de preciso que Base44 cloud. Sin API key cae automáticamente a Tesseract local (offline, menor calidad). Funciona con OpenAI, Azure OpenAI, Groq, Ollama, etc.">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="API Key" type="password" value={settings.vision_ocr?.api_key} onChange={(v) => update('vision_ocr', { ...(settings.vision_ocr || {}), api_key: v })} placeholder="sk-..." hint="Se guarda en el servidor. Se lee solo al escanear." />
+          <Field label="Modelo" value={settings.vision_ocr?.model} onChange={(v) => update('vision_ocr', { ...(settings.vision_ocr || {}), model: v })} placeholder="gpt-4o-mini" hint="Cualquier modelo con visión del endpoint elegido" />
+          <div className="sm:col-span-2">
+            <Field label="Endpoint (Base URL)" value={settings.vision_ocr?.base_url} onChange={(v) => update('vision_ocr', { ...(settings.vision_ocr || {}), base_url: v })} placeholder="https://api.openai.com/v1/chat/completions" hint="Debe ser compatible con la API de chat completions de OpenAI" />
+          </div>
+        </div>
+        <div className="mt-3 flex items-start gap-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
+          <ScanLine className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
+          <p>Cuando hay API key configurada, el escaneo de DNI y patentes usa el LLM de visión (máxima calidad, requiere internet hacia el endpoint). Sin key o sin conexión, cae a Tesseract local automáticamente — el sistema nunca deja de escanear.</p>
         </div>
       </Section>
 

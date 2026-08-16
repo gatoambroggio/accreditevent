@@ -95,7 +95,7 @@ export async function recognize(imageInput, _opts = {}) {
   const filePath = resolveLocalPath(imageInput);
 
   // Visión primero (si está configurada): calidad "igual que Base44".
-  if (visionAvailable()) {
+  if (await visionAvailable()) {
     try {
       const r = await recognizeWithVision(filePath);
       if (r && r.patente) return r;

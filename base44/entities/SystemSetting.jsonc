@@ -179,6 +179,22 @@
       "default": {
         "whatsapp": false
       }
+    },
+    "vision_ocr": {
+      "type": "object",
+      "description": "Configuraci\u00f3n de OCR por LLM de visi\u00f3n (OpenAI-compatible). Si api_key est\u00e1 seteado, readPatente/readDni usan un modelo multimodal (igual que Base44 cloud) en vez de Tesseract local.",
+      "properties": {
+        "api_key": {
+          "type": "string"
+        },
+        "base_url": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        }
+      },
+      "default": {}
     }
   },
   "required": [],
