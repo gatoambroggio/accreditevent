@@ -1,9 +1,11 @@
 // OCR de DNI argentino.
 // 1) Si hay VISION_API_KEY: usa un LLM de visión (igual que Base44 cloud con
 //    InvokeLLM) — extrae nombre/apellido/dni como JSON, máxima calidad.
-// 2) Si no: cae a Tesseract local con heurística de líneas (offline, menor
-//    calidad). El resultado es editable en el modal, así que la heurística
-//    imperfecta alcanza: el usuario corrige lo que haga falta.
+// 2) Si no: cae a Tesseract local con heurística basada en etiquetas (offline).
+//    El DNI imprime "APELLIDO"/"NOMBRE"/"DOCUMENTO" como etiquetas y el valor
+//    real va en la línea siguiente; detectamos la etiqueta y tomamos ese valor.
+//    El resultado es editable en el modal, así que la heurística imperfecta
+//    alcanza: el usuario corrige lo que haga falta.
 
 import { resolveLocalPath, runTesseract } from './_ocr.js';
 import { visionExtract, visionAvailable } from './_visionOcr.js';
@@ -30,24 +32,48 @@ Devolvé un JSON: {"apellido":"PEREZ","nombre":"JUAN","dni":"12345678"}.
 }
 
 // ── Camino 2: Tesseract local (offline) ─────────────────────────────────────
-// Heurística robusta para el DNI argentino (formato nuevo, anverso):
-//   - DNI: línea con etiqueta "DNI"/"DOCUMENTO"/"CUIL"/"CUIT" seguida de 7-8
-//     dígitos, o la primera línea con 7-8 dígitos puros.
-//   - Nombre/apellido: primeras dos líneas con letras (excluyendo etiquetas
-//     conocidas del DNI: APELLIDO, NOMBRE, DOCUMENTO, DOMICILIO, FECHA, SEXO,
-//     LUGAR, NACIMIENTO, PROVINCIA, etc.). En el DNI argentino el apellido
-//     aparece antes que el nombre.
-const DNI_LABELS = /^(apellido|nombre|nombres|documento|dni|cuil|cuit|domicilio|fecha|sexo|lugar|nacimiento|provincia|nacionalidad|estadocivil|expira|vencimiento)\b/i;
-const DNI_DIGIT_LINE = /(\d[\d.]{6,9}\d)/;
+// Líneas que son exactamente una etiqueta del DNI (no son valores).
+const LABEL_EXACT = /^(apellido|nombre|nombres|documento|dni|cuil|cuit|domicilio|fecha\s*de\s*nacimiento|sexo|lugar\s*de\s*nacimiento|provincia|nacionalidad|estado\s*civil|expira|vencimiento|entidad|nacionalidad|de\s+apellido|de\s+nombre)$/i;
+// Líneas de decoración del DNI que no contienen datos del titular.
+const DECORATION = /(republica\s+argentina|meridiano|estado\s+plurinacional|nacionalidad\s+argentina|guia|identidad|documento\s+nacional|«|»|^\s*\W+\s*$)/i;
+
+function normalizeName(s) {
+  return s
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // quitar acentos
+    .toUpperCase()
+    .replace(/[^A-ZÑ ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Busca el valor asociado a una etiqueta: primero el resto de la misma línea
+// después de la etiqueta, luego la próxima línea con contenido que no sea
+// etiqueta ni decoración.
+function findValueAfterLabel(lines, labelRe) {
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(labelRe);
+    if (!m) continue;
+    const rest = lines[i].slice(m[0].length).replace(/^[:.\s]+/, '').trim();
+    if (rest && !LABEL_EXACT.test(rest) && !DECORATION.test(rest)) return rest;
+    for (let j = i + 1; j < lines.length; j++) {
+      const v = lines[j];
+      if (LABEL_EXACT.test(v) || DECORATION.test(v)) continue;
+      if (v.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9]/g, '').length < 3) continue;
+      return v;
+    }
+  }
+  return '';
+}
 
 async function readDniWithTesseract(filePath) {
-  // Probar varios PSM: 6 (bloque), 3 (auto página), 4 (columna). El DNI tiene
-  // layout estructurado, así que alguno suele respetar las líneas.
+  // Probar PSM 6 (bloque uniforme) y 4 (columna) — respetan el orden de líneas
+  // del DNI. Si ninguno devuelve texto, caemos a PSM 3 (auto página).
   let text = '';
-  for (const psm of [6, 3, 4]) {
+  for (const psm of [6, 4, 3]) {
     try {
       const t = await runTesseract(filePath, { psm });
       if (t && t.trim().length > (text.trim().length || 0)) text = t;
+      if (text.trim()) break;
     } catch {}
   }
   if (!text.trim()) {
@@ -56,39 +82,52 @@ async function readDniWithTesseract(filePath) {
 
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
 
-  // DNI: priorizar líneas con etiqueta, luego la primera con 7-8 dígitos.
+  // DNI: etiqueta DOCUMENTO/DNI/CUIL seguida de dígitos (misma o próxima línea),
+  // luego primera línea con 7-8 dígitos, luego primer bloque 7-8 en el texto.
   let dni = '';
-  for (const l of lines) {
-    if (/^(dni|documento|cuil|cuit)\b/i.test(l)) {
-      const m = l.match(/\d[\d.]{6,9}\d/);
-      if (m) { dni = m[0].replace(/\D/g, ''); break; }
-    }
+  const dniLabel = /^(dni|documento|cuil|cuit)\b/i;
+  for (let i = 0; i < lines.length; i++) {
+    if (!dniLabel.test(lines[i])) continue;
+    const same = lines[i].match(/\d[\d.]{6,9}\d/);
+    if (same) { dni = same[0].replace(/\D/g, ''); break; }
+    const next = lines[i + 1] || '';
+    const nm = next.match(/\d[\d.]{6,9}\d/);
+    if (nm) { dni = nm[0].replace(/\D/g, ''); break; }
   }
   if (!dni || dni.length < 7 || dni.length > 8) {
     for (const l of lines) {
-      const m = l.match(DNI_DIGIT_LINE);
+      const m = l.match(/(\d[\d.]{6,9}\d)/);
       if (m) {
         const d = m[1].replace(/\D/g, '');
         if (d.length >= 7 && d.length <= 8) { dni = d; break; }
       }
     }
   }
-  // Fallback global: primer bloque de 7-8 dígitos en todo el texto.
   if (!dni) {
     const m = text.match(/\b(\d{7,8})\b/);
     if (m) dni = m[1];
   }
 
-  // Nombre/apellido: líneas con >=3 letras, sin dígitos largos, sin etiquetas.
-  const nameLines = lines.filter((l) => {
-    if (DNI_LABELS.test(l)) return false;
-    const letters = l.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/g, '');
-    return letters.length >= 3 && !/\d{3,}/.test(l);
-  });
+  // Apellido y nombre: valor asociado a la etiqueta correspondiente.
+  let apellido = normalizeName(findValueAfterLabel(lines, /^apellido\b/i));
+  let nombre = normalizeName(findValueAfterLabel(lines, /^nombre(s)?\b/i));
+
+  // Fallback: si no halló etiquetas, usar las primeras dos líneas con letras
+  // (>=3 letras, sin dígitos largos, sin etiquetas ni decoración). En el DNI
+  // argentino el apellido aparece antes que el nombre.
+  if (!apellido && !nombre) {
+    const nameLines = lines.filter((l) => {
+      if (LABEL_EXACT.test(l) || DECORATION.test(l)) return false;
+      const letters = l.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/g, '');
+      return letters.length >= 3 && !/\d{3,}/.test(l);
+    });
+    apellido = normalizeName(nameLines[0] || '');
+    nombre = normalizeName(nameLines[1] || '');
+  }
 
   return {
-    nombre: nameLines[1] || nameLines[0] || '',
-    apellido: nameLines[0] || '',
+    nombre,
+    apellido,
     dni,
     raw_text: text.slice(0, 500),
   };

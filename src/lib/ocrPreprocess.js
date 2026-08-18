@@ -17,7 +17,7 @@ function loadImg(url) {
   });
 }
 
-export async function enhanceImage(blob, { grayscale = true, contrast = 1.7, targetMax = OCR_MAX_DIM } = {}) {
+export async function enhanceImage(blob, { grayscale = true, contrast = 1.7, targetMax = OCR_MAX_DIM, binarize = false } = {}) {
   const url = URL.createObjectURL(blob);
   try {
     const img = await loadImg(url);
@@ -49,6 +49,31 @@ export async function enhanceImage(blob, { grayscale = true, contrast = 1.7, tar
         v = (v - 128) * contrast + 128;
         v = Math.max(0, Math.min(255, v));
         d[i] = d[i + 1] = d[i + 2] = v;
+      }
+      // Binarización Otsu: umbral óptimo que separa tinta de fondo. Sobre el
+      // DNI (texto chico sobre fondo con patrones de seguridad) mejora mucho
+      // la lectura de Tesseract vs. solo grises+contraste. Opcional (solo DNI).
+      if (binarize) {
+        const hist = new Array(256).fill(0);
+        const total = d.length / 4;
+        let sum = 0;
+        for (let i = 0; i < d.length; i += 4) { hist[d[i]]++; sum += d[i]; }
+        let sumB = 0, wB = 0, varMax = 0, threshold = 127;
+        for (let t = 0; t < 256; t++) {
+          wB += hist[t];
+          if (wB === 0) continue;
+          const wF = total - wB;
+          if (wF === 0) break;
+          sumB += t * hist[t];
+          const mB = sumB / wB;
+          const mF = (sum - sumB) / wF;
+          const between = wB * wF * (mB - mF) * (mB - mF);
+          if (between > varMax) { varMax = between; threshold = t; }
+        }
+        for (let i = 0; i < d.length; i += 4) {
+          const v = d[i] >= threshold ? 255 : 0;
+          d[i] = d[i + 1] = d[i + 2] = v;
+        }
       }
       ctx.putImageData(id, 0, 0);
     }

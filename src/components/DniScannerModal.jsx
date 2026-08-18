@@ -41,7 +41,7 @@ export default function DniScannerModal({ open, onClose, onScanned }) {
       // Preprocesar la imagen para OCR (grises + contraste + escala) antes de
       // subirla: Tesseract lee mucho mejor un DNI con alto contraste que la
       // foto cruda. La detección de rostro sigue usando la imagen original.
-      const enhancedBlob = await enhanceImage(dniFile, { grayscale: true, contrast: 1.6 });
+      const enhancedBlob = await enhanceImage(dniFile, { grayscale: true, contrast: 1.7, targetMax: 2200, binarize: true });
       const enhancedFile = new File([enhancedBlob], 'dni-ocr.png', { type: 'image/png' });
       const { file_url: dniImageUrl } = await base44.integrations.Core.UploadFile({ file: enhancedFile });
 
