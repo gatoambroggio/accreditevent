@@ -44,6 +44,47 @@ DISTRO="$(lsb_release -is 2>/dev/null || echo Ubuntu)"
 if [[ "$DISTRO" != "Ubuntu" ]]; then warn "Distro detectado: $DISTRO (script pensado para Ubuntu; continuando igual)"; fi
 ok "Ejecutando como root en $DISTRO"
 
+# ── 0. Auto-actualización desde Git ──────────────────────────────────────────
+# Si este install.sh se corre desde el directorio de despliegue
+# (/opt/accreditevent/server) en vez de desde el repo, busca el repo git real,
+# hace `git pull` y re-ejecuta la versión nueva del install.sh. Así basta con
+# correr "sudo bash /opt/accreditevent/server/install.sh" y el servidor se
+# actualiza solo desde GitHub — sin copiar nada a mano.
+SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_SELF_PARENT="$(cd "$SELF_DIR/.." && pwd)"
+_find_git_repo() {
+  for c in "$_SELF_PARENT" "$SELF_DIR/.." "$HOME/accreditevent" "$HOME/accreditevent-repo" "/opt/accreditevent-repo" "/srv/accreditevent" "$PWD"; do
+    [[ -z "$c" ]] && continue
+    if [[ -d "$c/.git" && -f "$c/server/install.sh" ]]; then echo "$c"; return; fi
+  done
+}
+_REPO_GIT="$(_find_git_repo || true)"
+if [[ -n "$_REPO_GIT" && "$_REPO_GIT" != "$_SELF_PARENT" ]]; then
+  step "Auto-actualización desde Git"
+  _owner="$(stat -c '%U' "$_REPO_GIT" 2>/dev/null || echo root)"
+  log "Repo git encontrado en $_REPO_GIT — git pull..."
+  if sudo -u "$_owner" git -C "$_REPO_GIT" pull --ff-only >/dev/null 2>&1; then
+    ok "Código actualizado desde Git"
+  else
+    warn "git pull falló (sin internet o conflictos) — usando el código ya presente en $_REPO_GIT"
+  fi
+  log "Re-ejecutando install.sh del repo actualizado..."
+  exec bash "$_REPO_GIT/server/install.sh"
+fi
+# Si ya estamos corriendo desde el repo git, hacer pull in-place.
+if [[ -d "$_SELF_PARENT/.git" ]]; then
+  _owner="$(stat -c '%U' "$_SELF_PARENT" 2>/dev/null || echo root)"
+  if sudo -u "$_owner" git -C "$_SELF_PARENT" pull --ff-only >/dev/null 2>&1; then
+    ok "Código actualizado desde Git (in-place)"
+  else
+    warn "git pull falló o sin internet — usando el código ya presente"
+  fi
+elif [[ "$_SELF_PARENT" == "$APP_HOME" ]]; then
+  warn "No se encontró repo git junto al install.sh — el código NO se actualizará solo."
+  echo "    Cloná el repo junto a este install.sh (ej: /opt/accreditevent-repo con .git y server/)"
+  echo "    o ejecutá el install.sh desde el repo. Así la próxima vez se auto-actualiza."
+fi
+
 # ── 1. Dependencias del sistema ──────────────────────────────────────────────
 step "Dependencias del sistema (Node, Postgres, Nginx, Tesseract)"
 export DEBIAN_FRONTEND=noninteractive
@@ -80,10 +121,18 @@ ok "Nginx $(nginx -v 2>&1 | cut -d/ -f2)"
 # Tesseract del sistema (binario nativo, no tesseract.js que necesita WASM de
 # internet) + poppler-utils para rasterizar PDFs (pólizas/ART subidas en PDF).
 apt-get install -qq -y tesseract-ocr tesseract-ocr-spa poppler-utils graphicsmagick build-essential python3 >/dev/null 2>&1 || warn "Algunas libs opcionales no se instalaron"
+OCR_STATUS="no instalado"
 if has tesseract; then
-  ok "Tesseract $(tesseract --version 2>/dev/null | head -1 | awk '{print $2}')"
-  if ! tesseract --list-langs 2>/dev/null | grep -qw spa; then
+  _tver="$(tesseract --version 2>/dev/null | head -1 | awk '{print $2}')"
+  if tesseract --list-langs 2>/dev/null | grep -qw spa; then
+    OCR_STATUS="Tesseract $_tver (idioma: spa)"
+    ok "Tesseract $_tver + idioma español"
+  elif tesseract --list-langs 2>/dev/null | grep -qw eng; then
+    OCR_STATUS="Tesseract $_tver (idioma: eng — falta spa)"
     warn "Falta el idioma español de Tesseract (tesseract-ocr-spa). El OCR caerá a inglés (menor calidad en DNI, ok en patentes). Instalalo: sudo apt-get install -y tesseract-ocr-spa"
+  else
+    OCR_STATUS="Tesseract $_tver (sin idiomas)"
+    warn "Tesseract no tiene idiomas instalados. Instalá: sudo apt-get install -y tesseract-ocr-spa"
   fi
 else
   warn "Tesseract NO se instaló — el OCR de DNI/patentes no funcionará. Instalalo: sudo apt-get install -y tesseract-ocr tesseract-ocr-spa"
@@ -487,6 +536,7 @@ if [[ "$API_CODE" == "200" && "$WEB_CODE" == "200" ]]; then
   echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
   echo -e "  Panel:       ${GREEN}https://${LAN_IP:-127.0.0.1}/${NC}"
   echo -e "  Superadmin:  ${GREEN}admin@accreditevent.local${NC} / ${GREEN}admin123${NC}"
+  echo -e "  OCR:         ${GREEN}${OCR_STATUS}${NC}"
   echo -e "  Webhook Dahua:  ${GREEN}https://${LAN_IP:-127.0.0.1}/api/webhooks/dahua?key=API_KEY&sn=SERIAL${NC}"
   echo -e "  Webhook ZKTeco: ${GREEN}https://${LAN_IP:-127.0.0.1}/api/webhooks/zkteco?key=API_KEY&SN=SERIAL${NC}"
   echo -e "  Impresión:   Descargá el agente local en cada PC desde Configuración → Impresión"
