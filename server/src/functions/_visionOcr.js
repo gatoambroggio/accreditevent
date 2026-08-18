@@ -108,5 +108,13 @@ export async function visionExtract(filePath, { prompt, jsonSchema } = {}) {
     throw new Error(`Vision API ${res.status}: ${t.slice(0, 200)}`);
   }
   const data = await res.json();
-  return data?.choices?.[0]?.message?.content || '';
+  let content = data?.choices?.[0]?.message?.content || '';
+  // Groq a veces envuelve el JSON en fences de markdown (```json ... ``` o ``` ... ```).
+  // readDni/readPatente esperan JSON puro, así que lo limpiamos acá antes de devolver.
+  if (content) {
+    const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fenced) content = fenced[1];
+    content = content.trim();
+  }
+  return content;
 }
