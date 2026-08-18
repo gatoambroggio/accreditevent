@@ -387,6 +387,123 @@ else
   ok "Modelos de face-api.js presentes (${#MODELS[@]} archivos)"
 fi
 
+# ── 6b. Modelo de visión local (Ollama + minicpm-v) ──────────────────────────
+# OCR por visión con calidad tipo nube, 100% local en el propio servidor
+# (air-gapped). Ollama expone un endpoint OpenAI-compatible en 127.0.0.1:11434
+# que readDni / readPatente ya saben usar (SystemSetting.vision_ocr). Si no se
+# puede instalar (sin internet y sin binario/modelo local), el OCR sigue con
+# Tesseract — no rompe nada.
+step "Modelo de visión local (Ollama + minicpm-v) — OCR de DNI/patentes"
+VISION_MODEL_NAME="${VISION_MODEL_NAME:-minicpm-v}"
+OLLAMA_OK=0
+VISION_STATUS="no instalado (OCR usa Tesseract)"
+
+if ! has ollama; then
+  # Estrategia 1: binario local bundled (air-gapped, sin internet)
+  for bundled in "$REPO_DIR/server/bin/ollama" "$APP_HOME/server/bin/ollama" "/usr/local/bin/ollama"; do
+    [[ -x "$bundled" ]] || continue
+    install -m 0755 "$bundled" /usr/local/bin/ollama
+    ok "Ollama instalado desde binario local: $bundled"
+    break
+  done
+  # Estrategia 2: instalador oficial (requiere internet una sola vez)
+  if ! has ollama; then
+    log "Instalando Ollama desde ollama.com (requiere internet)..."
+    if curl -fsSL https://ollama.com/install.sh | sh >/dev/null 2>&1; then
+      ok "Ollama instalado desde ollama.com"
+    else
+      warn "No se pudo instalar Ollama (sin internet o binario local). El OCR seguirá con Tesseract."
+      echo "    Para habilitar visión local: descargá el binario de Ollama en una PC con internet,"
+      echo "    copialo a server/bin/ollama y volvé a correr: sudo bash server/install.sh"
+    fi
+  fi
+else
+  ok "Ollama ya instalado ($(ollama --version 2>/dev/null || echo ok))"
+fi
+
+if has ollama; then
+  # Asegurar servicio systemd escuchando SOLO en 127.0.0.1:11434 (no exponer a la LAN).
+  # El instalador oficial crea /etc/systemd/system/ollama.service; si no existe, lo creamos.
+  if [[ ! -f /etc/systemd/system/ollama.service ]]; then
+    cat > /etc/systemd/system/ollama.service <<'EOF'
+[Unit]
+Description=Ollama Service (local vision OCR for AccreditEvent)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Environment="OLLAMA_HOST=127.0.0.1:11434"
+ExecStart=/usr/local/bin/ollama serve
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+  fi
+  systemctl enable ollama >/dev/null 2>&1 || true
+  systemctl restart ollama >/dev/null 2>&1 || true
+  sleep 3
+
+  if curl -s http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
+    ok "Ollama responde en 127.0.0.1:11434"
+
+    # Determinar el usuario bajo el que corre el servicio para que `ollama pull`
+    # guarde los modelos en el mismo store que lee `ollama serve` (si no, el
+    # servidor no ve el modelo bajado). El oficial usa 'ollama'; nuestro unit usa root.
+    OLLAMA_USER="root"
+    if systemctl cat ollama 2>/dev/null | grep -qE '^User=ollama'; then OLLAMA_USER="ollama"; fi
+
+    if ! sudo -u "$OLLAMA_USER" ollama list 2>/dev/null | grep -qw "$VISION_MODEL_NAME"; then
+      log "Cargando modelo de visión $VISION_MODEL_NAME (la 1ra vez baja ~2.5GB y puede tardar varios minutos)..."
+      # Estrategia 1: pull desde Ollama (internet)
+      if sudo -u "$OLLAMA_USER" ollama pull "$VISION_MODEL_NAME" >/dev/null 2>&1; then
+        ok "Modelo $VISION_MODEL_NAME descargado desde Ollama"
+      else
+        # Estrategia 2: cargar desde .gguf local (air-gapped)
+        GGUF_FOUND=""
+        for gguf in "$REPO_DIR/server/models/$VISION_MODEL_NAME.gguf" "$APP_HOME/server/models/$VISION_MODEL_NAME.gguf" "$REPO_DIR/models/$VISION_MODEL_NAME.gguf"; do
+          [[ -s "$gguf" ]] && { GGUF_FOUND="$gguf"; break; }
+        done
+        if [[ -n "$GGUF_FOUND" ]]; then
+          log "Cargando $VISION_MODEL_NAME desde .gguf local: $GGUF_FOUND (air-gapped)..."
+          TMP_MOD=$(mktemp -d)
+          printf 'FROM %s\n' "$GGUF_FOUND" > "$TMP_MOD/Modelfile"
+          if sudo -u "$OLLAMA_USER" ollama create "$VISION_MODEL_NAME" -f "$TMP_MOD/Modelfile" >/dev/null 2>&1; then
+            ok "Modelo $VISION_MODEL_NAME cargado desde .gguf local"
+          else
+            warn "ollama create falló desde el .gguf — ver formato del archivo. Visión queda en espera."
+          fi
+          rm -rf "$TMP_MOD"
+        else
+          warn "No se pudo bajar $VISION_MODEL_NAME (sin internet ni .gguf local). Visión queda en espera; OCR sigue con Tesseract."
+          echo "    Descargá el .gguf de minicpm-v en una PC con internet, copialo a"
+          echo "    server/models/$VISION_MODEL_NAME.gguf y volvé a correr: sudo bash server/install.sh"
+        fi
+      fi
+    else
+      ok "Modelo $VISION_MODEL_NAME ya cargado"
+    fi
+
+    # Si el modelo quedó cargado, configurar SystemSetting.vision_ocr automáticamente
+    if sudo -u "$OLLAMA_USER" ollama list 2>/dev/null | grep -qw "$VISION_MODEL_NAME"; then
+      log "Configurando OCR del sistema para usar visión local ($VISION_MODEL_NAME)..."
+      if sudo -u "$APP_USER" -H bash -lc "cd '$APP_HOME/server' && VISION_MODEL_NAME='$VISION_MODEL_NAME' node src/configure-vision.js" >/dev/null 2>&1; then
+        ok "SystemSetting.vision_ocr apuntado a Ollama local (modelo $VISION_MODEL_NAME)"
+        OLLAMA_OK=1
+        VISION_STATUS="Ollama + $VISION_MODEL_NAME activo (visión local)"
+      else
+        warn "No se pudo guardar la config de visión en la DB. El admin puede setearla a mano en Configuración → OCR:"
+        echo "    api_key=ollama  base_url=http://127.0.0.1:11434/v1/chat/completions  model=$VISION_MODEL_NAME"
+      fi
+    fi
+  else
+    warn "Ollama instalado pero no responde en 127.0.0.1:11434 — ver: journalctl -u ollama -n 30"
+  fi
+fi
+
 # ── 7. systemd ────────────────────────────────────────────────────────────────
 step "Servicio systemd"
 cat > /etc/systemd/system/accreditevent.service <<EOF
@@ -537,6 +654,7 @@ if [[ "$API_CODE" == "200" && "$WEB_CODE" == "200" ]]; then
   echo -e "  Panel:       ${GREEN}https://${LAN_IP:-127.0.0.1}/${NC}"
   echo -e "  Superadmin:  ${GREEN}admin@accreditevent.local${NC} / ${GREEN}admin123${NC}"
   echo -e "  OCR:         ${GREEN}${OCR_STATUS}${NC}"
+  echo -e "  Visión:      ${GREEN}${VISION_STATUS}${NC}"
   echo -e "  Webhook Dahua:  ${GREEN}https://${LAN_IP:-127.0.0.1}/api/webhooks/dahua?key=API_KEY&sn=SERIAL${NC}"
   echo -e "  Webhook ZKTeco: ${GREEN}https://${LAN_IP:-127.0.0.1}/api/webhooks/zkteco?key=API_KEY&SN=SERIAL${NC}"
   echo -e "  Impresión:   Descargá el agente local en cada PC desde Configuración → Impresión"

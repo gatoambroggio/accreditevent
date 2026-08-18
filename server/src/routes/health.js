@@ -21,7 +21,7 @@ healthRouter.get('/', async (_req, res) => {
 // Útil para verificar desde el navegador que el OCR vaya a funcionar:
 //   curl -k https://127.0.0.1/api/health/ocr
 healthRouter.get('/ocr', async (_req, res) => {
-  const status = { tesseract: null, langs: [], spa_available: false, vision: false };
+  const status = { tesseract: null, langs: [], spa_available: false, vision: false, ollama: false, ollama_model: null, ollama_model_loaded: null };
   try {
     const { stdout } = await execFileAsync('tesseract', ['--version'], { timeout: 10000 });
     status.tesseract = (stdout.split('\n')[0] || '').trim();
@@ -34,6 +34,21 @@ healthRouter.get('/ocr', async (_req, res) => {
   try {
     const s = await prisma.systemSetting.findFirst();
     status.vision = !!(s?.vision_ocr?.api_key) || !!process.env.VISION_API_KEY;
+    status.ollama_model = s?.vision_ocr?.model || null;
   } catch {}
+  // Verifica que el Ollama local esté vivo y que el modelo de visión configurado
+  // esté cargado — clave para diagnosticar por qué el OCR cae a Tesseract.
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 3000);
+    const r = await fetch('http://127.0.0.1:11434/api/tags', { signal: ctrl.signal });
+    clearTimeout(t);
+    if (r.ok) {
+      const j = await r.json();
+      status.ollama = true;
+      const names = (j.models || []).map((m) => m.name);
+      if (status.ollama_model) status.ollama_model_loaded = names.includes(status.ollama_model);
+    }
+  } catch { status.ollama = false; }
   res.json(status);
 });
