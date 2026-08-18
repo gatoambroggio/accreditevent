@@ -13,10 +13,12 @@ import { visionExtract, visionAvailable } from './_visionOcr.js';
 // ── Camino 1: LLM de visión ─────────────────────────────────────────────────
 async function readDniWithVision(filePath) {
   const prompt = `Leé los datos del DNI argentino visible en la imagen.
-Devolvé un JSON: {"apellido":"PEREZ","nombre":"JUAN","dni":"12345678"}.
+Devolvé un JSON: {"apellido":"<APELLIDO>","nombre":"<NOMBRE>","dni":"<NNNNNNNN>"}.
+- Reemplazá los placeholders por los datos reales impresos en el DNI.
 - apellido y nombre en MAYÚSCULAS, sin acentos innecesarios.
 - dni solo números, 7-8 dígitos, sin puntos ni espacios.
-- Si un campo no se lee, devolvé cadena vacía para ese campo.`;
+- Si un campo no se lee, devolvé cadena vacía para ese campo.
+- No inventes datos ni repitas el ejemplo; solo extraé lo que esté en la imagen.`;
   const content = await visionExtract(filePath, { prompt, jsonSchema: { properties: { apellido: {}, nombre: {}, dni: {} } } });
   const match = content.match(/\{[\s\S]*\}/);
   if (!match) return null;

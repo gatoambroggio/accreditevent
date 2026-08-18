@@ -47,7 +47,7 @@ healthRouter.get('/ocr', async (_req, res) => {
       const j = await r.json();
       status.ollama = true;
       const names = (j.models || []).map((m) => m.name);
-      if (status.ollama_model) status.ollama_model_loaded = names.includes(status.ollama_model);
+      if (status.ollama_model) status.ollama_model_loaded = names.some((n) => n.replace(/:.*$/, '') === status.ollama_model);
     }
   } catch { status.ollama = false; }
   res.json(status);
