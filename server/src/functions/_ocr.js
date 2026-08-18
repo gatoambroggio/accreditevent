@@ -30,9 +30,33 @@ export function resolveLocalPath(input) {
   return filePath;
 }
 
+// Detecta los idiomas de tesseract disponibles (caché). Si falta el español
+// (tesseract-ocr-spa no instalado — común en air-gapped sin acceso al repo),
+// cae a inglés para que el OCR igual funcione (menor calidad, pero lee
+// dígitos y letras). Para patentes (alfanumérico) el inglés alcanza perfecto.
+let _tessLangs = null;
+async function tesseractLangs() {
+  if (_tessLangs !== null) return _tessLangs;
+  try {
+    const { stdout } = await execFileAsync('tesseract', ['--list-langs'], { timeout: 10000, maxBuffer: 1024 * 1024 });
+    _tessLangs = stdout.split('\n').map((l) => l.trim()).filter((l) => l && !/^list/i.test(l));
+  } catch { _tessLangs = []; }
+  return _tessLangs;
+}
+
+async function resolveTessLang(requested) {
+  const langs = await tesseractLangs();
+  if (langs.length === 0) return requested || env.tesseractLang || 'spa';
+  const want = requested || env.tesseractLang || 'spa';
+  if (langs.includes(want)) return want;
+  if (langs.includes('eng')) return 'eng';
+  return langs[0];
+}
+
 // Ejecuta `tesseract <image> stdout -l <lang> --psm <psm>` y devuelve el texto.
-export async function runTesseract(filePath, { psm = 6, lang = 'spa', whitelist } = {}) {
-  const args = [filePath, 'stdout', '-l', lang, '--psm', String(psm)];
+export async function runTesseract(filePath, { psm = 6, lang, whitelist } = {}) {
+  const resolvedLang = await resolveTessLang(lang);
+  const args = [filePath, 'stdout', '-l', resolvedLang, '--psm', String(psm)];
   if (whitelist) args.push('-c', `tessedit_char_whitelist=${whitelist}`);
   try {
     const { stdout } = await execFileAsync('tesseract', args, { timeout: 30000, maxBuffer: 8 * 1024 * 1024 });

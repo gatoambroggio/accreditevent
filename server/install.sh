@@ -80,7 +80,14 @@ ok "Nginx $(nginx -v 2>&1 | cut -d/ -f2)"
 # Tesseract del sistema (binario nativo, no tesseract.js que necesita WASM de
 # internet) + poppler-utils para rasterizar PDFs (pólizas/ART subidas en PDF).
 apt-get install -qq -y tesseract-ocr tesseract-ocr-spa poppler-utils graphicsmagick build-essential python3 >/dev/null 2>&1 || warn "Algunas libs opcionales no se instalaron"
-ok "Tesseract OCR + poppler (PDF) + dependencias"
+if has tesseract; then
+  ok "Tesseract $(tesseract --version 2>/dev/null | head -1 | awk '{print $2}')"
+  if ! tesseract --list-langs 2>/dev/null | grep -qw spa; then
+    warn "Falta el idioma español de Tesseract (tesseract-ocr-spa). El OCR caerá a inglés (menor calidad en DNI, ok en patentes). Instalalo: sudo apt-get install -y tesseract-ocr-spa"
+  fi
+else
+  warn "Tesseract NO se instaló — el OCR de DNI/patentes no funcionará. Instalalo: sudo apt-get install -y tesseract-ocr tesseract-ocr-spa"
+fi
 
 # ── 2. Usuario de servicio + directorios ─────────────────────────────────────
 step "Usuario y directorios"
@@ -142,7 +149,7 @@ fi
 log "npm install (servidor)..."
 # Sin --omit=dev: prisma (CLI) está en devDependencies y lo necesitamos instalado
 # para que `npx prisma generate/db push` no descargue nada de internet en re-ejecuciones air-gapped.
-sudo -u "$APP_USER" -H bash -lc "cd '$APP_HOME/server' && npm install" >/dev/null 2>&1 || { err "npm install del servidor falló"; exit 1; }
+sudo -u "$APP_USER" -H bash -lc "cd '$APP_HOME/server' && npm install --no-fund --no-audit" >/dev/null 2>&1 || { err "npm install del servidor falló"; exit 1; }
 
 log "Prisma: generate + db push (crea las tablas desde schema.prisma)..."
 sudo -u "$APP_USER" -H bash -lc "cd '$APP_HOME/server' && npx prisma generate && npx prisma db push" >/dev/null 2>&1 || { err "Prisma db push falló — ver schema.prisma y DATABASE_URL"; exit 1; }
@@ -245,16 +252,16 @@ export default defineConfig({
   resolve: {
     alias: { '@': path.resolve(__dirname, 'src') }
   },
-  build: { outDir: 'dist' }
+  build: { outDir: 'dist', chunkSizeWarningLimit: 1600 }
 })
 EOF
   ok "Parches self-hosted aplicados (idempotente)"
 
   log "npm install (frontend)..."
-  sudo -u "$APP_USER" -H bash -lc "cd '$FRONTEND_PERSIST' && npm install" || warn "npm install del frontend tuvo warnings"
+  sudo -u "$APP_USER" -H bash -lc "cd '$FRONTEND_PERSIST' && npm install --no-fund --no-audit" || warn "npm install del frontend tuvo warnings"
 
   log "Vite build (VITE_API_URL=/api)..."
-  if ! sudo -u "$APP_USER" -H bash -lc "cd '$FRONTEND_PERSIST' && VITE_API_URL=/api npm run build"; then
+  if ! sudo -u "$APP_USER" -H bash -lc "cd '$FRONTEND_PERSIST' && VITE_API_URL=/api BROWSERSLIST_IGNORE_OLD_DATA=1 npm run build"; then
     err "Build del frontend falló — log arriba ↑"
     exit 1
   fi
