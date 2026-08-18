@@ -44,3 +44,67 @@ export async function runTesseract(filePath, { psm = 6, lang = 'spa', whitelist 
     throw new Error(`OCR falló: ${e.message}`);
   }
 }
+
+// ── Soporte de PDF ──────────────────────────────────────────────────────────
+// `tesseract` no lee PDFs directamente: hay que rasterizar las páginas a PNG
+// con `pdftoppm` (poppler-utils). Si no está instalado o el archivo no es PDF,
+// cae a pasar el archivo tal cual a tesseract (que fallará con un mensaje claro
+// si es PDF sin poppler — el install.sh instala poppler-utils para evitarlo).
+function isPdf(filePath) {
+  return /\.pdf$/i.test(filePath);
+}
+
+// Convierte un PDF a una lista de PNGs temporales (una por página, 200 DPI).
+// Devuelve [] si pdftoppm no está disponible (el caller decide qué hacer).
+async function pdfToImages(filePath) {
+  const os = await import('node:os');
+  const prefix = path.join(os.tmpdir(), `ae-pdf-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  try {
+    await execFileAsync('pdftoppm', ['-png', '-r', '200', filePath, prefix], { timeout: 60000, maxBuffer: 8 * 1024 * 1024 });
+  } catch (e) {
+    if (e.code === 'ENOENT') {
+      throw new Error('El binario `pdftoppm` no está instalado (requerido para leer PDFs). Ejecutá: sudo apt-get install -y poppler-utils');
+    }
+    throw new Error(`PDF→imagen falló: ${e.message}`);
+  }
+  // pdftoppm nombra los archivos como prefix-1.png, prefix-2.png, ... (o prefix-01.png)
+  const dir = path.dirname(prefix);
+  const base = path.basename(prefix);
+  const files = fs.readdirSync(dir)
+    .filter((f) => f.startsWith(base) && /\.png$/i.test(f))
+    .sort((a, b) => {
+      const na = parseInt(a.replace(/\D/g, '').slice(-6), 10) || 0;
+      const nb = parseInt(b.replace(/\D/g, '').slice(-6), 10) || 0;
+      return na - nb;
+    })
+    .map((f) => path.join(dir, f));
+  return files;
+}
+
+// OCR de un documento completo (póliza, ART, etc.). A diferencia de runTesseract
+// (pensado para patentes/DNI con PSM 6), usa PSM 3 (auto, página completa) y
+// soporta PDFs multipágina concatenando el texto de cada página. Sin whitelist
+// (necesita letras, números, símbolos, acentos). 100% offline.
+export async function ocrDocument(filePath, { psm = 3, lang = 'spa' } = {}) {
+  const resolved = resolveLocalPath(filePath);
+
+  if (!isPdf(resolved)) {
+    return runTesseract(resolved, { psm, lang });
+  }
+
+  // PDF: rasterizar cada página y concatenar el OCR.
+  const pages = await pdfToImages(resolved);
+  if (pages.length === 0) throw new Error('El PDF no tiene páginas o no se pudo rasterizar.');
+  const chunks = [];
+  for (const page of pages) {
+    try {
+      chunks.push(await runTesseract(page, { psm, lang }));
+    } catch (e) {
+      // Si una página falla, seguimos con las demás (mejor texto parcial que nada).
+      console.warn(`[ocrDocument] página falló: ${e.message}`);
+    } finally {
+      try { fs.unlinkSync(page); } catch {}
+    }
+  }
+  return chunks.join('\n\n');
+}

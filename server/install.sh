@@ -77,9 +77,10 @@ ok "PostgreSQL $(psql --version 2>/dev/null | awk '{print $3}')"
 if ! has nginx; then apt-get install -qq -y nginx >/dev/null; systemctl enable --now nginx >/dev/null 2>&1 || true; fi
 ok "Nginx $(nginx -v 2>&1 | cut -d/ -f2)"
 
-# Libs de sistema para Tesseract (tesseract.js las usa en runtime)
-apt-get install -qq -y tesseract-ocr tesseract-ocr-spa graphicsmagick build-essential python3 >/dev/null 2>&1 || warn "Algunas libs opcionales no se instalaron (tesseract.js trae su propio worker)"
-ok "Tesseract OCR + dependencias"
+# Tesseract del sistema (binario nativo, no tesseract.js que necesita WASM de
+# internet) + poppler-utils para rasterizar PDFs (pólizas/ART subidas en PDF).
+apt-get install -qq -y tesseract-ocr tesseract-ocr-spa poppler-utils graphicsmagick build-essential python3 >/dev/null 2>&1 || warn "Algunas libs opcionales no se instalaron"
+ok "Tesseract OCR + poppler (PDF) + dependencias"
 
 # ── 2. Usuario de servicio + directorios ─────────────────────────────────────
 step "Usuario y directorios"

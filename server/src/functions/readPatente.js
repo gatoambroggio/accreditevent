@@ -19,6 +19,47 @@ function normalize(raw) {
   return String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
+// Corrección de confusiones típicas de OCR (O↔0, I↔1, S↔5, B↔8, Z↔2) en las
+// posiciones donde el formato exige letra o dígito. Solo se aplica a candidatos
+// con longitud plausible (6-7) y devuelve la versión corregida solo si valida,
+// así no genera falsos positivos: el resultado final siempre pasa validarPatente.
+const LETTER_FIX = { '0': 'O', '1': 'I', '5': 'S', '8': 'B', '2': 'Z', '4': 'A', '6': 'G' };
+const DIGIT_FIX = { 'O': '0', 'I': '1', 'S': '5', 'B': '8', 'Z': '2', 'A': '4', 'G': '6', 'D': '0' };
+
+function fixPlateForFormat(c, fmt) {
+  const chars = c.split('');
+  // mercosur_auto: posiciones 0,1,5,6 = letras; 2,3,4 = dígitos
+  if (fmt === 'mercosur_auto' && c.length === 7) {
+    [0, 1, 5, 6].forEach((i) => { if (/[0-9]/.test(chars[i])) chars[i] = LETTER_FIX[chars[i]] || chars[i]; });
+    [2, 3, 4].forEach((i) => { if (/[A-Z]/.test(chars[i])) chars[i] = DIGIT_FIX[chars[i]] || chars[i]; });
+  }
+  // antiguo_auto: 0,1,2 = letras; 3,4,5 = dígitos
+  else if (fmt === 'antiguo_auto' && c.length === 6) {
+    [0, 1, 2].forEach((i) => { if (/[0-9]/.test(chars[i])) chars[i] = LETTER_FIX[chars[i]] || chars[i]; });
+    [3, 4, 5].forEach((i) => { if (/[A-Z]/.test(chars[i])) chars[i] = DIGIT_FIX[chars[i]] || chars[i]; });
+  }
+  // mercosur_moto: 0,1 = letras; 2,3,4 = dígitos; 6 = letra
+  else if (fmt === 'mercosur_moto' && c.length === 6) {
+    [0, 1, 5].forEach((i) => { if (/[0-9]/.test(chars[i])) chars[i] = LETTER_FIX[chars[i]] || chars[i]; });
+    [2, 3, 4].forEach((i) => { if (/[A-Z]/.test(chars[i])) chars[i] = DIGIT_FIX[chars[i]] || chars[i]; });
+  }
+  return chars.join('');
+}
+
+// Intenta corregir un candidato a un formato válido. Devuelve la patente
+// corregida+validada, o null si no se puede arreglar.
+function tryFixPlate(c) {
+  if (!c) return null;
+  for (const fmt of ['mercosur_auto', 'antiguo_auto', 'mercosur_moto']) {
+    const fixed = fixPlateForFormat(c, fmt);
+    if (fixed !== c) {
+      const v = validarPatente(fixed);
+      if (v.valido) return { patente: fixed, ...v };
+    }
+  }
+  return null;
+}
+
 function validarPatente(p) {
   if (!p) return { valido: false, formato: 'desconocido', descripcion: 'Sin patente' };
   if (MERCOSUR_AUTO.test(p)) return { valido: true, formato: 'mercosur_auto', descripcion: 'Auto Mercosur (2 letras · 3 números · 2 letras)' };
@@ -70,14 +111,20 @@ async function recognizeWithTesseract(filePath) {
     for (const c of candidates) {
       const v = validarPatente(c);
       if (v.valido) {
-        return {
-          patente: c,
-          valido: true,
-          descripcion: v.descripcion,
-          confianza: 0.9,
-          formato_detectado: v.formato,
-          raw_text: rawAll,
-        };
+        return { patente: c, valido: true, descripcion: v.descripcion, confianza: 0.9, formato_detectado: v.formato, raw_text: rawAll };
+      }
+      // No validó tal cual: probar corrección de confusiones (O↔0, I↔1, etc.).
+      const fixed = tryFixPlate(c);
+      if (fixed) {
+        return { patente: fixed.patente, valido: true, descripcion: fixed.descripcion, confianza: 0.75, formato_detectado: fixed.formato, raw_text: `${rawAll}\n[corregido] ${c} → ${fixed.patente}`.slice(0, 240) };
+      }
+    }
+    // Sin candidato exacto: tokens alfanuméricos de 6-7 chars con corrección.
+    const tokens = normalize(text).match(/[A-Z0-9]{6,7}/g) || [];
+    for (const t of tokens) {
+      const fixed = tryFixPlate(t);
+      if (fixed) {
+        return { patente: fixed.patente, valido: true, descripcion: fixed.descripcion, confianza: 0.7, formato_detectado: fixed.formato, raw_text: `${rawAll}\n[corregido] ${t} → ${fixed.patente}`.slice(0, 240) };
       }
     }
   }

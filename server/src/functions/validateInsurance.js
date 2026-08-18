@@ -1,10 +1,9 @@
-import Tesseract from 'tesseract.js';
-import fs from 'node:fs';
-import path from 'node:path';
-import { env } from '../config/env.js';
+import { ocrDocument } from './_ocr.js';
 
-// Validación de seguro air-gapped: OCR del documento con Tesseract + matching
-// determinista de cláusulas/DNI/montos contra la póliza. Reemplaza el
+// Validación de seguro air-gapped: OCR del documento con el binario `tesseract`
+// del sistema (NO tesseract.js, que necesita descargar WASM/traineddata de
+// internet y por eso falla en air-gapped). Soporta PDFs (vía pdftoppm) y hace
+// matching determinista de cláusulas/DNI/montos contra la póliza. Reemplaza el
 // ExtractDataFromUploadedFile + InvokeLLM de Base44 (sin internet).
 
 function dniToBase(s) { const d = (s || '').replace(/\D/g, ''); return d.length === 11 ? d.substring(2, 10) : d; }
@@ -25,19 +24,10 @@ export async function validateInsurance({ document_id, event_id }, { user, prism
   let companyEmployees = [];
   if (doc.company) companyEmployees = await prisma.person.findMany({ where: { company: doc.company, tipo_vinculo: 'empresa' } });
 
-  // --- OCR del archivo con Tesseract ---
-  let filePath = doc.file_url;
-  if (typeof doc.file_url === 'string' && doc.file_url.startsWith('http')) {
-    const rel = doc.file_url.replace(env.lanBaseUrl, '');
-    const cand = path.resolve(rel.replace(/^\//, ''));
-    filePath = fs.existsSync(cand) ? cand : path.join(env.uploadDir, path.basename(rel));
-  }
-  if (!fs.existsSync(filePath)) throw Object.assign(new Error('Archivo no encontrado: ' + filePath), { status: 422 });
-
+  // --- OCR del archivo con el binario tesseract del sistema (soporta PDF) ---
   let ocrText = '';
   try {
-    const { data } = await Tesseract.recognize(filePath, 'spa', { logger: () => {} });
-    ocrText = (data?.text || '').toLowerCase();
+    ocrText = (await ocrDocument(doc.file_url, { psm: 3, lang: 'spa' })).toLowerCase();
   } catch (e) {
     return { error: 'No se pudo leer el documento (OCR falló): ' + e.message, raw: '' };
   }
