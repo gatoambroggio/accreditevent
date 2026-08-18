@@ -3,6 +3,7 @@
 
 import { Router } from 'express';
 import { buildWhere, getPolicy, canAccess, mergeWhere, getModel } from './engine.js';
+import { broadcast } from '../realtime/ws.js';
 
 // Normaliza un where de query (puede venir con operadores $in, $ne, $or, $and).
 function normalizeWhere(raw) {
@@ -61,6 +62,7 @@ export function makeCrudRouter(entityName) {
       const data = { ...req.body, created_by_id: req.user.id };
       if (!canAccess(policy, req.user, data)) return res.status(403).json({ error: 'El registro no cumple el contexto de creación' });
       const rec = await model.create({ data });
+      broadcast(entityName, { id: rec.id, type: 'create', data: rec });
       res.status(201).json(rec);
     } catch (e) { next(e); }
   });
@@ -72,6 +74,7 @@ export function makeCrudRouter(entityName) {
       const policy = getPolicy(entityName, 'update');
       if (!canAccess(policy, req.user, rec)) return res.status(403).json({ error: 'Sin permiso de edición' });
       const updated = await model.update({ where: { id: req.params.id }, data: req.body });
+      broadcast(entityName, { id: updated.id, type: 'update', data: updated });
       res.json(updated);
     } catch (e) { next(e); }
   });
@@ -83,6 +86,7 @@ export function makeCrudRouter(entityName) {
       const policy = getPolicy(entityName, 'delete');
       if (!canAccess(policy, req.user, rec)) return res.status(403).json({ error: 'Sin permiso de borrado' });
       await model.delete({ where: { id: req.params.id } });
+      broadcast(entityName, { id: req.params.id, type: 'delete', data: { id: req.params.id } });
       res.json({ ok: true });
     } catch (e) { next(e); }
   });

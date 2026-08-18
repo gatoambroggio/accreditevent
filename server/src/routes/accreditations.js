@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../db/prisma.js';
 import { canAccess, getPolicy, buildWhere } from '../rls/engine.js';
 import { genBadgePrefix } from '../auth/bcrypt.js';
+import { broadcast } from '../realtime/ws.js';
 
 export const accreditationsRouter = Router();
 
@@ -68,6 +69,7 @@ accreditationsRouter.post('/', async (req, res, next) => {
       return res.status(403).json({ error: 'Sin permiso para crear esta acreditación' });
     }
     const rec = await prisma.accreditation.create({ data: payload });
+    broadcast('Accreditation', { id: rec.id, type: 'create', data: rec });
     res.status(201).json(rec);
   } catch (e) { next(e); }
 });
@@ -83,6 +85,7 @@ accreditationsRouter.put('/:id', async (req, res, next) => {
       where: { id: req.params.id },
       data: { status, block_reason, access_level, event_phases, area, delivered_personal, delivered_vehicular, has_biometric },
     });
+    broadcast('Accreditation', { id: updated.id, type: 'update', data: updated });
     res.json(updated);
   } catch (e) { next(e); }
 });
@@ -94,6 +97,7 @@ accreditationsRouter.delete('/:id', async (req, res, next) => {
     if (!rec) return res.status(404).json({ error: 'No encontrado' });
     if (!canAccess(getPolicy('Accreditation', 'delete'), req.user, rec)) return res.status(403).json({ error: 'Sin permiso' });
     await prisma.accreditation.delete({ where: { id: req.params.id } });
+    broadcast('Accreditation', { id: req.params.id, type: 'delete', data: { id: req.params.id } });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });

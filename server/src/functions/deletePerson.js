@@ -14,6 +14,7 @@ export async function deletePerson({ person_id }, { user, prisma }) {
     prisma.document.deleteMany({ where: { person_id } }),
     prisma.vehicle.deleteMany({ where: { person_id } }),
     prisma.zkTecoCommand.deleteMany({ where: { person_id } }),
+    prisma.dahuaCommand.deleteMany({ where: { person_id } }),
     prisma.accreditation.deleteMany({ where: { person_id } }),
     prisma.providerRequest.deleteMany({ where: { person_id } }),
     prisma.auditLog.deleteMany({ where: { entity_id: person_id } }),

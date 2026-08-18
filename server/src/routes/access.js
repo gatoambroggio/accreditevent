@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../db/prisma.js';
 import { canAccess, getPolicy } from '../rls/engine.js';
+import { broadcast } from '../realtime/ws.js';
 
 export const accessRouter = Router();
 
@@ -116,6 +117,7 @@ async function logAccess(user, event, accred, vehicle, r, method, pda_number, re
     access_level: access_level || '',
   };
   if (canAccess(getPolicy('AccessLog', 'create'), user || {}, entry)) {
-    await prisma.accessLog.create({ data: entry });
+    const log = await prisma.accessLog.create({ data: entry });
+    broadcast('AccessLog', { id: log.id, type: 'create', data: log });
   }
 }

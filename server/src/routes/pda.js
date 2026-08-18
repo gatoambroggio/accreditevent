@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../db/prisma.js';
+import { broadcast } from '../realtime/ws.js';
 
 export const pdaRouter = Router();
 
@@ -28,6 +29,7 @@ pdaRouter.post('/heartbeat', async (req, res, next) => {
         },
       });
     }
+    broadcast('PdaStation', { id: station.id, type: 'update', data: station });
     res.json({ ok: true, station });
   } catch (e) { next(e); }
 });
@@ -39,7 +41,8 @@ pdaRouter.post('/sync-logs', async (req, res, next) => {
     let created = 0;
     for (const log of logs) {
       try {
-        await prisma.accessLog.create({ data: { ...log, created_at: log.created_at ? new Date(log.created_at) : new Date() } });
+        const rec = await prisma.accessLog.create({ data: { ...log, created_at: log.created_at ? new Date(log.created_at) : new Date() } });
+        broadcast('AccessLog', { id: rec.id, type: 'create', data: rec });
         created++;
       } catch {}
     }
