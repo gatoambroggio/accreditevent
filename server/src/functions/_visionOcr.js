@@ -86,10 +86,11 @@ export async function visionExtract(filePath, { prompt, jsonSchema } = {}) {
     temperature: 0,
   };
 
-  // minicpm-v corriendo en CPU puede tardar 60-90s en inferir un DNI; 30s lo abortaba
-  // y caía innecesariamente a Tesseract. 120s da margen suficiente en CPU modesto.
+  // Una API de visión cloud (Groq/OpenAI) responde en 2-4s. 30s da margen amplio
+  // y, si el endpoint tarda más, aborta y cae rápido al fallback Tesseract en
+  // vez de colgar al operador (que antes esperaba 2-3 min hasta el 504).
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 120000);
+  const timer = setTimeout(() => controller.abort(), 30000);
   let res;
   try {
     res = await fetch(cfg.baseUrl, {
