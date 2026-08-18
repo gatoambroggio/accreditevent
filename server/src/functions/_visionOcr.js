@@ -79,11 +79,11 @@ export async function visionExtract(filePath, { prompt, jsonSchema } = {}) {
       { role: 'system', content: system },
       { role: 'user', content: [
         { type: 'text', text: userText },
-        { type: 'image_url', image_url: { url: dataUrl, detail: 'high' } },
+        { type: 'image_url', image_url: { url: dataUrl } },
       ] },
     ],
-    max_tokens: 400,
-    temperature: 0,
+    max_completion_tokens: 400,
+    temperature: 1,
   };
 
   // Una API de visión cloud (Groq/OpenAI) responde en 2-4s. 30s da margen amplio
