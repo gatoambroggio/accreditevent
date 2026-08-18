@@ -304,6 +304,15 @@ export default defineConfig({
   build: { outDir: 'dist', chunkSizeWarningLimit: 1600 }
 })
 EOF
+  # Parchear MODEL_URL en faceRecognition.js para que el navegador cargue los
+  # modelos desde /models/ (servido local por Nginx) en vez del CDN remoto — sin
+  # esto la biometría facial no anda en LAN air-gapped. Solo toca la copia
+  # persistente self-hosted; la versión cloud del repo queda intacta (CDN).
+  if [[ -f "$FRONTEND_PERSIST/src/lib/faceRecognition.js" ]]; then
+    sed -i "s#const MODEL_URL = .*#const MODEL_URL = '/models/';#" "$FRONTEND_PERSIST/src/lib/faceRecognition.js"
+    ok "faceRecognition.js parcheado (MODEL_URL='/models/')"
+  fi
+
   ok "Parches self-hosted aplicados (idempotente)"
 
   log "npm install (frontend)..."
@@ -332,7 +341,7 @@ fi
 # ── 6. Modelos face-api.js (offline) ──────────────────────────────────────────
 step "Modelos face-api.js (servidos locales, sin internet)"
 MODELS_DIR="$APP_HOME/server/public/models"
-MODELS=(tiny_face_detector_model-1.bin face_landmark_68_model-1.bin face_recognition_model-1.bin ssd_mobilenetv1_model-1.bin)
+MODELS=(ssd_mobilenetv1_model.bin ssd_mobilenetv1_model-weights_manifest.json face_landmark_68_model.bin face_landmark_68_model-weights_manifest.json face_recognition_model.bin face_recognition_model-weights_manifest.json)
 install -d -o "$APP_USER" -g "$APP_USER" "$MODELS_DIR"
 
 need_models() {
@@ -353,29 +362,20 @@ if need_models; then
 fi
 
 if need_models; then
-  log "Bajando modelos de face-api.js (git, mismo transporte que ya funcionó)..."
-  TMP=$(mktemp -d)
-  # Estrategia 1: sparse-checkout del repo de pesos (vladmandic fork incluye /weights)
-  if git clone --depth 1 --filter=blob:none --sparse https://github.com/vladmandic/face-api.git "$TMP/faceapi" >/dev/null 2>&1; then
-    (cd "$TMP/faceapi" && git sparse-checkout set weights) >/dev/null 2>&1
-    for f in "${MODELS[@]}"; do [[ -s "$TMP/faceapi/weights/$f" ]] && cp "$TMP/faceapi/weights/$f" "$MODELS_DIR/$f"; done
-  fi
-  rm -rf "$TMP"
-
-  # Estrategia 2 (fallback): wget a raw.githubusercontent si git falló
-  if need_models; then
-    log "Faltan algunos modelos — probando descarga directa (wget)..."
-    for BASE in \
-      "https://raw.githubusercontent.com/vladmandic/face-api/master/weights" \
-      "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights"; do
-      need_models || break
-      for f in "${MODELS[@]}"; do
-        [[ -s "$MODELS_DIR/$f" ]] && continue
-        wget -q -O "$MODELS_DIR/$f" "$BASE/$f" 2>/dev/null || rm -f "$MODELS_DIR/$f"
-      done
+  log "Bajando modelos de face-api.js desde CDN (jsdelivr → raw.githubusercontent)..."
+  # vladmandic/face-api guarda los pesos en /model (no /weights) como *.bin +
+  # *-weights_manifest.json. jsdelivr sirve el repo por HTTPS de forma confiable;
+  # raw.githubusercontent es el fallback. Los nombres viejos (-1.bin en /weights)
+  # no existen en ningún fork y por eso la descarga fallaba silenciosamente.
+  for BASE in \
+    "https://cdn.jsdelivr.net/gh/vladmandic/face-api@master/model" \
+    "https://raw.githubusercontent.com/vladmandic/face-api/master/model"; do
+    need_models || break
+    for f in "${MODELS[@]}"; do
+      [[ -s "$MODELS_DIR/$f" ]] && continue
+      wget -q -O "$MODELS_DIR/$f" "$BASE/$f" 2>/dev/null || rm -f "$MODELS_DIR/$f"
     done
-  fi
-
+  done
   chown -R "$APP_USER":"$APP_USER" "$MODELS_DIR" 2>/dev/null || true
 fi
 
