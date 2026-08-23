@@ -179,6 +179,7 @@ model SystemSetting {
   role_access   Json?    @default("{}")
   enabled_modules Json? @default("{}")
   vision_ocr    Json?    @default("{}")  // {api_key, base_url, model} — OCR por LLM de visión
+  mercadopago   Json?    @default("{}")  // {access_token, public_key, webhook_url, sandbox, back_url_base}
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
 
@@ -566,4 +567,75 @@ model AuditLog {
 
   @@index([entity, entity_id])
   @@map("audit_logs")
+}
+
+// ─── Venta de entradas (ticketera) ───
+model TicketSale {
+  id            String   @id @default(cuid())
+  event_id      String
+  event_name    String?
+  company       String?
+  enabled       Boolean  @default(false)
+  open_at       DateTime?
+  close_at      DateTime?
+  description   String?
+  address       String?
+  terms         String?
+  image_url     String?
+  created_by_id String?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@index([event_id])
+  @@map("ticket_sales")
+}
+
+model TicketType {
+  id                 String   @id @default(cuid())
+  event_id           String
+  event_name         String?
+  company            String?
+  name               String
+  description        String?
+  price              Float
+  capacity           Int      @default(0)
+  sold               Int      @default(0)
+  limit_per_purchase Int      @default(10)
+  status             String   @default("active")
+  sort_order         Int      @default(0)
+  created_by_id      String?
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  @@index([event_id])
+  @@map("ticket_types")
+}
+
+model Ticket {
+  id              String   @id @default(cuid())
+  event_id        String
+  event_name      String?
+  company         String?
+  ticket_type_id  String
+  ticket_type_name String?
+  buyer_name      String
+  buyer_dni       String?
+  buyer_email     String?
+  buyer_phone     String?
+  quantity        Int      @default(1)
+  unit_price      Float    @default(0)
+  total           Float    @default(0)
+  status          String   @default("pending") // pending|paid|used|refunded|cancelled
+  payment_id      String?
+  qr_code         String   @unique
+  used_at         DateTime?
+  verified_by     String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@index([event_id])
+  @@index([status])
+  @@index([ticket_type_id])
+  @@index([buyer_email])
+  @@map("tickets")
 }

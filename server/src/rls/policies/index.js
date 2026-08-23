@@ -316,4 +316,43 @@ export const policies = {
     update: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { id: '{{user.id}}' }] },
     delete: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }] },
   },
+
+  // ─── Venta de entradas (ticketera) ───
+  TicketType: {
+    read: { $or: [
+      { user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } },
+      { user_condition: { role: 'control' } }, { user_condition: { role: 'pda' } },
+      { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] },
+      { 'data.event_id': { $in: '{{user.data.assigned_event_ids}}' } },
+    ] },
+    create: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }] },
+    update: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }] },
+    delete: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }] },
+  },
+  TicketSale: {
+    read: { $or: [
+      { user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } },
+      { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] },
+    ] },
+    create: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }] },
+    update: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }] },
+    delete: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }] },
+  },
+  Ticket: {
+    read: { $or: [
+      { user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } },
+      { user_condition: { role: 'control' } }, { user_condition: { role: 'pda' } },
+      { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] },
+      { 'data.event_id': { $in: '{{user.data.assigned_event_ids}}' } },
+      { 'data.buyer_email': '{{user.email}}' },
+    ] },
+    create: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }] },
+    update: { $or: [
+      { user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } },
+      { user_condition: { role: 'control' } }, { user_condition: { role: 'pda' } },
+      { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] },
+      { 'data.event_id': { $in: '{{user.data.assigned_event_ids}}' } },
+    ] },
+    delete: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }] },
+  },
 };

@@ -37,6 +37,7 @@ import {
   Palette,
   AlertTriangle,
   Smartphone,
+  Ticket,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { applyTheme } from '@/lib/useTheme';
@@ -75,6 +76,9 @@ const NAV_ITEMS = [
     { path: '/parking-sectors', label: 'Sectores de estacionamiento' },
     { path: '/parking-capacities', label: 'Capacidades por evento' },
   ] },
+  // Venta de entradas (ticketera)
+  { path: '/ticket-sales', label: 'Venta de entradas', icon: Ticket, minLevel: 1 },
+  { path: '/control-entradas', label: 'Control de entradas', icon: ScanSearch, minLevel: 0 },
   // Logística
   // Reportes y comunicación
   { path: '/reports', label: 'Reportes', icon: BarChart3, minLevel: 1 },

@@ -1,0 +1,178 @@
+{
+  "name": "TicketSale",
+  "type": "object",
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "description": "Evento cuya venta de entradas se habilita"
+    },
+    "event_name": {
+      "type": "string",
+      "description": "Nombre del evento (denormalizado)"
+    },
+    "company": {
+      "type": "string",
+      "description": "Empresa productora (denormalizado para RLS)"
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Indica si la tienda p\u00fablica de este evento est\u00e1 publicada/activa"
+    },
+    "open_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha/hora de apertura de la venta"
+    },
+    "close_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha/hora de cierre de la venta"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n del evento para la tienda p\u00fablica"
+    },
+    "address": {
+      "type": "string",
+      "description": "Direcci\u00f3n/sede del evento para la tienda"
+    },
+    "terms": {
+      "type": "string",
+      "description": "T\u00e9rminos y condiciones de la venta"
+    },
+    "image_url": {
+      "type": "string",
+      "description": "Imagen/portada del evento para la tienda"
+    }
+  },
+  "required": [
+    "event_id"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

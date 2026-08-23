@@ -113,6 +113,7 @@ const ENTITY_TO_MODEL = {
   CustomField: 'customField', EventCompanyApproval: 'eventCompanyApproval',
   ProviderRequest: 'providerRequest', RequirementItem: 'requirementItem',
   AuditLog: 'auditLog', PendingOperator: 'pendingOperator',
+  Ticket: 'ticket', TicketType: 'ticketType', TicketSale: 'ticketSale',
 };
 
 export function getModel(name) {

@@ -56,13 +56,20 @@ import EmergencyScan from '@/pages/EmergencyScan';
 import PdaStations from '@/pages/PdaStations';
 import PdaId from '@/pages/PdaId';
 import Notifications from '@/pages/Notifications';
+import TicketStore from '@/pages/tickets/TicketStore';
+import TicketEvent from '@/pages/tickets/TicketEvent';
+import TicketConfirmation from '@/pages/tickets/TicketConfirmation';
+import TicketSales from '@/pages/TicketSales';
+import AccessTicketStation from '@/pages/AccessTicketStation';
 
 const AUTH_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password', '/provider-register', '/registro-empresa'];
+// Rutas públicas sin login (tienda de entradas para compradores anónimos).
+const PUBLIC_PREFIXES = ['/entradas'];
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, authChecked } = useAuth();
   const location = useLocation();
-  const isAuthRoute = AUTH_ROUTES.includes(location.pathname) || location.pathname.startsWith('/registro');
+  const isAuthRoute = AUTH_ROUTES.includes(location.pathname) || location.pathname.startsWith('/registro') || PUBLIC_PREFIXES.some((p) => location.pathname === p || location.pathname.startsWith(p + '/'));
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -131,7 +138,12 @@ const AuthenticatedApp = () => {
         <Route path="/apariencia" element={<Appearance />} />
         <Route path="/emergency-scan" element={<EmergencyScan />} />
         <Route path="/notifications" element={<Notifications />} />
+        <Route path="/ticket-sales" element={<TicketSales />} />
       </Route>
+      <Route path="/entradas" element={<TicketStore />} />
+      <Route path="/entradas/:eventId" element={<TicketEvent />} />
+      <Route path="/entradas/confirmacion" element={<TicketConfirmation />} />
+      <Route path="/control-entradas" element={<AccessTicketStation />} />
       <Route path="/portal" element={<ProviderPortal />} />
       <Route path="/registro-empresa" element={<EmpresaRegister />} />
       <Route path="/empresa-portal" element={<EmpresaPortal />} />

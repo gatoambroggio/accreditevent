@@ -1,0 +1,252 @@
+{
+  "name": "Ticket",
+  "type": "object",
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "description": "Evento de la entrada"
+    },
+    "event_name": {
+      "type": "string",
+      "description": "Nombre del evento (denormalizado)"
+    },
+    "company": {
+      "type": "string",
+      "description": "Empresa productora (denormalizado para RLS)"
+    },
+    "ticket_type_id": {
+      "type": "string",
+      "description": "Tipo de entrada comprado"
+    },
+    "ticket_type_name": {
+      "type": "string",
+      "description": "Nombre del tipo de entrada (denormalizado)"
+    },
+    "buyer_name": {
+      "type": "string",
+      "description": "Nombre del comprador"
+    },
+    "buyer_dni": {
+      "type": "string",
+      "description": "DNI del comprador"
+    },
+    "buyer_email": {
+      "type": "string",
+      "format": "email",
+      "description": "Email del comprador"
+    },
+    "buyer_phone": {
+      "type": "string",
+      "description": "Tel\u00e9fono del comprador"
+    },
+    "quantity": {
+      "type": "number",
+      "default": 1,
+      "description": "Cantidad de entradas compradas"
+    },
+    "unit_price": {
+      "type": "number",
+      "default": 0,
+      "description": "Precio unitario pagado"
+    },
+    "total": {
+      "type": "number",
+      "default": 0,
+      "description": "Total pagado"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "paid",
+        "used",
+        "refunded",
+        "cancelled"
+      ],
+      "default": "pending",
+      "description": "Estado de la entrada"
+    },
+    "payment_id": {
+      "type": "string",
+      "description": "ID de pago de Mercado Pago"
+    },
+    "qr_code": {
+      "type": "string",
+      "description": "C\u00f3digo QR \u00fanico de la entrada (para validar en puerta)"
+    },
+    "used_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha/hora en que se us\u00f3 la entrada en puerta"
+    },
+    "verified_by": {
+      "type": "string",
+      "description": "Operador/estaci\u00f3n que valid\u00f3 la entrada"
+    }
+  },
+  "required": [
+    "event_id",
+    "ticket_type_id",
+    "buyer_name",
+    "qr_code"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "control"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "pda"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
+        },
+        {
+          "data.buyer_email": "{{user.email}}"
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "control"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "pda"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

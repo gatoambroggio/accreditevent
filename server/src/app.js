@@ -19,6 +19,8 @@ import { downloadsRouter } from './routes/downloads.js';
 import { importRouter } from './routes/import.js';
 import { usersRouter } from './routes/users.js';
 import { webhooksRouter } from './routes/webhooks.js';
+import { ticketsPublicRouter, ticketsAdminRouter, ticketAccessRouter } from './routes/tickets.js';
+import { mercadoPagoRouter } from './routes/mercadopago.js';
 import { makeCrudRouter } from './rls/middleware.js';
 import { initRealtime, broadcast } from './realtime/ws.js';
 
@@ -45,6 +47,9 @@ export function createApp() {
   // Webhooks de hardware: públicos (la terminal Dahua/ZKTeco no tiene token).
   // Se autentican por api_key en query.
   app.use('/api/webhooks', webhooksRouter);
+  // Webhook + tienda pública de entradas: públicos (Mercado Pago y compradores anónimos).
+  app.use('/api/webhooks/mercadopago', mercadoPagoRouter);
+  app.use('/api/public/tickets', ticketsPublicRouter);
 
   // Todo lo demás requiere auth (adjunta user a req.user).
   app.use('/api/files', requireAuth, filesRouter);
@@ -82,6 +87,12 @@ export function createApp() {
   app.use('/api/dahua-commands', requireAuth, makeCrudRouter('DahuaCommand'));
   app.use('/api/zkteco-devices', requireAuth, makeCrudRouter('ZKTecoDevice'));
   app.use('/api/zkteco-commands', requireAuth, makeCrudRouter('ZKTecoCommand'));
+  // Venta de entradas (ticketera): CRUD admin + stats/export + validación en puerta.
+  app.use('/api/tickets', requireAuth, makeCrudRouter('Ticket'));
+  app.use('/api/ticket-types', requireAuth, makeCrudRouter('TicketType'));
+  app.use('/api/ticket-sales', requireAuth, makeCrudRouter('TicketSale'));
+  app.use('/api/tickets-stats', requireAuth, ticketsAdminRouter);
+  app.use('/api/ticket-access', requireAuth, ticketAccessRouter);
 
   // attachUser para rutas que quizá necesiten user sin requerir auth (webhooks)
   app.use(attachUser);

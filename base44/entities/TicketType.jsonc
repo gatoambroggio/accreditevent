@@ -1,0 +1,196 @@
+{
+  "name": "TicketType",
+  "type": "object",
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "description": "Evento al que pertenece el tipo de entrada"
+    },
+    "event_name": {
+      "type": "string",
+      "description": "Nombre del evento (denormalizado)"
+    },
+    "company": {
+      "type": "string",
+      "description": "Empresa productora (denormalizado para RLS)"
+    },
+    "name": {
+      "type": "string",
+      "description": "Nombre del tipo de entrada (General, VIP, etc.)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n del tipo de entrada"
+    },
+    "price": {
+      "type": "number",
+      "description": "Precio unitario en la moneda local (ARS)"
+    },
+    "capacity": {
+      "type": "number",
+      "default": 0,
+      "description": "Capacidad m\u00e1xima disponible para este tipo"
+    },
+    "sold": {
+      "type": "number",
+      "default": 0,
+      "description": "Cantidad vendida/reservada (se incrementa de forma at\u00f3mica)"
+    },
+    "limit_per_purchase": {
+      "type": "number",
+      "default": 10,
+      "description": "Cantidad m\u00e1xima por compra"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "inactive"
+      ],
+      "default": "active",
+      "description": "Estado del tipo de entrada"
+    },
+    "sort_order": {
+      "type": "number",
+      "default": 0,
+      "description": "Orden de visualizaci\u00f3n en la tienda"
+    }
+  },
+  "required": [
+    "event_id",
+    "name",
+    "price",
+    "capacity"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

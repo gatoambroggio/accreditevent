@@ -57,6 +57,9 @@ const ENTITY_PATH = {
   RequirementItem: 'requirement-items',
   PendingOperator: 'pending-operators',
   AuditLog: 'audit-logs',
+  Ticket: 'tickets',
+  TicketType: 'ticket-types',
+  TicketSale: 'ticket-sales',
 };
 
 async function http(path, { method = 'GET', body, headers, raw } = {}) {
