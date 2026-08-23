@@ -3,14 +3,25 @@
 
 const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || '/api';
 
+async function parseJson(res) {
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) {
+    // El backend devolvió HTML (típicamente el index del SPA en un 404): la
+    // ruta pública de entradas no existe en este entorno. Degradamos con un
+    // error limpio en vez de un "Unexpected token '<'" al parsear.
+    throw new Error('La tienda de entradas no está disponible en este entorno.');
+  }
+  return res.json();
+}
+
 async function apiGet(path) {
   const res = await fetch(`${API_BASE}${path}`);
   if (!res.ok) {
     let msg = `Error ${res.status}`;
-    try { const j = await res.json(); msg = j.error || msg; } catch {}
+    try { const j = await parseJson(res); msg = j.error || msg; } catch {}
     throw new Error(msg);
   }
-  return res.json();
+  return parseJson(res);
 }
 
 async function apiPost(path, body) {
@@ -21,10 +32,10 @@ async function apiPost(path, body) {
   });
   if (!res.ok) {
     let msg = `Error ${res.status}`;
-    try { const j = await res.json(); msg = j.error || msg; } catch {}
+    try { const j = await parseJson(res); msg = j.error || msg; } catch {}
     throw new Error(msg);
   }
-  return res.json();
+  return parseJson(res);
 }
 
 export const ticketApi = {

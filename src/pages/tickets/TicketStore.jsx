@@ -41,8 +41,10 @@ export default function TicketStore() {
             <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
           </div>
         ) : error ? (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-10 text-center">
-            <p className="text-sm font-semibold text-red-700">{error}</p>
+          <div className="rounded-2xl border border-slate-200 bg-white px-5 py-16 text-center">
+            <TicketIcon className="mx-auto h-10 w-10 text-slate-300" />
+            <p className="mt-4 text-base font-bold text-slate-700">No hay eventos con venta abierta</p>
+            <p className="mt-1 text-sm text-slate-400">Volvé más tarde para ver las próximas fechas.</p>
           </div>
         ) : events.length === 0 ? (
           <div className="rounded-2xl border border-slate-200 bg-white px-5 py-16 text-center">
