@@ -57,9 +57,14 @@ export default function TicketSales() {
 
   const refreshStats = async (id) => {
     try {
-      const res = await fetch(`${API_BASE}/tickets-stats/stats?event_id=${id}`);
-      const data = await res.json();
-      setStats(data);
+      const all = await base44.entities.Ticket.filter({ event_id: id }, '-created_date', 1000);
+      const counts = { paid: 0, pending: 0, used: 0, refunded: 0, cancelled: 0 };
+      let revenue = 0, sold_count = 0;
+      for (const t of all) {
+        counts[t.status] = (counts[t.status] || 0) + 1;
+        if (t.status === 'paid' || t.status === 'used') { revenue += Number(t.total) || 0; sold_count += Number(t.quantity) || 0; }
+      }
+      setStats({ revenue, sold_count, counts });
     } catch {}
   };
 
@@ -113,20 +118,26 @@ export default function TicketSales() {
   const saveMp = async () => {
     setSavingMp(true);
     try {
-      // PUT /settings crea o actualiza el singleton de SystemSetting (no hay POST).
-      const res = await fetch(`${API_BASE}/settings`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('ae_access_token') || ''}` },
-        body: JSON.stringify({ mercadopago: mpConfig }),
-      });
-      if (!res.ok) throw new Error('No se pudo guardar la configuración.');
+      // SystemSetting es una entidad en Base44: update si existe, create si no.
+      const s = await base44.entities.SystemSetting.list('-created_date', 1);
+      const cur = s[0];
+      if (cur?.id) await base44.entities.SystemSetting.update(cur.id, { mercadopago: mpConfig });
+      else await base44.entities.SystemSetting.create({ mercadopago: mpConfig });
       toast({ title: 'Mercado Pago', description: 'Configuración guardada.' });
     } catch (e) { toast({ title: 'Error', description: e.message, variant: 'destructive' }); }
     setSavingMp(false);
   };
 
   const exportCsv = () => {
-    window.open(`${API_BASE}/tickets-stats/export?event_id=${eventId}`, '_blank');
+    const rows = [['QR', 'Comprador', 'DNI', 'Tipo', 'Cantidad', 'Total', 'Estado']];
+    for (const t of tickets) rows.push([t.qr_code, t.buyer_name, t.buyer_dni || '', t.ticket_type_name, t.quantity, t.total, t.status]);
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `entradas-${eventId}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   if (loading && !event) {

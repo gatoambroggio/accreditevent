@@ -42,12 +42,20 @@ export default function AccessTicketStation() {
     setVerifying(true);
     const code = String(rawCode || '').trim();
     try {
-      const res = await fetch(`${API_BASE}/ticket-access/validate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('ae_access_token') || ''}` },
-        body: JSON.stringify({ qr_code: code, event_id: selectedEvent.id }),
-      });
-      const data = await res.json();
+      let data;
+      try {
+        // Base44 cloud: función autenticada (el operador tiene token).
+        const res = await base44.functions.invoke('ticketAccess', { action: 'validate', qr_code: code, event_id: selectedEvent.id });
+        data = res.data;
+      } catch {
+        // Fallback al servidor self-hosted.
+        const res = await fetch(`${API_BASE}/ticket-access/validate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('ae_access_token') || ''}` },
+          body: JSON.stringify({ qr_code: code, event_id: selectedEvent.id }),
+        });
+        data = await res.json();
+      }
       setResult(data);
     } catch (err) {
       setResult({ ok: false, message: err.message });
