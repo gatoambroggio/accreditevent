@@ -22,6 +22,22 @@
       "type": "string",
       "description": "Ubicaci\u00f3n de la barra dentro del evento"
     },
+    "sectors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "default": [],
+      "description": "Sectores/ubicaciones que atiende la barra (ej. General, VIP). El POS usa un selector para cambiar los precios seg\u00fan el sector elegido."
+    },
     "status": {
       "type": "string",
       "enum": [

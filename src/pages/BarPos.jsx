@@ -29,6 +29,7 @@ export default function BarPos() {
   const [bar, setBar] = useState(null);
   const [products, setProducts] = useState([]);
   const [devices, setDevices] = useState([]);
+  const [sector, setSector] = useState('');
   const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState({});
   const [category, setCategory] = useState('all');
@@ -50,6 +51,7 @@ export default function BarPos() {
       try {
         const b = await base44.entities.Bar.get(barId);
         setBar(b);
+        if (b?.sectors?.length) setSector(b.sectors[0].value);
         const [ps, devs] = await Promise.all([
           base44.entities.BarProduct.filter({ bar_id: barId, status: 'active' }, 'sort_order', 200),
           base44.entities.BarPosDevice.filter({ bar_id: barId, status: 'active' }, 'alias', 50),
@@ -68,13 +70,18 @@ export default function BarPos() {
   const categories = ['all', ...Array.from(new Set(products.map((p) => p.category).filter(Boolean)))];
   const visible = category === 'all' ? products : products.filter((p) => p.category === category);
 
-  const add = (p) => setCart((c) => ({ ...c, [p.id]: { product: p, qty: (c[p.id]?.qty || 0) + 1 } }));
+  const effPrice = (p) => {
+    const sp = p.sector_prices;
+    if (sp && sector && sp[sector] != null && sp[sector] !== '') return Number(sp[sector]);
+    return Number(p.price);
+  };
+  const add = (p) => setCart((c) => ({ ...c, [p.id]: { product: p, qty: (c[p.id]?.qty || 0) + 1, unit_price: effPrice(p) } }));
   const dec = (id) => setCart((c) => { const n = { ...c }; if (n[id]) { n[id] = { ...n[id], qty: n[id].qty - 1 }; if (n[id].qty <= 0) delete n[id]; } return n; });
   const removeItem = (id) => setCart((c) => { const n = { ...c }; delete n[id]; return n; });
   const clear = () => setCart({});
 
   const items = Object.values(cart);
-  const total = items.reduce((s, it) => s + it.product.price * it.qty, 0);
+  const total = items.reduce((s, it) => s + (it.unit_price ?? it.product.price) * it.qty, 0);
 
   const savePrinter = (name) => { setPrinterName(name); localStorage.setItem(LS_PRINTER_KEY, name); };
 
@@ -85,7 +92,7 @@ export default function BarPos() {
     try {
       const me = await base44.auth.me().catch(() => null);
       const opName = me?.full_name || me?.email || 'Operador';
-      const saleItems = items.map((it) => ({ name: it.product.name, price: it.product.price, qty: it.qty, subtotal: it.product.price * it.qty }));
+      const saleItems = items.map((it) => ({ name: it.product.name, price: it.unit_price ?? it.product.price, qty: it.qty, subtotal: (it.unit_price ?? it.product.price) * it.qty }));
 
       const res = await base44.functions.invoke('barSale', {
         action: 'create',
@@ -323,6 +330,11 @@ export default function BarPos() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {bar?.sectors?.length > 0 && (
+            <select value={sector} onChange={(e) => setSector(e.target.value)} className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-bold text-slate-700">
+              {bar.sectors.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+          )}
           <span className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-xs font-semibold ${cardAvailable ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
             <Cpu className="h-3 w-3" /> {cardAvailable ? `${devices.length} POS` : 'Sin POS'}
           </span>
@@ -358,7 +370,7 @@ export default function BarPos() {
                 {visible.map((p) => (
                   <button key={p.id} onClick={() => add(p)} className="flex min-h-[96px] flex-col items-start justify-between rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-emerald-400 hover:bg-emerald-50 active:scale-[0.98]">
                     <span className="text-sm font-bold leading-tight text-slate-900">{p.name}</span>
-                    <span className="mt-2 text-xl font-extrabold text-emerald-700">{fmtCur(p.price)}</span>
+                    <span className="mt-2 text-xl font-extrabold text-emerald-700">{fmtCur(effPrice(p))}</span>
                   </button>
                 ))}
               </div>
@@ -380,7 +392,7 @@ export default function BarPos() {
                   <div key={it.product.id} className="flex items-center gap-2 rounded-xl border border-slate-100 px-2 py-2">
                     <div className="flex-1">
                       <p className="text-sm font-bold text-slate-800">{it.product.name}</p>
-                      <p className="text-xs text-slate-400">{fmtCur(it.product.price)} c/u</p>
+                      <p className="text-xs text-slate-400">{fmtCur(it.unit_price ?? it.product.price)} c/u</p>
                     </div>
                     <div className="flex items-center gap-1">
                       <button onClick={() => dec(it.product.id)} className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"><Minus className="h-4 w-4" /></button>
@@ -388,7 +400,7 @@ export default function BarPos() {
                       <button onClick={() => add(it.product)} className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"><Plus className="h-4 w-4" /></button>
                       <button onClick={() => removeItem(it.product.id)} className="ml-1 grid h-8 w-8 place-items-center rounded-lg border border-red-200 text-red-500 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button>
                     </div>
-                    <span className="w-16 text-right text-sm font-bold text-slate-900">{fmtCur(it.product.price * it.qty)}</span>
+                    <span className="w-16 text-right text-sm font-bold text-slate-900">{fmtCur((it.unit_price ?? it.product.price) * it.qty)}</span>
                   </div>
                 ))}
               </div>

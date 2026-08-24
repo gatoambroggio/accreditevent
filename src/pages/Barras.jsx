@@ -99,7 +99,7 @@ export default function Barras() {
     try {
       const bar = bars.find((b) => b.id === (p.bar_id || productModal?.barId));
       const barId = p.bar_id || productModal?.barId;
-      const clean = { ...p, bar_id: barId, bar_name: bar?.name, event_id: bar?.event_id, event_name: bar?.event_name, company: bar?.company, price: Number(p.price), sort_order: Number(p.sort_order || 0) };
+      const clean = { ...p, bar_id: barId, bar_name: bar?.name, event_id: bar?.event_id, event_name: bar?.event_name, company: bar?.company, price: Number(p.price), sector_prices: p.sector_prices || {}, sort_order: Number(p.sort_order || 0) };
       if (p.id) await base44.entities.BarProduct.update(p.id, clean);
       else await base44.entities.BarProduct.create(clean);
       setProductModal(null);
@@ -203,7 +203,7 @@ export default function Barras() {
       )}
 
       {barModal && <BarFormModal bar={barModal} onClose={() => setBarModal(null)} onSave={saveBar} />}
-      {productModal && <ProductEditorModal product={productModal} onClose={() => setProductModal(null)} onSave={saveProduct} />}
+      {productModal && (() => { const mb = bars.find((x) => x.id === (productModal.bar_id || productModal.barId)); return <ProductEditorModal product={productModal} sectors={mb?.sectors || []} onClose={() => setProductModal(null)} onSave={saveProduct} />; })()}
     </div>
   );
 }
