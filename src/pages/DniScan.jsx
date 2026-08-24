@@ -4,6 +4,7 @@ import { Upload, Loader2, ScanLine, RefreshCw, User, Hash, Image as ImageIcon, A
 import { Image as UIImage } from '@/components/ui/image';
 import * as faceapi from '@vladmandic/face-api';
 import { loadModels } from '@/lib/faceRecognition';
+import Pdf417Scanner from '@/components/dni/Pdf417Scanner';
 
 export default function DniScan() {
   const [dniFile, setDniFile] = useState(null);
@@ -11,6 +12,7 @@ export default function DniScan() {
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
+  const [mode, setMode] = useState('ocr'); // 'ocr' | 'pdf417'
   const fileInputRef = useRef(null);
 
   const handleFile = (file) => {
@@ -98,6 +100,17 @@ export default function DniScan() {
         <p className="mt-1 text-sm text-slate-500">Subí una foto del DNI para extraer nombre, apellido, número y foto por OCR.</p>
       </div>
 
+      {/* Selector de modo */}
+      <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+        <button onClick={() => setMode('ocr')} className={`rounded-lg px-4 py-2 text-sm font-bold transition ${mode === 'ocr' ? 'bg-emerald-700 text-white shadow' : 'text-slate-600 hover:bg-slate-50'}`}>
+          Frente (OCR)
+        </button>
+        <button onClick={() => setMode('pdf417')} className={`rounded-lg px-4 py-2 text-sm font-bold transition ${mode === 'pdf417' ? 'bg-emerald-700 text-white shadow' : 'text-slate-600 hover:bg-slate-50'}`}>
+          Reverso (PDF417)
+        </button>
+      </div>
+
+      {mode === 'ocr' && (
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Upload / Preview */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -201,6 +214,11 @@ export default function DniScan() {
           )}
         </div>
       </div>
+      )}
+
+      {mode === 'pdf417' && (
+        <Pdf417Scanner onScanned={(d) => setResult({ nombre: d.nombre, apellido: d.apellido, dni: d.dni })} />
+      )}
     </div>
   );
 }
