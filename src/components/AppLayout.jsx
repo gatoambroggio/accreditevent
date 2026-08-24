@@ -44,7 +44,7 @@ import {
 import { base44 } from '@/api/base44Client';
 import { applyTheme } from '@/lib/useTheme';
 
-export const ROLE_LEVEL = { provider: -1, empresa: -1, control: 0, operador: 0, coordinator: 1, productora: 1, admin: 2, superadmin: 3 };
+export const ROLE_LEVEL = { provider: -1, empresa: -1, barra: 0, control: 0, operador: 0, coordinator: 1, productora: 1, admin: 2, superadmin: 3 };
 
 const NAV_ITEMS = [
   // Operación
@@ -135,18 +135,25 @@ export default function AppLayout() {
   const userLevel = ROLE_LEVEL[role] ?? -1;
   const isProvider = role === 'provider';
   const isEmpresa = role === 'empresa';
+  const isBarra = role === 'barra';
   const sysName = settings?.system_name || 'acceso';
   const orgName = user?.company || (settings?.organization_name || 'Acceso Eventos');
   const logoUrl = settings?.logo_url;
 
   useEffect(() => {
+    if (isBarra) {
+      // Los operadores de barra no usan el panel administrativo: /bar-app los
+      // manda directo al POS de su barra asignada.
+      navigate('/bar-app', { replace: true });
+      return;
+    }
     if (isProvider && location.pathname !== '/portal') {
       navigate('/portal', { replace: true });
     }
     if (isEmpresa && location.pathname !== '/empresa-portal') {
       navigate('/empresa-portal', { replace: true });
     }
-  }, [isProvider, isEmpresa, location.pathname, navigate]);
+  }, [isBarra, isProvider, isEmpresa, location.pathname, navigate]);
 
   useEffect(() => {
     setMobileOpen(false);

@@ -7,6 +7,7 @@ import PageHeader from '@/components/ui/page-header';
 import BarFormModal from '@/components/barras/BarFormModal';
 import BarPosDevices from '@/components/barras/BarPosDevices';
 import EventMenu from '@/components/barras/EventMenu';
+import BarOperators from '@/components/barras/BarOperators';
 
 export default function Barras() {
   const { toast } = useToast();
@@ -16,6 +17,7 @@ export default function Barras() {
   const [loading, setLoading] = useState(true);
   const [barModal, setBarModal] = useState(null);
   const [posBar, setPosBar] = useState(null);
+  const [tab, setTab] = useState('barras');
 
   useEffect(() => {
     (async () => {
@@ -50,6 +52,15 @@ export default function Barras() {
 
   return (
     <div>
+      <div className="mb-5 flex gap-1 rounded-xl border border-slate-200 bg-white p-1">
+        <button onClick={() => setTab('barras')} className={`flex-1 rounded-lg px-4 py-2 text-sm font-bold transition ${tab === 'barras' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>Barras</button>
+        <button onClick={() => setTab('operadores')} className={`flex-1 rounded-lg px-4 py-2 text-sm font-bold transition ${tab === 'operadores' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>Operadores</button>
+      </div>
+
+      {tab === 'operadores' ? (
+        <BarOperators />
+      ) : (
+      <>
       <PageHeader kicker="Barras" title="Barras de bebida y comida">
         <div className="flex flex-wrap items-center gap-2">
           <select value={eventId} onChange={(e) => { setEventId(e.target.value); loadBars(e.target.value); }} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
@@ -108,6 +119,8 @@ export default function Barras() {
       )}
 
       {barModal && <BarFormModal bar={barModal} sectors={events.find((e) => e.id === eventId)?.bar_sectors || []} onClose={() => setBarModal(null)} onSave={saveBar} />}
+      </>
+      )}
     </div>
   );
 }
