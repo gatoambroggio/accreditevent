@@ -37,6 +37,21 @@ async function getMpConfig(prisma) {
 const pointEndpoint = (mp) => (mp.point?.endpoint || 'https://api.mercadopago.com').replace(/\/$/, '');
 const pointToken = (mp) => mp.point?.access_token || mp.access_token;
 
+// Código corto de retiro (ej. R-1234) para que administración confirme la
+// recepción del efectivo. Se imprime en el comprobante (+ QR). Generación con
+// retry anti-colisión.
+function genWithdrawalCode() {
+  return 'R-' + Math.floor(1000 + Math.random() * 9000);
+}
+async function uniqueWithdrawalCode(prisma) {
+  for (let i = 0; i < 8; i++) {
+    const code = genWithdrawalCode();
+    const exists = await prisma.barCashMovement.findFirst({ where: { ticket_code: code } }).catch(() => null);
+    if (!exists) return code;
+  }
+  return genWithdrawalCode();
+}
+
 export async function barSale(body, { prisma }) {
   const action = body.action;
 
@@ -295,11 +310,13 @@ export async function barSale(body, { prisma }) {
     const withdrawTotal = active.filter((m) => m.type === 'withdraw').reduce((s, m) => s + Number(m.amount || 0), 0);
     const cashSales = (sales || []).reduce((s, sa) => s + Number(sa.total || 0), 0);
     const balanceAfter = openTotal - withdrawTotal + cashSales - amt;
+    const ticketCode = await uniqueWithdrawalCode(prisma);
     const mov = await prisma.barCashMovement.create({
       data: {
         bar_id, bar_name: bar.name, event_id: bar.event_id, event_name: bar.event_name, company: bar.company,
         type: 'withdraw', amount: amt, operator_id: operator_id || '', operator_name: operator_name || 'Operador',
         responsible_name: responsible_name || '', responsible_dni: responsible_dni || '',
+        ticket_code: ticketCode,
         note: note || '', balance_after: balanceAfter, status: 'active',
       },
     });

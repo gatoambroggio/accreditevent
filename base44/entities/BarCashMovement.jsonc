@@ -53,6 +53,24 @@
       "type": "string",
       "description": "DNI de quien retira el efectivo (para el comprobante de retiro)"
     },
+    "ticket_code": {
+      "type": "string",
+      "description": "C\u00f3digo corto del retiro (ej. R-1234), generado al crear el retiro. Se imprime en el comprobante y administraci\u00f3n lo usa (tecle\u00e1ndolo o escaneando el QR) para confirmar la recepci\u00f3n del dinero."
+    },
+    "received": {
+      "type": "boolean",
+      "default": false,
+      "description": "Indica que administraci\u00f3n confirm\u00f3 haber recibido el efectivo del retiro. Paso opcional: el retiro se registra igual en la barra; la confirmaci\u00f3n es la trazabilidad de la entrega a administraci\u00f3n."
+    },
+    "received_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha/hora en que administraci\u00f3n confirm\u00f3 la recepci\u00f3n del retiro"
+    },
+    "received_by": {
+      "type": "string",
+      "description": "Usuario de administraci\u00f3n que confirm\u00f3 la recepci\u00f3n (denormalizado)"
+    },
     "note": {
       "type": "string",
       "description": "Motivo o aclaracion del movimiento"

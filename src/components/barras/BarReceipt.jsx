@@ -1,4 +1,5 @@
 import React, { forwardRef, useImperativeHandle } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { printToAgent } from '@/lib/printAgent';
 
 const fmtDate = (d) => {
@@ -152,6 +153,15 @@ const BarReceipt = forwardRef(function BarReceipt({ sale, bar, event, withdrawal
           <div style={{ textAlign: 'center', fontSize: '12px', fontWeight: 'bold', marginTop: '4px' }}>{bar?.name || 'Barra'}</div>
           {event && <div style={{ textAlign: 'center', fontSize: '10px' }}>{event.name}</div>}
           <div style={{ borderTop: '2px solid #000', margin: '6px 0' }} />
+          {withdrawal.ticket_code && (
+            <div style={{ textAlign: 'center', margin: '4px 0' }}>
+              <div style={{ fontSize: '9px' }}>Llevar a administración</div>
+              <div style={{ fontSize: '18px', fontWeight: 'bold', letterSpacing: '2px' }}>{withdrawal.ticket_code}</div>
+              <div style={{ display: 'flex', justifyContent: 'center', margin: '4px 0' }}>
+                <QRCodeSVG value={withdrawal.ticket_code} size={80} level="M" />
+              </div>
+            </div>
+          )}
           <div style={{ fontSize: '11px' }}>{fmtDate(withdrawal.created_at || withdrawal.created_date || Date.now())}</div>
           <div style={{ fontSize: '10px' }}>Op: {withdrawal.operator_name || 'Operador'}</div>
           <div style={{ fontSize: '10px' }}>Mov #: {String(withdrawal.id || '').slice(-6).toUpperCase()}</div>

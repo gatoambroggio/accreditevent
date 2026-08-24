@@ -812,6 +812,10 @@ model BarCashMovement {
   responsible_name String?
   responsible_dni  String?
   note             String?
+  ticket_code      String?
+  received         Boolean  @default(false)
+  received_at      DateTime?
+  received_by      String?
   balance_after    Float?
   status           String   @default("active")
   created_at       DateTime @default(now())
@@ -820,5 +824,6 @@ model BarCashMovement {
   @@index([bar_id])
   @@index([event_id])
   @@index([type])
+  @@index([ticket_code])
   @@map("bar_cash_movements")
 }

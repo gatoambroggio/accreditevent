@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Loader2, Wallet, Download, Search, Filter } from 'lucide-react';
+import { Loader2, Wallet, Download, Search, Filter, CheckCircle2 } from 'lucide-react';
 import PageHeader from '@/components/ui/page-header';
+import RecepcionRetiros from '@/components/caja/RecepcionRetiros';
+import { useAuth } from '@/lib/AuthContext';
 import {
   RANGES,
   MOV_LABELS,
@@ -25,6 +27,7 @@ function StatCard({ label, value, color, sub }) {
 }
 
 export default function Caja() {
+  const { user } = useAuth();
   const [events, setEvents] = useState([]);
   const [eventId, setEventId] = useState('');
   const [bars, setBars] = useState([]);
@@ -70,6 +73,19 @@ export default function Caja() {
 
   const stats = useMemo(() => aggregateCash(filtered), [filtered]);
 
+  const confirmReceipt = async (m) => {
+    try {
+      await base44.entities.BarCashMovement.update(m.id, {
+        received: true,
+        received_at: new Date().toISOString(),
+        received_by: user?.full_name || user?.email || 'Administración',
+      });
+      await load(eventId);
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
   return (
     <div>
       <PageHeader kicker="Barras" title="Caja y retiros">
@@ -101,6 +117,8 @@ export default function Caja() {
           )}
         </div>
       </PageHeader>
+
+      {eventId && !loading && <RecepcionRetiros onConfirmed={() => load(eventId)} />}
 
       {!eventId ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center">
@@ -180,6 +198,7 @@ export default function Caja() {
                     <th className="px-3 py-2">Motivo</th>
                     <th className="px-3 py-2 text-right">Saldo</th>
                     <th className="px-3 py-2 text-right">Diferencia</th>
+                    <th className="px-3 py-2">Recepción</th>
                     <th className="px-3 py-2">Estado</th>
                   </tr>
                 </thead>
@@ -212,6 +231,34 @@ export default function Caja() {
                             </span>
                           ) : (
                             '-'
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          {m.type === 'withdraw' ? (
+                            m.received ? (
+                              <div className="text-xs">
+                                <span className="inline-flex items-center gap-1 font-semibold text-emerald-600">
+                                  <CheckCircle2 className="h-3.5 w-3.5" /> Recibido
+                                </span>
+                                {m.received_by && <div className="text-slate-400">{m.received_by}</div>}
+                                {m.received_at && (
+                                  <div className="text-slate-400">
+                                    {new Date(m.received_at).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                  </div>
+                                )}
+                              </div>
+                            ) : m.status === 'void' ? (
+                              <span className="text-xs text-slate-400">—</span>
+                            ) : (
+                              <button
+                                onClick={() => confirmReceipt(m)}
+                                className="rounded-lg bg-emerald-700 px-2 py-1 text-xs font-bold text-white hover:bg-emerald-800"
+                              >
+                                Confirmar
+                              </button>
+                            )
+                          ) : (
+                            <span className="text-xs text-slate-400">—</span>
                           )}
                         </td>
                         <td className="px-3 py-2">

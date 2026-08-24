@@ -68,6 +68,9 @@ export function exportCashXlsx(movs, eventName) {
       Motivo: m.note || '',
       'Saldo posterior': m.balance_after != null ? Number(m.balance_after) : '',
       Diferencia: diff != null ? Number(diff.toFixed(2)) : '',
+      Recepción: m.type === 'withdraw' ? (m.received ? 'Recibido' : 'Pendiente') : '',
+      'Recibido por': m.received_by || '',
+      'Fecha recepción': m.received_at ? new Date(m.received_at).toLocaleString('es-AR') : '',
       Estado: m.status === 'void' ? 'Anulado' : 'Activo',
     };
   });
