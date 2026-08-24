@@ -61,6 +61,9 @@ import TicketEvent from '@/pages/tickets/TicketEvent';
 import TicketConfirmation from '@/pages/tickets/TicketConfirmation';
 import TicketSales from '@/pages/TicketSales';
 import AccessTicketStation from '@/pages/AccessTicketStation';
+import Barras from '@/pages/Barras';
+import BarPos from '@/pages/BarPos';
+import BarrasReportes from '@/pages/BarrasReportes';
 
 const AUTH_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password', '/provider-register', '/registro-empresa'];
 // Rutas públicas sin login (tienda de entradas para compradores anónimos).
@@ -139,11 +142,14 @@ const AuthenticatedApp = () => {
         <Route path="/emergency-scan" element={<EmergencyScan />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/ticket-sales" element={<TicketSales />} />
+        <Route path="/barras" element={<Barras />} />
+        <Route path="/barras-reportes" element={<BarrasReportes />} />
       </Route>
       <Route path="/entradas" element={<TicketStore />} />
       <Route path="/entradas/:eventId" element={<TicketEvent />} />
       <Route path="/entradas/confirmacion" element={<TicketConfirmation />} />
       <Route path="/control-entradas" element={<AccessTicketStation />} />
+      <Route path="/barras/:barId" element={<BarPos />} />
       <Route path="/portal" element={<ProviderPortal />} />
       <Route path="/registro-empresa" element={<EmpresaRegister />} />
       <Route path="/empresa-portal" element={<EmpresaPortal />} />

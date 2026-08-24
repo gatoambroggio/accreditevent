@@ -1,0 +1,213 @@
+{
+  "name": "BarProduct",
+  "type": "object",
+  "properties": {
+    "bar_id": {
+      "type": "string",
+      "description": "Barra a la que pertenece el producto del men\u00fa"
+    },
+    "bar_name": {
+      "type": "string",
+      "description": "Nombre de la barra (denormalizado)"
+    },
+    "event_id": {
+      "type": "string",
+      "description": "Evento del producto (para RLS)"
+    },
+    "event_name": {
+      "type": "string",
+      "description": "Nombre del evento (denormalizado)"
+    },
+    "company": {
+      "type": "string",
+      "description": "Empresa productora (denormalizado para RLS)"
+    },
+    "name": {
+      "type": "string",
+      "description": "Nombre del producto (bebida/comida)"
+    },
+    "category": {
+      "type": "string",
+      "description": "Categor\u00eda del producto (Bebida, Comida, etc.)"
+    },
+    "price": {
+      "type": "number",
+      "description": "Precio unitario (ARS)"
+    },
+    "sort_order": {
+      "type": "number",
+      "default": 0,
+      "description": "Orden de visualizaci\u00f3n en el POS"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "inactive"
+      ],
+      "default": "active",
+      "description": "Estado del producto"
+    }
+  },
+  "required": [
+    "bar_id",
+    "name",
+    "price"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "control"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "pda"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
+        }
+      ]
+    }
+  }
+}
