@@ -58,8 +58,10 @@ export default function DniScannerModal({ open, onClose, onScanned }) {
             img.onerror = () => reject(new Error('No se pudo cargar la imagen.'));
           });
           await loadModels();
+          // La cara del DNI es muy chica; la detección por defecto no la pega.
+          // Bajamos el tamaño mínimo de cara y el umbral de score para detectarla.
           const detection = await faceapi
-            .detectSingleFace(img)
+            .detectSingleFace(img, new faceapi.SsdMobilenetv1Options({ minFaceSize: 40, scoreThreshold: 0.3 }))
             .withFaceLandmarks()
             .withFaceDescriptor();
           if (!detection) throw new Error('No se detectó un rostro en el DNI.');

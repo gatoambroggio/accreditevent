@@ -29,26 +29,7 @@ export default function DniScan() {
       const { file_url: dniImageUrl } = await base44.integrations.Core.UploadFile({ file: dniFile });
 
       const [ocrResult, faceResult] = await Promise.allSettled([
-        base44.integrations.Core.InvokeLLM({
-          prompt:
-            'Sos un sistema de OCR para documentos de identidad argentinos (DNI).\n' +
-            'Analizá la imagen del DNI y extraé:\n' +
-            '- nombre: primer nombre (o nombres de pila)\n' +
-            '- apellido: apellido(s)\n' +
-            '- dni: número de documento (solo dígitos, sin puntos ni guiones)\n\n' +
-            'Si algún campo no es legible, devolvé string vacío en ese campo.\n' +
-            'Respondé únicamente con el JSON.',
-          file_urls: [dniImageUrl],
-          response_json_schema: {
-            type: 'object',
-            properties: {
-              nombre: { type: 'string' },
-              apellido: { type: 'string' },
-              dni: { type: 'string' },
-            },
-            required: ['nombre', 'apellido', 'dni'],
-          },
-        }),
+        base44.functions.invoke('readDni', { file_url: dniImageUrl }),
         (async () => {
           const img = document.createElement('img');
           img.src = dniUrl;
@@ -57,8 +38,10 @@ export default function DniScan() {
             img.onerror = () => reject(new Error('No se pudo cargar la imagen.'));
           });
           await loadModels();
+          // La cara del DNI es muy chica; la detección por defecto no la pega.
+          // Bajamos el tamaño mínimo de cara y el umbral de score para detectarla.
           const detection = await faceapi
-            .detectSingleFace(img)
+            .detectSingleFace(img, new faceapi.SsdMobilenetv1Options({ minFaceSize: 40, scoreThreshold: 0.3 }))
             .withFaceLandmarks()
             .withFaceDescriptor();
           if (!detection) throw new Error('No se detectó un rostro en el DNI.');
@@ -84,7 +67,7 @@ export default function DniScan() {
         throw new Error('No se pudo realizar el OCR del DNI.');
       }
 
-      const ocr = ocrResult.value;
+      const ocr = ocrResult.value?.data ?? ocrResult.value ?? {};
       setResult({
         nombre: ocr.nombre || '',
         apellido: ocr.apellido || '',
