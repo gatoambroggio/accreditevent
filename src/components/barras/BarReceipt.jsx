@@ -11,52 +11,53 @@ const fmtDate = (d) => {
 
 const PAY_LABELS = { cash: 'EFECTIVO', card: 'TARJETA', qr: 'QR MERCADO PAGO', demo: 'DEMO' };
 
+// Fallback: abre el diálogo de impresión del navegador con layout térmico 80mm.
+function printFallback(title, bodyHtml) {
+  const html = `
+    <html><head><meta charset="utf-8"><title>${title}</title>
+    <style>
+      @page { size: 80mm auto; margin: 0; }
+      * { font-family: 'Courier New', monospace; box-sizing: border-box; }
+      .gap { height: 8mm; }
+    </style></head><body>${bodyHtml}</body></html>`;
+  const w = window.open('', '_blank', 'width=400,height=600');
+  if (w) {
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    w.print();
+    w.close();
+  }
+}
+
 // Imprime comanda (despachador) + comprobante (cliente) vía el Print Agent.
 // Si no hay agente o impresora, cae a window.print() con layout térmico.
 const BarReceipt = forwardRef(function BarReceipt({ sale, bar, event }, ref) {
   useImperativeHandle(ref, () => ({
+    // Imprime comanda + comprobante de cliente.
     async printBoth(printerName) {
       const comanda = document.querySelector('.bar-print-comanda');
       const comprobante = document.querySelector('.bar-print-comprobante');
       if (!comanda || !comprobante) return;
-
-      // Intentar agente de impresión local.
       if (printerName) {
         const ok1 = await printToAgent(comanda, printerName, 1).catch(() => false);
         if (ok1) await new Promise((r) => setTimeout(r, 800));
         const ok2 = await printToAgent(comprobante, printerName, 1).catch(() => false);
         if (ok1 && ok2) return;
       }
+      printFallback('Comanda + Comprobante', `${comanda.outerHTML}<div class="gap"></div>${comprobante.outerHTML}`);
+    },
 
-      // Fallback: diálogo del navegador con layout térmico.
-      const html = `
-        <html><head><meta charset="utf-8"><title>Comanda + Comprobante</title>
-        <style>
-          @page { size: 80mm auto; margin: 0; }
-          * { font-family: 'Courier New', monospace; box-sizing: border-box; }
-          .rcpt { width: 74mm; padding: 2mm; color: #000; }
-          .center { text-align: center; }
-          .bold { font-weight: bold; }
-          .lg { font-size: 14px; }
-          .md { font-size: 11px; }
-          .sm { font-size: 9px; }
-          .line { border-top: 1px dashed #000; margin: 4px 0; }
-          .dbl { border-top: 2px solid #000; margin: 4px 0; }
-          .row { display: flex; justify-content: space-between; font-size: 11px; }
-          .gap { height: 8mm; }
-        </style></head><body>
-        ${comanda.outerHTML}
-        <div class="gap"></div>
-        ${comprobante.outerHTML}
-        </body></html>`;
-      const w = window.open('', '_blank', 'width=400,height=600');
-      if (w) {
-        w.document.write(html);
-        w.document.close();
-        w.focus();
-        w.print();
-        w.close();
+    // Imprime sólo la comanda (para pagos con tarjeta: el ticket de cliente
+    // lo emite el propio posnet Mercado Pago Point).
+    async printComanda(printerName) {
+      const comanda = document.querySelector('.bar-print-comanda');
+      if (!comanda) return;
+      if (printerName) {
+        const ok = await printToAgent(comanda, printerName, 1).catch(() => false);
+        if (ok) return;
       }
+      printFallback('Comanda', comanda.outerHTML);
     },
   }));
 

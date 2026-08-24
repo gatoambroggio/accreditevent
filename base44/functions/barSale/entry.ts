@@ -77,7 +77,16 @@ export default async function (req) {
         return Response.json({ sale_id: sale.id, status: 'pending', init_point, total: calcTotal });
       }
 
-      // Efectivo, Tarjeta, o modo demo: confirma la venta al instante.
+      // Tarjeta (posnet Mercado Pago Point): venta pending hasta que el
+      // operador confirme el pago en la terminal física. El ticket de cliente
+      // lo imprime el propio posnet, así que acá sólo esperamos confirmación.
+      if (method === 'card') {
+        saleData.status = 'pending';
+        const sale = await base44.asServiceRole.entities.BarSale.create(saleData);
+        return Response.json({ sale_id: sale.id, status: 'pending', total: calcTotal, method: 'card' });
+      }
+
+      // Efectivo o modo demo: confirma la venta al instante.
       const sale = await base44.asServiceRole.entities.BarSale.create(saleData);
       return Response.json({ sale_id: sale.id, status: 'paid', total: calcTotal, demo: demoMode });
     }

@@ -19,6 +19,7 @@ export default function BarPos() {
   const [payModal, setPayModal] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [qrView, setQrView] = useState(null); // { sale_id, init_point, total, sale_items }
+  const [cardView, setCardView] = useState(null); // { sale_id, total, sale_items, operator_name }
   const [confirming, setConfirming] = useState(null); // { total, method }
   const [lastSale, setLastSale] = useState(null); // datos completos para imprimir
   const [printers, setPrinters] = useState([]);
@@ -88,7 +89,14 @@ export default function BarPos() {
         return;
       }
 
-      // Efectivo, Tarjeta o demo: venta confirmada → imprimir + mostrar.
+      // Tarjeta (posnet físico): venta pendiente, espera confirmación del operador.
+      if (method === 'card' && data.status === 'pending') {
+        setProcessing(false);
+        setCardView({ sale_id: data.sale_id, total: data.total, sale_items: saleItems, operator_name: opName });
+        return;
+      }
+
+      // Efectivo o demo: venta confirmada → imprimir + mostrar.
       setLastSale({
         id: data.sale_id,
         items: saleItems,
@@ -163,6 +171,30 @@ export default function BarPos() {
     setQrView(null);
   };
 
+  // Confirmar pago con tarjeta: el operador ya cobró en el posnet Point.
+  const confirmCard = async () => {
+    if (!cardView) return;
+    try {
+      await base44.functions.invoke('barSale', { action: 'confirm', sale_id: cardView.sale_id });
+      const cv = cardView;
+      setCardView(null);
+      setLastSale({
+        id: cv.sale_id,
+        items: cv.sale_items,
+        total: cv.total,
+        payment_method: 'card',
+        operator_name: cv.operator_name || 'Operador',
+        created_at: new Date().toISOString(),
+      });
+      setConfirming({ total: cv.total, method: 'card' });
+      setCart({});
+    } catch (e) { alert('Error: ' + e.message); }
+  };
+
+  const cancelCard = () => {
+    setCardView(null);
+  };
+
   useEffect(() => {
     if (confirming) {
       const t = setTimeout(() => setConfirming(null), 2500);
@@ -171,9 +203,13 @@ export default function BarPos() {
   }, [confirming]);
 
   // Dispara la impresión cuando lastSale se actualiza (el DOM ya tiene los divs).
+  // Tarjeta: sólo comanda (el ticket de cliente lo imprime el posnet Point).
   useEffect(() => {
     if (!lastSale) return;
-    if (receiptRef.current) {
+    if (!receiptRef.current) return;
+    if (lastSale.payment_method === 'card') {
+      receiptRef.current.printComanda(printerName).catch(() => {});
+    } else {
       receiptRef.current.printBoth(printerName).catch(() => {});
     }
   }, [lastSale, printerName]);
@@ -329,6 +365,31 @@ export default function BarPos() {
                 Confirmar pago manual
               </button>
               <button onClick={cancelQr} className="rounded-xl border border-slate-300 px-6 py-3 text-sm font-bold text-slate-600 hover:bg-slate-100">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Overlay de espera para pago con tarjeta (posnet Point) */}
+      {cardView && (
+        <div className="fixed inset-0 z-[55] flex flex-col items-center justify-center bg-slate-900 p-6">
+          <div className="rounded-3xl bg-white p-8 text-center shadow-2xl">
+            <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-amber-100">
+              <CreditCard className="h-8 w-8 text-amber-600" />
+            </div>
+            <h3 className="mt-5 text-xl font-extrabold text-slate-900">Cobrá {fmtCur(cardView.total)}</h3>
+            <p className="mt-2 text-sm text-slate-500">Pasá la tarjeta en el posnet Mercado Pago Point y confirmá el pago aprobado.</p>
+            <div className="mt-6 flex items-center justify-center gap-2 text-slate-400">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm">Esperando confirmación…</span>
+            </div>
+            <div className="mt-6 flex gap-3">
+              <button onClick={confirmCard} className="rounded-xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white hover:bg-emerald-700">
+                Pago aprobado
+              </button>
+              <button onClick={cancelCard} className="rounded-xl border border-slate-300 px-6 py-3 text-sm font-bold text-slate-600 hover:bg-slate-100">
                 Cancelar
               </button>
             </div>
