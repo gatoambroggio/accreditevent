@@ -65,7 +65,16 @@ export default function BarPos() {
       setLoading(false);
       try {
         const health = await checkAgent();
-        if (health) setPrinters(await getAgentPrinters() || []);
+        if (health) {
+          const ps = await getAgentPrinters() || [];
+          setPrinters(ps);
+          // Auto-selección silenciosa de la impresora (impresión automática sin popup)
+          let pref = localStorage.getItem(LS_PRINTER_KEY) || '';
+          if (!pref || !ps.includes(pref)) {
+            pref = ps[0] || '';
+            if (pref) { localStorage.setItem(LS_PRINTER_KEY, pref); setPrinterName(pref); }
+          }
+        }
       } catch {}
     })();
   }, [barId]);

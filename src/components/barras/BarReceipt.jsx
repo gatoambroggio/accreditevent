@@ -39,13 +39,10 @@ const BarReceipt = forwardRef(function BarReceipt({ sale, bar, event }, ref) {
       const comanda = document.querySelector('.bar-print-comanda');
       const comprobante = document.querySelector('.bar-print-comprobante');
       if (!comanda || !comprobante) return;
-      if (printerName) {
-        const ok1 = await printToAgent(comanda, printerName, 1).catch(() => false);
-        if (ok1) await new Promise((r) => setTimeout(r, 800));
-        const ok2 = await printToAgent(comprobante, printerName, 1).catch(() => false);
-        if (ok1 && ok2) return;
-      }
-      printFallback('Comanda + Comprobante', `${comanda.outerHTML}<div class="gap"></div>${comprobante.outerHTML}`);
+      if (!printerName) return; // sin impresora/agente: no abrimos ningún diálogo
+      const ok1 = await printToAgent(comanda, printerName, 1).catch(() => false);
+      if (ok1) await new Promise((r) => setTimeout(r, 800));
+      await printToAgent(comprobante, printerName, 1).catch(() => false);
     },
 
     // Imprime sólo la comanda (para pagos con tarjeta: el ticket de cliente
@@ -53,11 +50,8 @@ const BarReceipt = forwardRef(function BarReceipt({ sale, bar, event }, ref) {
     async printComanda(printerName) {
       const comanda = document.querySelector('.bar-print-comanda');
       if (!comanda) return;
-      if (printerName) {
-        const ok = await printToAgent(comanda, printerName, 1).catch(() => false);
-        if (ok) return;
-      }
-      printFallback('Comanda', comanda.outerHTML);
+      if (!printerName) return; // sin impresora/agente: no abrimos ningún diálogo
+      await printToAgent(comanda, printerName, 1).catch(() => false);
     },
   }));
 
