@@ -7,7 +7,8 @@ import PageHeader from '@/components/ui/page-header';
 import BarFormModal from '@/components/barras/BarFormModal';
 import ProductEditorModal from '@/components/barras/ProductEditorModal';
 import BarPosDevices from '@/components/barras/BarPosDevices';
-import { Cpu } from 'lucide-react';
+import EventMenu from '@/components/barras/EventMenu';
+import { Cpu, Download } from 'lucide-react';
 
 const fmtCur = (n) => `$${Number(n || 0).toLocaleString('es-AR')}`;
 
@@ -53,11 +54,40 @@ export default function Barras() {
     try {
       const ev = events.find((e) => e.id === (b.event_id || eventId));
       const clean = { ...b, event_id: b.event_id || eventId, event_name: ev?.name, company: ev?.company };
+      let created;
       if (b.id) await base44.entities.Bar.update(b.id, clean);
-      else await base44.entities.Bar.create(clean);
+      else created = await base44.entities.Bar.create(clean);
       setBarModal(null);
+      // Al crear una barra nueva, copia el catálogo del evento como menú base.
+      if (created) await seedFromEvent(created);
       await loadBars(eventId);
     } catch (e) { toast({ title: 'Error', description: e.message, variant: 'destructive' }); }
+  };
+
+  // Copia los productos del catálogo del evento a la barra (sólo los que no
+  // existan ya por nombre, para no pisar precios ajustados en reimportaciones).
+  const seedFromEvent = async (bar) => {
+    try {
+      const catalog = await base44.entities.EventProduct.filter({ event_id: bar.event_id, status: 'active' }, 'sort_order', 300);
+      if (!catalog.length) return 0;
+      const existing = await base44.entities.BarProduct.filter({ bar_id: bar.id }, 'sort_order', 300);
+      const names = new Set(existing.map((p) => p.name));
+      const toCreate = catalog
+        .filter((c) => !names.has(c.name))
+        .map((c) => ({
+          bar_id: bar.id, bar_name: bar.name,
+          event_id: bar.event_id, event_name: bar.event_name, company: bar.company,
+          name: c.name, category: c.category, price: Number(c.price), sort_order: Number(c.sort_order || 0), status: 'active',
+        }));
+      if (toCreate.length) await base44.entities.BarProduct.bulkCreate(toCreate);
+      return toCreate.length;
+    } catch { return 0; }
+  };
+
+  const importMenu = async (b) => {
+    const n = await seedFromEvent(b);
+    await loadProducts(b.id);
+    toast({ title: n ? 'Menú importado' : 'Sin cambios', description: n ? `Se agregaron ${n} producto(s) del evento (sin pisar los ya ajustados).` : 'La barra ya tiene todos los productos del catálogo.' });
   };
 
   const deleteBar = async (b) => {
@@ -111,7 +141,8 @@ export default function Barras() {
       ) : loading ? (
         <div className="flex justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
+          <EventMenu event={events.find((e) => e.id === eventId)} />
           {bars.length === 0 && <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-400">Sin barras. Creá la primera.</div>}
           {bars.map((b) => (
             <div key={b.id} className="rounded-2xl border border-slate-200 bg-white">
@@ -126,6 +157,9 @@ export default function Barras() {
                 </Link>
                 <button onClick={() => toggleBar(b.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                   <UtensilsCrossed className="h-4 w-4" /> Menú
+                </button>
+                <button onClick={() => importMenu(b)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                  <Download className="h-4 w-4" /> Importar menú
                 </button>
                 <button onClick={() => setPosBar(posBar === b.id ? null : b.id)} className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-semibold ${posBar === b.id ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}>
                   <Cpu className="h-4 w-4" /> POS
