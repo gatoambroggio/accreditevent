@@ -548,7 +548,11 @@ else
   done
   if [[ -n "$PADDLE_BUNDLE" ]]; then
     log "Instalando PaddleOCR desde bundle local: $PADDLE_BUNDLE"
-    if pip3 install --no-index --find-links="$PADDLE_BUNDLE" "paddlepaddle==2.6.2" "paddleocr==2.7.3" >/dev/null 2>&1; then
+    # numpy<2 es OBLIGATORIO: paddlepaddle 2.6.2 se compiló contra numpy 1.x
+    # (ABI 0x1000009); con numpy 2.x (ABI 0x2000000) truena al importar con
+    # "module compiled against ABI version 0x1000009 but this version of numpy
+    # is 0x2000000". Sin esto PaddleOCR no carga y readDni cae a Tesseract (basura).
+    if pip3 install --no-index --find-links="$PADDLE_BUNDLE" "paddlepaddle==2.6.2" "paddleocr==2.7.3" "numpy==1.26.4" >/dev/null 2>&1; then
       ok "PaddleOCR instalado desde bundle local"; PADDLE_OK=1
     else
       warn "Falló el bundle local — ver que tenga paddlepaddle + paddleocr + deps."
@@ -557,7 +561,8 @@ else
   # Estrategia 2: pip desde PyPI (requiere internet una sola vez)
   if [[ $PADDLE_OK -eq 0 ]]; then
     log "Instalando PaddleOCR desde PyPI (requiere internet)..."
-    if pip3 install "paddlepaddle==2.6.2" "paddleocr==2.7.3" >/dev/null 2>&1; then
+    # numpy<2 (ver nota en el camino del bundle) — paddlepaddle 2.6.2 no soporta numpy 2.x.
+    if pip3 install "paddlepaddle==2.6.2" "paddleocr==2.7.3" "numpy==1.26.4" >/dev/null 2>&1; then
       ok "PaddleOCR instalado desde PyPI"; PADDLE_OK=1
     else
       warn "No se pudo instalar PaddleOCR (sin internet ni bundle). OCR sigue con VLM/Tesseract."

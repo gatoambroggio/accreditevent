@@ -16,12 +16,19 @@ mkdir -p paddle-packages
 pip3 download \
   paddlepaddle==2.6.2 \
   paddleocr==2.7.3 \
+  numpy==1.26.4 \
   -d paddle-packages
 ```
 
-Esto baja `paddlepaddle`, `paddleocr` y **todas** sus dependencias (numpy, pillow,
-shapely, pyclipper, lmdb, etc.) como wheels `.whl` en la carpeta `paddle-packages`
-(~250-350 MB en total).
+> ⚠️ **`numpy==1.26.4` es obligatorio.** `paddlepaddle 2.6.2` se compiló contra
+> numpy 1.x (ABI `0x1000009`). Si el bundle trae numpy 2.x, PaddleOCR no importa y
+> el error es: `module compiled against ABI version 0x1000009 but this version of
+> numpy is 0x2000000`. Con `numpy==1.26.4` forzada en la descarga, el bundle
+> traerá el wheel 1.x correcto.
+
+Esto baja `paddlepaddle`, `paddleocr`, `numpy 1.26.4` y **todas** sus dependencias
+(pillow, shapely, pyclipper, lmdb, etc.) como wheels `.whl` en la carpeta
+`paddle-packages` (~250-350 MB en total).
 
 > Si pip no encuentra alguna dependencia binaria, agregá:
 > `--platform manylinux2014_x86_64 --python-version 3.10 --only-binary=:all:`
