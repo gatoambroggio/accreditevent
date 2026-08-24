@@ -24,7 +24,7 @@ const PM2_APP = process.env.PM2_APP_NAME || 'accreditevent';
 fs.mkdirSync(UPDATES_DIR, { recursive: true });
 fs.mkdirSync(BACKUPS_DIR, { recursive: true });
 
-export const updatesRouter = Router();
+export const updatesRouter = express.Router();
 updatesRouter.use(requireRole('superadmin'));
 
 function readState() {
