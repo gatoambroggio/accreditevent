@@ -188,8 +188,8 @@ export default function Pdf417Scanner({ onScanned }) {
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold text-slate-900">Reverso (PDF417)</h2>
-          <p className="text-xs text-slate-500">Escaneá el código PDF417 del <b>reverso</b> del DNI (no el frente). Ahí están los datos del titular.</p>
+          <h2 className="text-lg font-bold text-slate-900">Lector PDF417</h2>
+          <p className="text-xs text-slate-500">Escaneá el código de barras 2D (PDF417) del DNI y devolvé los datos del titular.</p>
         </div>
         {result ? (
           <button onClick={reset} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">
@@ -209,7 +209,7 @@ export default function Pdf417Scanner({ onScanned }) {
 
       <div className="mb-4 flex items-start gap-2 rounded-lg bg-sky-50 px-3 py-2.5 text-xs text-sky-800 ring-1 ring-sky-200">
         <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-        <span>El código PDF417 está en el <b>dorso (reverso)</b> del DNI, no en el frente. Si escaneás la cara con la foto, ningún lector va a encontrar el código.</span>
+        <span>Escaneá la cara del DNI que tenga el código de barras 2D (PDF417). Según la versión del DNI puede estar en el frente o en el dorso.</span>
       </div>
 
       {!result && tab === 'camera' && (
@@ -258,7 +258,7 @@ export default function Pdf417Scanner({ onScanned }) {
               <ImageIcon className="h-8 w-8" />
               <div className="text-center">
                 <p className="text-sm font-bold text-slate-700">Subir foto del DNI</p>
-                <p className="text-xs text-slate-400">JPG, PNG · Reverso del DNI (donde está el código de barras 2D)</p>
+                <p className="text-xs text-slate-400">JPG, PNG · La cara del DNI con el código de barras 2D (PDF417)</p>
               </div>
             </button>
           )}

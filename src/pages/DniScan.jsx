@@ -106,7 +106,7 @@ export default function DniScan() {
           Frente (OCR)
         </button>
         <button onClick={() => setMode('pdf417')} className={`rounded-lg px-4 py-2 text-sm font-bold transition ${mode === 'pdf417' ? 'bg-emerald-700 text-white shadow' : 'text-slate-600 hover:bg-slate-50'}`}>
-          Reverso (PDF417)
+          Lector PDF417
         </button>
       </div>
 
