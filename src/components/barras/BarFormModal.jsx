@@ -17,10 +17,6 @@ export default function BarFormModal({ bar, sectors = [], onClose, onSave }) {
             <label className="mb-1 block text-xs font-semibold text-slate-600">Nombre</label>
             <input value={b.name} onChange={(e) => setB({ ...b, name: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Barra principal" />
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-600">Ubicación</label>
-            <input value={b.location || ''} onChange={(e) => setB({ ...b, location: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Sector VIP, junto al escenario…" />
-          </div>
           {sectors.length > 0 && (
             <div>
               <label className="mb-1 block text-xs font-semibold text-slate-600">Sectores que atiende</label>

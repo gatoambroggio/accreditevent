@@ -86,7 +86,7 @@ export default function Barras() {
                 <span className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600"><Wine className="h-5 w-5" /></span>
                 <div className="flex-1">
                   <p className="font-bold text-slate-900">{b.name} {b.status === 'inactive' && <span className="ml-1 text-xs text-slate-400">(inactiva)</span>}</p>
-                  <p className="text-xs text-slate-500">{b.location || 'Sin ubicación'}</p>
+                  <p className="text-xs text-slate-500">{b.sectors?.length ? b.sectors.map((s) => s.label).join(' · ') : 'Sin sector'}</p>
                 </div>
                 <Link to={`/barras/${b.id}`} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-800">
                   <ExternalLink className="h-4 w-4" /> Abrir POS
