@@ -29,20 +29,30 @@ export default async function (req) {
       return Response.json({ error: 'No autorizado para eliminar esta persona' }, { status: 403 });
     }
 
-    // Get accreditation IDs for access log cleanup
-    const accreditations = await base44.asServiceRole.entities.Accreditation.filter(
-      { person_id },
-      '-created_date',
-      500
-    );
-    const accredIds = accreditations.map((a) => a.id);
+    // Get ALL accreditation IDs for access log cleanup (paginated to avoid
+    // leaving orphan AccessLog rows when a person has >500 accreditations).
+    const accredIds = [];
+    let skip = 0;
+    while (true) {
+      const batch = await base44.asServiceRole.entities.Accreditation.filter(
+        { person_id },
+        '-created_date',
+        500,
+        skip
+      );
+      accredIds.push(...batch.map((a) => a.id));
+      if (batch.length < 500) break;
+      skip += 500;
+      if (skip > 10000) break;
+    }
 
-    // Delete ALL related records in parallel
+    // Delete ALL related records in parallel (full cascade)
     await Promise.all([
       base44.asServiceRole.entities.Biometric.deleteMany({ person_id }),
       base44.asServiceRole.entities.Document.deleteMany({ person_id }),
       base44.asServiceRole.entities.Vehicle.deleteMany({ person_id }),
       base44.asServiceRole.entities.ZKTecoCommand.deleteMany({ person_id }),
+      base44.asServiceRole.entities.DahuaCommand.deleteMany({ person_id }),
       base44.asServiceRole.entities.Accreditation.deleteMany({ person_id }),
       base44.asServiceRole.entities.ProviderRequest.deleteMany({ person_id }),
       base44.asServiceRole.entities.AuditLog.deleteMany({ entity_id: person_id }),

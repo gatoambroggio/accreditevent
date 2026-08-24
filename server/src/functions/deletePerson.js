@@ -7,8 +7,15 @@ export async function deletePerson({ person_id }, { user, prisma }) {
   const allowed = ['superadmin', 'admin', 'coordinator'].includes(user.role) || (user.role === 'productora' && person.productora === userCompany) || (user.role === 'empresa' && person.company === userCompany);
   if (!allowed) throw Object.assign(new Error('No autorizado para eliminar esta persona'), { status: 403 });
 
-  const accreditations = await prisma.accreditation.findMany({ where: { person_id }, take: 500 });
-  const accredIds = accreditations.map((a) => a.id);
+  const accredIds = [];
+  let skip = 0;
+  while (true) {
+    const batch = await prisma.accreditation.findMany({ where: { person_id }, skip, take: 500 });
+    accredIds.push(...batch.map((a) => a.id));
+    if (batch.length < 500) break;
+    skip += 500;
+    if (skip > 10000) break;
+  }
   await Promise.all([
     prisma.biometric.deleteMany({ where: { person_id } }),
     prisma.document.deleteMany({ where: { person_id } }),

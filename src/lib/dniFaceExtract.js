@@ -53,11 +53,12 @@ export async function extractFaceFromDni(file, person, company) {
   const descriptor = Array.from(detection.descriptor);
 
   // SECURITY: Check face duplicate on a different person before saving
-  const dupCheck = await base44.functions.invoke('checkFaceDuplicate', {
+  const dupRes = await base44.functions.invoke('checkFaceDuplicate', {
     face_descriptor: descriptor,
     person_id: person.id,
   });
-  if (dupCheck.is_duplicate) {
+  const dupCheck = dupRes?.data ?? dupRes;
+  if (dupCheck?.is_duplicate) {
     throw new Error(`Este rostro ya está registrado para "${dupCheck.duplicates[0].person_name}". No se puede registrar la misma cara en dos personas distintas.`);
   }
 
@@ -70,6 +71,7 @@ export async function extractFaceFromDni(file, person, company) {
     person_id: person.id,
     person_name: person.full_name || '',
     company: company || person.company || person.productora || '',
+    event_id: person.event_id || (Array.isArray(person.event_ids) ? person.event_ids[0] : '') || '',
     face_photo_url: faceUrl,
     face_descriptor: descriptor,
     status: 'active',

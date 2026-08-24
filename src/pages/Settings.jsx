@@ -222,10 +222,11 @@ export default function Settings() {
     setCleanReport(null);
     try {
       const res = await base44.functions.invoke('cleanupDatabase', {});
-      if (res?.error) throw new Error(res.error);
-      setCleanReport(res?.report || res);
+      const data = res?.data ?? res;
+      if (data?.error) throw new Error(data.error);
+      setCleanReport(data?.report || data);
     } catch (err) {
-      setCleanError(err.message);
+      setCleanError(err?.data?.error || err?.error || err?.message || 'Error desconocido');
     } finally {
       setCleaning(false);
     }
@@ -647,7 +648,7 @@ export default function Settings() {
               <ShieldCheck className="h-4 w-4" /> Limpieza completada
             </div>
             <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-slate-700 sm:grid-cols-3">
-              {Object.entries(cleanReport).filter(([k]) => k !== 'errors').map(([k, v]) => (
+              {Object.entries(cleanReport).filter(([k, v]) => k !== 'errors' && v !== null && typeof v !== 'object').map(([k, v]) => (
                 <div key={k} className="flex justify-between border-b border-emerald-100/70 pb-1">
                   <span className="font-mono text-[10px] uppercase tracking-wide text-slate-500">{k.replace(/_/g, ' ')}</span>
                   <span className="font-bold text-slate-900">{v}</span>

@@ -16,7 +16,7 @@ export default async function(req) {
     const email = (body.email || '').toString().trim().toLowerCase();
     const newRole = (body.role || 'user').toString();
     const fullName = (body.full_name || '').toString().trim();
-    const company = (body.company || '').toString().trim();
+    const company = (body.company || '').toString().trim().toUpperCase();
     const assigned_event_ids = Array.isArray(body.assigned_event_ids) ? body.assigned_event_ids : [];
     let allowed_paths = Array.isArray(body.allowed_paths) ? body.allowed_paths : [];
     if (newRole === 'pda' && allowed_paths.length === 0) allowed_paths = PDA_DEFAULT_PATHS;
