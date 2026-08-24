@@ -72,12 +72,24 @@
     },
     "qr_code": {
       "type": "string",
-      "description": "C\u00f3digo QR \u00fanico de la entrada (para validar en puerta)"
+      "description": "C\u00f3digo est\u00e1tico de respaldo de la entrada (identificador \u00fanico)"
+    },
+    "qr_secret": {
+      "type": "string",
+      "description": "Secreto hex usado para generar el c\u00f3digo TOTP del QR din\u00e1mico (rota cada 30s)"
+    },
+    "stages_passed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Etapas de control ya validadas en puerta (values de validation_stages del TicketSale)"
     },
     "used_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Fecha/hora en que se us\u00f3 la entrada en puerta"
+      "description": "Fecha/hora en que se us\u00f3 la entrada en puerta (etapa final)"
     },
     "verified_by": {
       "type": "string",
