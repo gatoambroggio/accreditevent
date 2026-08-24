@@ -333,11 +333,6 @@ export default function BarPos() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {event?.bar_sectors?.length > 0 && (
-            <select value={sector} onChange={(e) => setSector(e.target.value)} className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-bold text-slate-700">
-              {event.bar_sectors.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </select>
-          )}
           <span className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-xs font-semibold ${cardAvailable ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
             <Cpu className="h-3 w-3" /> {cardAvailable ? `${devices.length} POS` : 'Sin POS'}
           </span>
@@ -356,6 +351,15 @@ export default function BarPos() {
 
       <div className="flex flex-1 overflow-hidden">
         <div className="flex flex-1 flex-col overflow-hidden">
+          {event?.bar_sectors?.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto border-b border-slate-200 bg-white px-5 py-2">
+              {event.bar_sectors.map((s) => (
+                <button key={s.value} onClick={() => setSector(s.value)} className={`whitespace-nowrap rounded-xl px-5 py-2.5 text-sm font-extrabold transition ${sector === s.value ? 'bg-indigo-600 text-white shadow' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          )}
           {categories.length > 2 && (
             <div className="flex gap-2 overflow-x-auto border-b border-slate-200 bg-white px-5 py-2">
               {categories.map((c) => (
