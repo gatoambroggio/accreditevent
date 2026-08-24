@@ -287,6 +287,7 @@ export default function Settings() {
         printer_personal: settings.printer_personal,
         printer_vehicular: settings.printer_vehicular,
         vision_ocr: settings.vision_ocr,
+        bar_email_template: settings.bar_email_template,
       });
       setSettings(updated);
       setSuccess(true);
@@ -456,6 +457,10 @@ export default function Settings() {
           <Printer className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
           <p>Si el agente no está corriendo o no configuraste las impresoras, al imprimir se abrirá el diálogo del navegador como fallback. En Windows el agente descarga SumatraPDF automáticamente la primera vez (requiere internet esa vez).</p>
         </div>
+      </Section>
+
+      <Section title="Operadores de barra" description="Plantilla de email para crear operadores que se loguean en la tablet sólo con usuario y contraseña. Usá {u} como placeholder del usuario; el sistema deriva el email real para cada operador (ej. barras+{u}@ipx.com.ar). La invitación llega al inbox compartido que administrás.">
+        <Field label="Plantilla de email de barras" value={settings.bar_email_template} onChange={(v) => update('bar_email_template', v)} placeholder="barras+{u}@ipx.com.ar" hint="Usá {u} donde va el usuario. Ej: barras+{u}@ipx.com.ar → barras+b1@ipx.com.ar" />
       </Section>
 
       <Section title="Fases de evento" description="Configurá las fases disponibles para los eventos (armado, show, desarme, etc.)">

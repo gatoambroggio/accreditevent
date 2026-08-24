@@ -10,18 +10,22 @@ export default function BarOperators() {
   const [bars, setBars] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null); // { editing } | null
+  const [template, setTemplate] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [opsRes, barList] = await Promise.all([
+      const [opsRes, barList, tplRes] = await Promise.all([
         base44.functions.invoke('manageBarOperator', { action: 'list' }),
         base44.entities.Bar.list('name', 500),
+        base44.functions.invoke('manageBarOperator', { action: 'getTemplate' }),
       ]);
       const opsData = opsRes?.data ?? opsRes;
       if (opsData?.error) throw new Error(opsData.error);
       setOperators(opsData.operators || []);
       setBars((barList || []).filter((b) => b.status === 'active'));
+      const tplData = tplRes?.data ?? tplRes;
+      setTemplate(tplData?.template || '');
     } catch (e) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     }
@@ -48,10 +52,15 @@ export default function BarOperators() {
       const body = res?.data ?? res;
       if (body?.error) throw new Error(body.error);
       if (body?.passwordWarning) toast({ title: 'Atención', description: body.passwordWarning, variant: 'destructive' });
+      if (body?.pending && body?.email) {
+        toast({ title: 'Invitación enviada', description: `Se envió la invitación a ${body.email}. Abrí ese email en el inbox compartido y completá el registro una vez; al hacerlo, el operador queda activo con su contraseña.`, duration: Infinity });
+      } else {
+        toast({ title: 'Operador guardado', description: `Usuario "${data.username}" creado.` });
+      }
     }
     setModal(null);
     await load();
-    toast({ title: 'Operador guardado', description: data.editing ? 'Los cambios se guardaron.' : `Usuario "${data.username}" creado.` });
+    if (data.editing) toast({ title: 'Operador guardado', description: 'Los cambios se guardaron.' });
   };
 
   const toggleBlock = async (op) => {
@@ -133,6 +142,7 @@ export default function BarOperators() {
           onSaved={save}
           bars={bars}
           editing={modal.editing}
+          template={template}
         />
       )}
     </div>

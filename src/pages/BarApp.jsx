@@ -4,15 +4,12 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { Loader2, Wine, LogOut, ArrowRight, AlertCircle } from 'lucide-react';
 
-// Dominio interno: el operador teclea sólo su usuario (ej. "barra1") y
-// /bar-app lo convierte en "barra1@barra.local" para loguear contra la plataforma.
-const BAR_DOMAIN = 'barra.local';
-
-const emailFromUser = (u) => {
-  const v = (u || '').trim().toLowerCase();
-  if (!v) return '';
-  if (v.includes('@')) return v;
-  return `${v}@${BAR_DOMAIN}`;
+// El operador teclea sólo su usuario libre (ej. "B1"); /bar-app lo convierte en
+// el email real usando la plantilla configurada en Configuración
+// (ej. "barras+{u}@ipx.com.ar" -> "barras+b1@ipx.com.ar") para loguear.
+const deriveEmail = (template, username) => {
+  const u = (username || '').trim().toLowerCase();
+  return (template || '').replace(/\{u\}/g, u);
 };
 
 export default function BarApp() {
@@ -26,12 +23,23 @@ export default function BarApp() {
   const [password, setPassword] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [template, setTemplate] = useState('');
 
   useEffect(() => {
     if (authChecked && !isAuthenticated) {
       // No forzamos redirect a /login: mostramos el login inline acá mismo.
     }
   }, [authChecked, isAuthenticated]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await base44.functions.invoke('manageBarOperator', { action: 'getTemplate' });
+        const data = res?.data ?? res;
+        setTemplate(data?.template || '');
+      } catch {}
+    })();
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -54,8 +62,19 @@ export default function BarApp() {
     e.preventDefault();
     setLoggingIn(true);
     setLoginError('');
+    if (!template || !template.includes('{u}')) {
+      setLoginError('El sistema no tiene configurado el email de barras. Pedí a un administrador que lo configure.');
+      setLoggingIn(false);
+      return;
+    }
+    const email = deriveEmail(template, username);
+    if (!email || !email.includes('@')) {
+      setLoginError('Ingresá tu usuario.');
+      setLoggingIn(false);
+      return;
+    }
     try {
-      await base44.auth.loginViaEmailPassword(emailFromUser(username), password);
+      await base44.auth.loginViaEmailPassword(email, password);
       // El hard redirect dispara AuthProvider y re-renderiza en sesión.
       window.location.href = '/bar-app';
     } catch (err) {

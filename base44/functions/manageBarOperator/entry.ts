@@ -1,24 +1,43 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 
-// Dominio interno usado para convertir el nombre de usuario libre (ej. "barra1")
-// en un email válido exigido por la plataforma: "barra1@barra.local". El operador
-// sólo teclea el usuario; el dominio se agrega automáticamente en /bar-app.
-const BAR_DOMAIN = 'barra.local';
-
 const ALLOWED_ROLES = ['superadmin', 'admin', 'productora'];
 
-function emailFromUsername(username) {
-  return `${username.toString().trim().toLowerCase()}@${BAR_DOMAIN}`;
+// Deriva el email real de un operador a partir de la plantilla configurada
+// en SystemSetting.bar_email_template (ej. "barras+{u}@ipx.com.ar" + "B1" ->
+// "barras+b1@ipx.com.ar"). {u} es el placeholder del usuario libre.
+function deriveEmail(template, username) {
+  const u = (username || '').toString().trim().toLowerCase();
+  return (template || '').toString().replace(/\{u\}/g, u);
 }
 
+// Extrae el usuario libre visible a partir del email real (best-effort).
+// Para plantillas con plus-addressing (barras+b1@...) devuelve "b1".
 function usernameFromEmail(email) {
   if (!email) return '';
-  return String(email).replace(new RegExp('@' + BAR_DOMAIN + '$', 'i'), '');
+  const local = String(email).split('@')[0] || '';
+  const plusIdx = local.indexOf('+');
+  return plusIdx >= 0 ? local.slice(plusIdx + 1) : local;
+}
+
+async function readBarTemplate(base44) {
+  const all = await base44.asServiceRole.entities.SystemSetting.list('-created_date', 1);
+  return (all && all[0] && all[0].bar_email_template) || '';
 }
 
 export default async function (req) {
   try {
     const base44 = createClientFromRequest(req);
+    const body = await req.json().catch(() => ({}));
+    const action = (body.action || 'list').toString();
+
+    // ---------- Public: getTemplate ----------
+    // Devuelve la plantilla de email de barras para que /bar-app pueda derivar
+    // el email de login del operador. No requiere auth (no expone secretos).
+    if (action === 'getTemplate') {
+      const template = await readBarTemplate(base44);
+      return Response.json({ ok: true, template: template || '' });
+    }
+
     const caller = await base44.auth.me();
     if (!caller) return Response.json({ error: 'No autenticado' }, { status: 401 });
     const role = caller.role || (caller.data && caller.data.role);
@@ -26,8 +45,6 @@ export default async function (req) {
       return Response.json({ error: 'No tenés permisos para gestionar operadores de barra' }, { status: 403 });
     }
     const myCompany = (caller.company || (caller.data && caller.data.company) || '').toString();
-    const body = await req.json().catch(() => ({}));
-    const action = (body.action || 'list').toString();
 
     const scopeOk = (company) => {
       if (role !== 'productora') return true;
@@ -55,7 +72,7 @@ export default async function (req) {
         id: u.id,
         full_name: u.full_name,
         email: u.email,
-        username: usernameFromEmail(u.email),
+        username: u.full_name || usernameFromEmail(u.email),
         company: u.company || (u.data && u.data.company) || '',
         blocked: !!u.blocked,
         bar_id: u.bar_id || (u.data && u.data.bar_id) || '',
@@ -83,8 +100,16 @@ export default async function (req) {
       if (password.length < 6) {
         return Response.json({ error: 'La contraseña debe tener al menos 6 caracteres' }, { status: 400 });
       }
-      if (!/^[a-z0-9._-]+$/i.test(username)) {
+      if (!/^[a-z0-9._+-]+$/i.test(username)) {
         return Response.json({ error: 'El usuario sólo puede tener letras, números, punto, guión o guión bajo' }, { status: 400 });
+      }
+      const template = await readBarTemplate(base44);
+      if (!template || template.indexOf('{u}') === -1) {
+        return Response.json({ error: 'Falta configurar la plantilla de email de barras en Configuración (usá {u} como placeholder del usuario).' }, { status: 400 });
+      }
+      const email = deriveEmail(template, username);
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+        return Response.json({ error: 'El email derivado no es válido: ' + email }, { status: 400 });
       }
       const resolved = await resolveBar(barId);
       if (!resolved) return Response.json({ error: 'Barra no encontrada' }, { status: 404 });
@@ -92,43 +117,78 @@ export default async function (req) {
       if (!scopeOk(company)) {
         return Response.json({ error: 'La barra no pertenece a tu empresa' }, { status: 403 });
       }
-      const email = emailFromUsername(username);
+
+      const assignedEventIds = bar.event_id ? [bar.event_id] : [];
+      const operatorCompany = company || (role === 'productora' ? myCompany : '');
+
+      // ¿Ya existe como usuario registrado? -> aplicar rol barra + barra asignada
+      // y setear la contraseña directamente (no necesita invitación).
       const existing = await base44.asServiceRole.entities.User.filter({ email });
       if (existing && existing.length) {
-        const exRole = existing[0].role || (existing[0].data && existing[0].data.role);
-        if (exRole && exRole !== 'barra' && exRole !== 'user') {
+        const ex = existing[0];
+        const exRole = ex.role || (ex.data && ex.data.role);
+        if (exRole && !['barra', 'user'].includes(exRole)) {
           return Response.json({ error: 'Ya existe un usuario con ese nombre y tiene otro rol' }, { status: 400 });
         }
+        const patch = {
+          role: 'barra',
+          full_name: username,
+          bar_id: barId,
+          bar_event_id: bar.event_id || '',
+          company: operatorCompany,
+          assigned_event_ids: assignedEventIds,
+        };
+        await base44.asServiceRole.entities.User.update(ex.id, patch);
+        let pwWarning = '';
+        try { await base44.auth.changePassword({ userId: ex.id, newPassword: password }); }
+        catch (e) { pwWarning = 'No se pudo setear la contraseña: ' + (e.message || e); }
+        return Response.json({ ok: true, existing: true, user: { id: ex.id, email, username }, passwordWarning: pwWarning });
       }
-      // Crear la cuenta (la plataforma sólo crea usuarios vía invitación). Ignoramos
-      // errores de envío de email: la cuenta se crea igual y seteamos la clave nosotros.
-      if (!existing || !existing.length) {
-        try { await base44.users.inviteUser(email, 'user'); }
-        catch (e) {
-          const msg = (e.message || '').toLowerCase();
-          if (!msg.includes('ya') && !msg.includes('exist') && !msg.includes('registrad') && !msg.includes('already')) {
-            // continuamos igual: la cuenta pudo haberse creado
-          }
-        }
-      }
-      const found = await base44.asServiceRole.entities.User.filter({ email });
-      if (!found || !found.length) {
-        return Response.json({ error: 'No se pudo crear la cuenta del operador' }, { status: 500 });
-      }
-      const target = found[0];
-      const patch = {
-        role: 'barra',
-        full_name: username,
+
+      // No existe: guardamos la asignación pendiente (con la contraseña a aplicar
+      // al confirmar) e invitamos al email compartido. El admin debe abrir esa
+      // invitación en el inbox compartido y completar el registro una vez; al
+      // registrarse, el workflow aplica rol barra + bar_id + contraseña.
+      const pendingData = {
+        email,
+        company: operatorCompany,
+        desired_role: 'barra',
+        assigned_event_ids: assignedEventIds,
+        allowed_paths: [],
+        invite_url: '',
+        status: 'pending',
         bar_id: barId,
         bar_event_id: bar.event_id || '',
-        company: company || (role === 'productora' ? myCompany : ''),
-        assigned_event_ids: bar.event_id ? [bar.event_id] : [],
+        bar_username: username,
+        bar_password: password,
       };
-      await base44.asServiceRole.entities.User.update(target.id, patch);
-      let pwWarning = '';
-      try { await base44.auth.changePassword({ userId: target.id, newPassword: password }); }
-      catch (e) { pwWarning = 'No se pudo setear la contraseña: ' + (e.message || e); }
-      return Response.json({ ok: true, user: { id: target.id, email, username }, passwordWarning: pwWarning });
+      const pendExisting = await base44.asServiceRole.entities.PendingOperator.filter({ email, status: 'pending' });
+      if (pendExisting && pendExisting.length) {
+        await base44.asServiceRole.entities.PendingOperator.update(pendExisting[0].id, pendingData);
+      } else {
+        await base44.asServiceRole.entities.PendingOperator.create(pendingData);
+      }
+
+      let inviteError = '';
+      try {
+        await base44.users.inviteUser(email, 'user');
+      } catch (e) {
+        const msg = (e.message || '').toLowerCase();
+        if (msg.includes('ya') || msg.includes('exist') || msg.includes('registrad') || msg.includes('already')) {
+          // ya invitado/registrado: no es bloqueante
+        } else {
+          inviteError = e.message || String(e);
+        }
+      }
+
+      return Response.json({
+        ok: true,
+        pending: true,
+        email,
+        username,
+        message: `Se envió la invitación a ${email}. Abrí ese email en el inbox compartido y completá el registro una vez; al hacerlo, el operador queda activo con su contraseña.`,
+        inviteError,
+      });
     }
 
     // ---------- UPDATE ----------

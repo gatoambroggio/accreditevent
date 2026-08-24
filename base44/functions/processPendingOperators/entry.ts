@@ -48,7 +48,24 @@ export default async function(req) {
 
     const patch = { role: desiredRole, assigned_event_ids: assignedEventIds, allowed_paths: allowedPaths };
     if (company) patch.company = company;
+    // Operador de barra: aplicar barra asignada + nombre de usuario libre.
+    const isBarra = desiredRole === 'barra' || !!(assignment.bar_id);
+    if (isBarra) {
+      if (assignment.bar_id) patch.bar_id = assignment.bar_id;
+      if (assignment.bar_event_id) patch.bar_event_id = assignment.bar_event_id;
+      if (assignment.bar_username) patch.full_name = assignment.bar_username;
+    }
     await base44.asServiceRole.entities.User.update(target.id, patch);
+
+    // Setear la contraseña inicial del operador de barra (self-service: el
+    // llamador es el propio usuario registrándose, caller.email === email).
+    // Si falla, el admin puede resetearla desde "Editar operador".
+    if (isBarra && assignment.bar_password) {
+      try {
+        await base44.auth.changePassword({ userId: target.id, newPassword: assignment.bar_password });
+        await base44.asServiceRole.entities.PendingOperator.update(assignment.id, { bar_password: '' });
+      } catch {}
+    }
 
     try {
       const comps = await base44.asServiceRole.entities.Company.filter({ name: company });
