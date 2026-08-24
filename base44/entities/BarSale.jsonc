@@ -53,6 +53,21 @@
       "default": 0,
       "description": "Total cobrado en la venta"
     },
+    "payment_method": {
+      "type": "string",
+      "enum": [
+        "cash",
+        "card",
+        "qr",
+        "demo"
+      ],
+      "default": "cash",
+      "description": "M\u00e9todo de pago: efectivo, tarjeta, QR (Mercado Pago) o demo"
+    },
+    "payment_id": {
+      "type": "string",
+      "description": "ID de pago de Mercado Pago (para pagos QR)"
+    },
     "status": {
       "type": "string",
       "enum": [
@@ -62,7 +77,7 @@
         "cancelled"
       ],
       "default": "paid",
-      "description": "Estado de la venta (modo demo: siempre paid al confirmar)"
+      "description": "Estado de la venta (QR inicia en pending hasta confirmaci\u00f3n del webhook)"
     }
   },
   "required": [

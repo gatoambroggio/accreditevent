@@ -30,20 +30,35 @@ export default async function (req) {
     if (!payRes.ok) return Response.json({ error: 'No se pudo obtener el pago de MP' }, { status: 502 });
     const pay = await payRes.json();
 
-    const ticketId = pay.external_reference;
-    if (!ticketId) return Response.json({ ok: true });
-
-    const ticket = await base44.asServiceRole.entities.Ticket.get(ticketId);
-    if (!ticket) return Response.json({ ok: true });
+    const refId = pay.external_reference;
+    if (!refId) return Response.json({ ok: true });
 
     const st = pay.status; // approved | rejected | cancelled | pending | in_process
+
+    // Primero probamos si es una venta de barra (BarSale).
+    const barSale = await base44.asServiceRole.entities.BarSale.get(refId).catch(() => null);
+    if (barSale) {
+      let newStatus = barSale.status;
+      if (st === 'approved') newStatus = 'paid';
+      else if (st === 'rejected' || st === 'cancelled') newStatus = 'cancelled';
+      else if (st === 'pending' || st === 'in_process') newStatus = 'pending';
+      if (newStatus !== barSale.status) {
+        await base44.asServiceRole.entities.BarSale.update(refId, { status: newStatus, payment_id: String(paymentId) });
+      }
+      return Response.json({ ok: true });
+    }
+
+    // Si no es BarSale, probamos como Ticket de entradas.
+    const ticket = await base44.asServiceRole.entities.Ticket.get(refId).catch(() => null);
+    if (!ticket) return Response.json({ ok: true });
+
     let newStatus = ticket.status;
     if (st === 'approved') newStatus = 'paid';
     else if (st === 'rejected' || st === 'cancelled') newStatus = 'cancelled';
     else if (st === 'pending' || st === 'in_process') newStatus = 'pending';
 
     if (newStatus !== ticket.status) {
-      await base44.asServiceRole.entities.Ticket.update(ticketId, { status: newStatus, payment_id: String(paymentId) });
+      await base44.asServiceRole.entities.Ticket.update(refId, { status: newStatus, payment_id: String(paymentId) });
       // Si se cancela/rechaza, liberar el stock reservado.
       if (newStatus === 'cancelled' && ticket.status !== 'cancelled') {
         const type = await base44.asServiceRole.entities.TicketType.get(ticket.ticket_type_id);
