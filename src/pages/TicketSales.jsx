@@ -25,7 +25,7 @@ export default function TicketSales() {
   const [loading, setLoading] = useState(true);
   const [savingSale, setSavingSale] = useState(false);
   const [editingType, setEditingType] = useState(null);
-  const [mpConfig, setMpConfig] = useState({ access_token: '', public_key: '', webhook_url: '', sandbox: false, back_url_base: '' });
+  const [mpConfig, setMpConfig] = useState({ access_token: '', public_key: '', webhook_url: '', sandbox: false, back_url_base: '', point: { endpoint: '', access_token: '', payment_mode: 'PASS_THROUGH' } });
   const [savingMp, setSavingMp] = useState(false);
   const [tickets, setTickets] = useState([]);
   const [statusFilter, setStatusFilter] = useState('all');
@@ -37,7 +37,7 @@ export default function TicketSales() {
         setEvents(evs);
         // MP config desde SystemSetting
         const s = await base44.entities.SystemSetting.list('-created_date', 1);
-        if (s[0]?.mercadopago) setMpConfig({ access_token: '', public_key: '', webhook_url: '', sandbox: false, back_url_base: '', ...(s[0].mercadopago || {}) });
+        if (s[0]?.mercadopago) setMpConfig({ access_token: '', public_key: '', webhook_url: '', sandbox: false, back_url_base: '', point: { endpoint: '', access_token: '', payment_mode: 'PASS_THROUGH' }, ...(s[0].mercadopago || {}), point: { endpoint: '', access_token: '', payment_mode: 'PASS_THROUGH', ...((s[0].mercadopago || {}).point || {}) } });
       } catch {}
       setLoading(false);
     })();
@@ -330,6 +330,23 @@ export default function TicketSales() {
                 <input type="checkbox" checked={!!mpConfig.demo_mode} onChange={(e) => setMpConfig({ ...mpConfig, demo_mode: e.target.checked })} className="h-4 w-4 accent-emerald-600" />
                 <span className="text-sm text-slate-700">Modo demo (sin Mercado Pago: confirma la entrada sin cobrar)</span>
               </label>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-bold text-slate-700">Mercado Pago Point (POS físico de barras)</p>
+                <p className="mt-0.5 text-[11px] text-slate-500">Point requiere un access token con scope de Point. Si lo dejás vacío, se usa el access token general. Las terminales se asignan por barra desde <b>Barras &gt; POS</b>.</p>
+                <div className="mt-2 space-y-2">
+                  <Field label="Access token Point (opcional)">
+                    <input type="password" value={mpConfig.point?.access_token || ''} onChange={(e) => setMpConfig({ ...mpConfig, point: { ...(mpConfig.point || {}), access_token: e.target.value } })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono" />
+                  </Field>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Field label="Endpoint Point">
+                      <input value={mpConfig.point?.endpoint || ''} onChange={(e) => setMpConfig({ ...mpConfig, point: { ...(mpConfig.point || {}), endpoint: e.target.value } })} placeholder="https://api.mercadopago.com" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono" />
+                    </Field>
+                    <Field label="Modo de pago">
+                      <input value={mpConfig.point?.payment_mode || ''} onChange={(e) => setMpConfig({ ...mpConfig, point: { ...(mpConfig.point || {}), payment_mode: e.target.value } })} placeholder="PASS_THROUGH" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono" />
+                    </Field>
+                  </div>
+                </div>
+              </div>
               <button onClick={saveMp} disabled={savingMp} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-50">
                 <Save className="h-4 w-4" /> {savingMp ? 'Guardando…' : 'Guardar credenciales'}
               </button>

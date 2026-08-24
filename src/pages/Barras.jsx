@@ -6,6 +6,8 @@ import { useToast } from '@/components/ui/use-toast';
 import PageHeader from '@/components/ui/page-header';
 import BarFormModal from '@/components/barras/BarFormModal';
 import ProductEditorModal from '@/components/barras/ProductEditorModal';
+import BarPosDevices from '@/components/barras/BarPosDevices';
+import { Cpu } from 'lucide-react';
 
 const fmtCur = (n) => `$${Number(n || 0).toLocaleString('es-AR')}`;
 
@@ -19,6 +21,7 @@ export default function Barras() {
   const [productModal, setProductModal] = useState(null);
   const [productsByBar, setProductsByBar] = useState({});
   const [expandedBar, setExpandedBar] = useState(null);
+  const [posBar, setPosBar] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -124,6 +127,9 @@ export default function Barras() {
                 <button onClick={() => toggleBar(b.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                   <UtensilsCrossed className="h-4 w-4" /> Menú
                 </button>
+                <button onClick={() => setPosBar(posBar === b.id ? null : b.id)} className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-semibold ${posBar === b.id ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}>
+                  <Cpu className="h-4 w-4" /> POS
+                </button>
                 <button onClick={() => setBarModal(b)} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"><Pencil className="h-4 w-4" /></button>
                 <button onClick={() => deleteBar(b)} className="grid h-9 w-9 place-items-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button>
               </div>
@@ -150,6 +156,11 @@ export default function Barras() {
                     ))}
                     {(!productsByBar[b.id] || productsByBar[b.id].length === 0) && <p className="text-sm text-slate-400">Sin productos.</p>}
                   </div>
+                </div>
+              )}
+              {posBar === b.id && (
+                <div className="border-t border-slate-100 p-4">
+                  <BarPosDevices bar={b} />
                 </div>
               )}
             </div>

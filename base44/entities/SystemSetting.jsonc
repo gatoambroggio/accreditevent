@@ -195,6 +195,56 @@
         }
       },
       "default": {}
+    },
+    "mercadopago": {
+      "type": "object",
+      "description": "Configuraci\u00f3n de Mercado Pago para entradas y barras. Incluye credenciales de Checkout (web/QR) y de Point (POS f\u00edsico).",
+      "properties": {
+        "access_token": {
+          "type": "string",
+          "description": "Access token de Mercado Pago (Checkout / QR)"
+        },
+        "public_key": {
+          "type": "string",
+          "description": "Public key de Mercado Pago"
+        },
+        "webhook_url": {
+          "type": "string",
+          "description": "URL de webhook para notificaciones de pago"
+        },
+        "sandbox": {
+          "type": "boolean",
+          "description": "Modo sandbox (pruebas)"
+        },
+        "demo_mode": {
+          "type": "boolean",
+          "description": "Modo demo: confirma ventas sin cobrar (sin MP)"
+        },
+        "back_url_base": {
+          "type": "string",
+          "description": "Base de back-urls para checkout web"
+        },
+        "point": {
+          "type": "object",
+          "description": "Configuraci\u00f3n espec\u00edfica de Mercado Pago Point (POS f\u00edsico). Point requiere un access token con scope de Point.",
+          "properties": {
+            "endpoint": {
+              "type": "string",
+              "description": "Endpoint base de la API de Point (default https://api.mercadopago.com)"
+            },
+            "access_token": {
+              "type": "string",
+              "description": "Access token con scope de Point (si est\u00e1 vac\u00edo, usa el access_token general)"
+            },
+            "payment_mode": {
+              "type": "string",
+              "description": "Modo de pago en terminal: PASS_THROUGH | POINT_DEFAULT (default PASS_THROUGH)"
+            }
+          },
+          "default": {}
+        }
+      },
+      "default": {}
     }
   },
   "required": [],

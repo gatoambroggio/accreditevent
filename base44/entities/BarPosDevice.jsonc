@@ -1,10 +1,18 @@
 {
-  "name": "BarSale",
+  "name": "BarPosDevice",
   "type": "object",
   "properties": {
+    "device_id": {
+      "type": "string",
+      "description": "ID de dispositivo de Mercado Pago Point (lo ves en el panel de MP)"
+    },
+    "alias": {
+      "type": "string",
+      "description": "Nombre amigable de la terminal (ej. Caja 1, Barra Principal)"
+    },
     "bar_id": {
       "type": "string",
-      "description": "Barra donde se registr\u00f3 la venta"
+      "description": "Barra a la que pertenece la terminal"
     },
     "bar_name": {
       "type": "string",
@@ -12,7 +20,7 @@
     },
     "event_id": {
       "type": "string",
-      "description": "Evento de la venta"
+      "description": "Evento de la barra (para RLS)"
     },
     "event_name": {
       "type": "string",
@@ -22,81 +30,25 @@
       "type": "string",
       "description": "Empresa productora (denormalizado para RLS)"
     },
-    "operator_name": {
-      "type": "string",
-      "description": "Operador que registr\u00f3 la venta en la tablet"
-    },
-    "items": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "price": {
-            "type": "number"
-          },
-          "qty": {
-            "type": "number"
-          },
-          "subtotal": {
-            "type": "number"
-          }
-        }
-      },
-      "default": [],
-      "description": "Items de la venta (productos, cantidades y subtotales)"
-    },
-    "total": {
-      "type": "number",
-      "default": 0,
-      "description": "Total cobrado en la venta"
-    },
-    "payment_method": {
-      "type": "string",
-      "enum": [
-        "cash",
-        "card",
-        "qr",
-        "demo"
-      ],
-      "default": "cash",
-      "description": "M\u00e9todo de pago: efectivo, tarjeta, QR (Mercado Pago) o demo"
-    },
-    "payment_id": {
-      "type": "string",
-      "description": "ID de pago de Mercado Pago (para pagos QR / webhook)"
-    },
-    "point_intent_id": {
-      "type": "string",
-      "description": "ID del payment-intent de Mercado Pago Point (cobro con tarjeta en terminal f\u00edsica)"
-    },
-    "point_device_id": {
-      "type": "string",
-      "description": "Device ID de la terminal Point usada (denormalizado para auditor\u00eda)"
-    },
-    "manual_confirm": {
-      "type": "boolean",
-      "default": false,
-      "description": "Indica si la venta fue confirmada manualmente por el operador (respaldo cuando la terminal Point no respondi\u00f3)"
-    },
     "status": {
       "type": "string",
       "enum": [
-        "paid",
-        "pending",
-        "refunded",
-        "cancelled"
+        "active",
+        "inactive"
       ],
-      "default": "paid",
-      "description": "Estado de la venta (QR/tarjeta inician en pending hasta confirmaci\u00f3n)"
+      "default": "active",
+      "description": "Estado de la terminal"
+    },
+    "last_used": {
+      "type": "string",
+      "format": "date-time",
+      "description": "\u00daltima vez que se us\u00f3 la terminal para un cobro"
     }
   },
   "required": [
-    "bar_id",
-    "event_id",
-    "total"
+    "device_id",
+    "alias",
+    "bar_id"
   ],
   "rls": {
     "read": {
@@ -163,21 +115,6 @@
         {
           "user_condition": {
             "role": "coordinator"
-          }
-        },
-        {
-          "user_condition": {
-            "role": "control"
-          }
-        },
-        {
-          "user_condition": {
-            "role": "pda"
-          }
-        },
-        {
-          "user_condition": {
-            "role": "operador"
           }
         },
         {
