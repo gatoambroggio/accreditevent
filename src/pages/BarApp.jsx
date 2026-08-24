@@ -91,7 +91,7 @@ export default function BarApp() {
             {online ? 'Online' : (<><WifiOff className="h-3 w-3" /> Offline</>)}
           </span>
         </div>
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleLogin} className="allow-lowercase space-y-4">
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold text-slate-300">Usuario</span>
             <input

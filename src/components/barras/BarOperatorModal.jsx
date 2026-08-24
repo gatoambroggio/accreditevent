@@ -82,7 +82,7 @@ export default function BarOperatorModal({ open, onClose, onSaved, bars, editing
           {editing ? 'Modificá la barra asignada, el bloqueo o la clave del operador.' : 'El operador se loguea en la tablet sólo con usuario y contraseña. No se envía ningún email.'}
         </p>
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+        <form onSubmit={handleSubmit} className="allow-lowercase mt-5 space-y-4">
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold text-slate-600">Usuario *</span>
             <input

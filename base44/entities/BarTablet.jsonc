@@ -1,0 +1,195 @@
+{
+  "name": "BarTablet",
+  "type": "object",
+  "properties": {
+    "device_id": {
+      "type": "string",
+      "description": "ID \u00fanico de la tablet generado en el navegador (UUID en localStorage). Identifica el dispositivo f\u00edsico."
+    },
+    "alias": {
+      "type": "string",
+      "description": "Nombre amigable de la tablet (auto-generado, editable)"
+    },
+    "bar_id": {
+      "type": "string",
+      "description": "Barra en la que est\u00e1 operando la tablet"
+    },
+    "bar_name": {
+      "type": "string",
+      "description": "Nombre de la barra (denormalizado)"
+    },
+    "event_id": {
+      "type": "string",
+      "description": "Evento de la barra (para RLS)"
+    },
+    "event_name": {
+      "type": "string",
+      "description": "Nombre del evento (denormalizado)"
+    },
+    "company": {
+      "type": "string",
+      "description": "Empresa productora (denormalizado para RLS)"
+    },
+    "operator_id": {
+      "type": "string",
+      "description": "Operador de barra logueado en la tablet"
+    },
+    "operator_name": {
+      "type": "string",
+      "description": "Nombre del operador (denormalizado)"
+    },
+    "last_seen": {
+      "type": "string",
+      "format": "date-time",
+      "description": "\u00daltimo heartbeat recibido de la tablet"
+    },
+    "battery_level": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Nivel de bater\u00eda reportado por la tablet (0-100). null si no est\u00e1 disponible."
+    },
+    "charging": {
+      "type": "boolean",
+      "default": false,
+      "description": "Indica si la tablet est\u00e1 conectada a la corriente"
+    },
+    "pending_sync": {
+      "type": "number",
+      "default": 0,
+      "description": "Ventas offline pendientes de sincronizar reportadas por la tablet"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "inactive"
+      ],
+      "default": "active",
+      "description": "Estado del registro de tablet"
+    }
+  },
+  "required": [
+    "device_id",
+    "bar_id"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        }
+      ]
+    }
+  }
+}

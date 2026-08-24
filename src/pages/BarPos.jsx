@@ -380,6 +380,39 @@ export default function BarPos() {
     return () => { clearInterval(t); window.removeEventListener('online', onOnline); };
   }, [barId]);
 
+  // Heartbeat de la tablet para monitoreo remoto (batería, online/offline).
+  useEffect(() => {
+    if (!barId) return;
+    const LS_DEV = 'ae_bar_device_id';
+    let deviceId = localStorage.getItem(LS_DEV);
+    if (!deviceId) {
+      deviceId = (crypto.randomUUID ? crypto.randomUUID() : 'dev-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+      localStorage.setItem(LS_DEV, deviceId);
+    }
+    let battery = null;
+    navigator.getBattery?.().then((b) => { battery = b; }).catch(() => {});
+    const beat = async () => {
+      if (!navigator.onLine) return;
+      let level = null, charging = false;
+      if (battery) { level = Math.round(battery.level * 100); charging = !!battery.charging; }
+      try {
+        await base44.functions.invoke('barTabletHeartbeat', {
+          action: 'heartbeat',
+          device_id: deviceId,
+          bar_id: barId,
+          operator_id: operatorId,
+          operator_name: operatorName,
+          battery_level: level,
+          charging,
+          pending_sync: pendingCount(barId),
+        });
+      } catch {}
+    };
+    beat();
+    const t = setInterval(beat, 30000);
+    return () => clearInterval(t);
+  }, [barId, operatorId, operatorName]);
+
   if (loading) return <div className="flex min-h-screen items-center justify-center bg-slate-50"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>;
   if (!bar) return <div className="flex min-h-screen items-center justify-center bg-slate-50"><p className="text-sm text-slate-500">Barra no encontrada. <Link to="/barras" className="font-bold text-emerald-700">Volver</Link></p></div>;
 

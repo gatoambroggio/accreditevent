@@ -8,6 +8,7 @@ import BarFormModal from '@/components/barras/BarFormModal';
 import BarPosDevices from '@/components/barras/BarPosDevices';
 import EventMenu from '@/components/barras/EventMenu';
 import BarOperators from '@/components/barras/BarOperators';
+import BarTablets from '@/components/barras/BarTablets';
 
 export default function Barras() {
   const { toast } = useToast();
@@ -55,10 +56,13 @@ export default function Barras() {
       <div className="mb-5 flex gap-1 rounded-xl border border-slate-200 bg-white p-1">
         <button onClick={() => setTab('barras')} className={`flex-1 rounded-lg px-4 py-2 text-sm font-bold transition ${tab === 'barras' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>Barras</button>
         <button onClick={() => setTab('operadores')} className={`flex-1 rounded-lg px-4 py-2 text-sm font-bold transition ${tab === 'operadores' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>Operadores</button>
+        <button onClick={() => setTab('tablets')} className={`flex-1 rounded-lg px-4 py-2 text-sm font-bold transition ${tab === 'tablets' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>Tablets</button>
       </div>
 
       {tab === 'operadores' ? (
         <BarOperators />
+      ) : tab === 'tablets' ? (
+        <BarTablets />
       ) : (
       <>
       <PageHeader kicker="Barras" title="Barras de bebida y comida">
