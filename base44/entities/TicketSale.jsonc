@@ -44,6 +44,35 @@
     "image_url": {
       "type": "string",
       "description": "Imagen/portada del evento para la tienda"
+    },
+    "validation_stages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "default": [
+        {
+          "value": "pre_ingreso",
+          "label": "Pre-ingreso"
+        },
+        {
+          "value": "ingreso",
+          "label": "Ingreso"
+        },
+        {
+          "value": "ingreso_vip",
+          "label": "Ingreso VIP"
+        }
+      ],
+      "description": "Etapas de control de acceso configurables (pre-ingreso, ingreso, ingreso VIP, etc.). Una entrada debe pasarlas en orden; la \u00faltima marca 'used'."
     }
   },
   "required": [
@@ -68,6 +97,16 @@
           }
         },
         {
+          "user_condition": {
+            "role": "control"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "pda"
+          }
+        },
+        {
           "$and": [
             {
               "user_condition": {
@@ -78,6 +117,11 @@
               "data.company": "{{user.data.company}}"
             }
           ]
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
         }
       ]
     },
