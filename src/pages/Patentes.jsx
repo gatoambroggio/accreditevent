@@ -43,7 +43,7 @@ export default function Patentes() {
           <PatenteScanner onPatente={buscar} />
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className={`rounded-2xl border-2 p-5 shadow-sm ${searched && patente && !searching ? (vehicles && vehicles.length > 0 ? 'border-emerald-400 bg-emerald-50' : 'border-red-400 bg-red-50') : 'border-slate-200 bg-white'}`}>
           <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-900">
             <Car className="h-4 w-4 text-emerald-600" /> Resultado
           </h2>
@@ -75,8 +75,8 @@ export default function Patentes() {
               </div>
 
               {searched && vehicles && vehicles.length === 0 && (
-                <div className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700 ring-1 ring-amber-200">
-                  No se encontró ningún vehículo acreditado ni pendiente con esa patente.
+                <div className="flex items-start gap-2 rounded-lg bg-red-100 px-4 py-3 text-sm font-semibold text-red-800 ring-1 ring-red-300">
+                  <XCircle className="mt-0.5 h-4 w-4 shrink-0" /> No se encontró ningún vehículo acreditado ni pendiente con esa patente.
                 </div>
               )}
 
