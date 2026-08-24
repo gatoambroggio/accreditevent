@@ -19,6 +19,7 @@ export async function afipIssue(body, { prisma: p }) {
       afip_cae: res.cae || null,
       afip_cae_vto: res.cae_vto || null,
       afip_cae_tipo: res.cae_tipo || null,
+      afip_pto_vta: res.pto_vta ?? null,
       afip_error: res.error || null,
     },
   }).catch(() => {});

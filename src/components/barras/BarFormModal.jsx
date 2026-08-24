@@ -8,6 +8,12 @@ export default function BarFormModal({ bar, sectors = [], onClose, onSave }) {
     setB({ ...b, sectors: has ? cur.filter((x) => x.value !== s.value) : [...cur, s] });
   };
   const isSel = (val) => (b.sectors || []).some((x) => x.value === val);
+  const setAfipField = (k, v) => {
+    const next = { ...(b.afip || {}) };
+    if (v === '' || v === undefined || v === null) delete next[k];
+    else next[k] = v;
+    setB({ ...b, afip: next });
+  };
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={onClose}>
       <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
@@ -31,6 +37,25 @@ export default function BarFormModal({ bar, sectors = [], onClose, onSave }) {
               {(b.sectors || []).length === 0 && <p className="mt-1 text-xs text-slate-400">Sin sectores elegidos · el POS usará precio base.</p>}
             </div>
           )}
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <p className="mb-1 text-xs font-bold text-slate-700">Facturación AFIP por barra</p>
+            <p className="mb-2 text-[11px] text-slate-400">Cada barra emite con su propio punto de venta (numeración independiente). El CUIT y certificado se heredan de la empresa productora.</p>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-semibold text-slate-600">Modo (override)</span>
+                <select value={b.afip?.modo_override || ''} onChange={(e) => setAfipField('modo_override', e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm">
+                  <option value="">Heredar de la empresa</option>
+                  <option value="production">Producción</option>
+                  <option value="sandbox">Pruebas</option>
+                  <option value="disabled">Desactivado</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-semibold text-slate-600">Punto de venta</span>
+                <input type="number" value={b.afip?.pto_vta ?? ''} onChange={(e) => setAfipField('pto_vta', e.target.value ? Number(e.target.value) : '')} placeholder="Ej. 1" className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm" />
+              </label>
+            </div>
+          </div>
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={b.status === 'active'} onChange={(e) => setB({ ...b, status: e.target.checked ? 'active' : 'inactive' })} className="h-4 w-4 accent-emerald-600" />
             <span className="text-sm text-slate-700">Barra activa</span>

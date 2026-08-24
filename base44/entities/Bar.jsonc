@@ -38,6 +38,26 @@
       "default": [],
       "description": "Sectores/ubicaciones que atiende la barra (ej. General, VIP). El POS usa un selector para cambiar los precios seg\u00fan el sector elegido."
     },
+    "afip": {
+      "type": "object",
+      "description": "Configuraci\u00f3n AFIP propia de la barra. El CUIT, certificado y raz\u00f3n social se heredan de la empresa productora (Company.afip); ac\u00e1 se define el punto de venta (numeraci\u00f3n independiente por barra) y un modo opcional que sobrescribe el modo default de la empresa.",
+      "properties": {
+        "modo_override": {
+          "type": "string",
+          "enum": [
+            "production",
+            "sandbox",
+            "disabled"
+          ],
+          "description": "Modo de facturaci\u00f3n que sobrescribe el default de la empresa. Si no se setea, la barra hereda el modo de la empresa productora."
+        },
+        "pto_vta": {
+          "type": "number",
+          "description": "Punto de venta AFIP propio de esta barra (numeraci\u00f3n independiente). Si no se setea, la venta queda sin facturar (afip_estado=none)."
+        }
+      },
+      "default": {}
+    },
     "status": {
       "type": "string",
       "enum": [

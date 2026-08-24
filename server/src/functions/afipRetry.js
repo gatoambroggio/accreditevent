@@ -12,10 +12,11 @@ async function persistResult(db, saleId, res) {
       afip_cae: res.cae || null,
       afip_cae_vto: res.cae_vto || null,
       afip_cae_tipo: res.cae_tipo || null,
+      afip_pto_vta: res.pto_vta ?? null,
       afip_error: res.error || null,
-    },
-  }).catch(() => {});
-}
+      },
+      }).catch(() => {});
+      }
 
 export async function afipRetry(body, { prisma: p } = {}) {
   const db = p || prisma;

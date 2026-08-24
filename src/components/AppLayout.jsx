@@ -40,6 +40,7 @@ import {
   Ticket,
   Wine,
   Receipt,
+  Wallet,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { applyTheme } from '@/lib/useTheme';
@@ -83,6 +84,7 @@ const NAV_ITEMS = [
   { path: '/control-entradas', label: 'Control de entradas', icon: ScanSearch, minLevel: 0 },
   { path: '/barras', label: 'Barras y bebida', icon: Wine, minLevel: 1 },
   { path: '/barras-reportes', label: 'Reportes de barras', icon: Receipt, minLevel: 1 },
+  { path: '/caja', label: 'Caja y retiros', icon: Wallet, minLevel: 1 },
   // Logística
   // Reportes y comunicación
   { path: '/reports', label: 'Reportes', icon: BarChart3, minLevel: 1 },

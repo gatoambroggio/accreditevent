@@ -1,3 +1,5 @@
+import { downloadXlsx } from './exportXlsx';
+
 export const fmtCur = (n) => `$${Number(n || 0).toLocaleString('es-AR')}`;
 
 export const PAY_LABELS = { cash: 'Efectivo', card: 'Tarjeta', qr: 'QR MP', demo: 'Demo' };
@@ -108,20 +110,31 @@ export function byCategory(paid, productCategoryMap) {
   return Object.values(m).sort((a, b) => b.revenue - a.revenue);
 }
 
-export function exportCsv(sales, eventId) {
-  const rows = [['Fecha', 'Hora', 'Barra', 'Operador', 'Método', 'Estado', 'Items', 'Unidades', 'Total']];
-  for (const s of sales) {
+export function exportSalesXlsx(sales, eventId) {
+  const movRows = sales.map((s) => {
     const d = new Date(s.created_date);
     const units = (s.items || []).reduce((u, it) => u + Number(it.qty || 0), 0);
-    rows.push([
-      d.toLocaleDateString('es-AR'),
-      d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
-      s.bar_name || '', s.operator_name || '',
-      PAY_LABELS[s.payment_method] || s.payment_method || '', s.status || '',
-      (s.items || []).length, units, s.total,
-    ]);
-  }
-  const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-  const a = document.createElement('a'); a.href = url; a.download = `reporte-barras-${eventId}.csv`; a.click(); URL.revokeObjectURL(url);
+    return {
+      Fecha: d.toLocaleDateString('es-AR'),
+      Hora: d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+      Barra: s.bar_name || '',
+      Operador: s.operator_name || '',
+      Método: PAY_LABELS[s.payment_method] || s.payment_method || '',
+      Estado: s.status || '',
+      Items: (s.items || []).length,
+      Unidades: units,
+      Total: Number(s.total || 0),
+      'AFIP': s.afip_estado || '',
+      CAE: s.afip_cae || '',
+    };
+  });
+  const total = sales.reduce((s, x) => s + Number(x.total || 0), 0);
+  const resumen = [
+    { Métrica: 'Tickets', Valor: sales.length },
+    { Métrica: 'Recaudación total', Valor: Number(total.toFixed(2)) },
+  ];
+  downloadXlsx(`reporte-barras-${eventId}.xlsx`, [
+    { name: 'Ventas', rows: movRows },
+    { name: 'Resumen', rows: resumen },
+  ]);
 }

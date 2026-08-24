@@ -119,12 +119,25 @@ function splitIva(total, alicuota) {
 // event.company). Devuelve { companyId, afip } o null si no hay empresa.
 async function resolveCompanyForSale(prisma, sale) {
   let companyName = sale.company;
+  let bar = null;
+  if (sale.bar_id) bar = await prisma.bar.findUnique({ where: { id: sale.bar_id } }).catch(() => null);
+  if (!companyName && bar?.company) companyName = bar.company;
   if (!companyName && sale.event_id) {
     const ev = await prisma.event.findUnique({ where: { id: sale.event_id } }).catch(() => null);
     companyName = ev?.company;
   }
   if (!companyName) return null;
-  return getCompanyAfipConfig(prisma, companyName);
+  const res = await getCompanyAfipConfig(prisma, companyName);
+  if (!res) return null;
+  // Merge: la empresa es la base (CUIT/cert/razon_social/modo default). La
+  // barra sobrescribe el modo (override) y define su propio pto_vta, para que
+  // cada barra emita con numeración independiente. Sin pto_vta en la barra, no
+  // se factura (afip_estado=none).
+  const cfg = { ...res.afip, pto_vta: 0 };
+  const barAfip = bar?.afip || {};
+  if (barAfip.modo_override) cfg.modo = barAfip.modo_override;
+  if (barAfip.pto_vta) cfg.pto_vta = Number(barAfip.pto_vta);
+  return { companyId: res.companyId, afip: cfg };
 }
 
 // Emite el CAE para una venta ya persistida (status=paid), bajo la empresa
@@ -134,10 +147,11 @@ export async function issueCaeForSale(prisma, sale) {
   const res = await resolveCompanyForSale(prisma, sale);
   if (!res) return { estado: 'none', error: 'La empresa productora no tiene AFIP configurado' };
   const { companyId, afip: cfg } = res;
-  if (cfg.modo === 'disabled') return { estado: 'none', error: 'Facturación AFIP deshabilitada para esta empresa' };
-  if (cfg.modo === 'sandbox') return { estado: 'sandbox', error: 'Modo pruebas (comprobante no fiscal, sin AFIP)' };
-  if (!cfg.cuit || !cfg.pto_vta) return { estado: 'pending', error: 'AFIP sin configurar (CUIT / punto de venta)' };
-  if (!(await afipReachable())) return { estado: 'pending', error: 'Sin conexión a afip.gob.ar' };
+  if (cfg.modo === 'disabled') return { estado: 'none', error: 'Facturación AFIP deshabilitada' };
+  if (cfg.modo === 'sandbox') return { estado: 'sandbox', pto_vta: cfg.pto_vta || null, error: 'Modo pruebas (comprobante no fiscal)' };
+  if (!cfg.cuit) return { estado: 'none', error: 'La empresa no tiene CUIT configurado' };
+  if (!cfg.pto_vta) return { estado: 'none', error: 'La barra no tiene punto de venta AFIP configurado' };
+  if (!(await afipReachable())) return { estado: 'pending', pto_vta: cfg.pto_vta, error: 'Sin conexión a afip.gob.ar' };
 
   let afip;
   try { afip = await getCompanyAfip(prisma, companyId, cfg); } catch (e) { return { estado: 'error', error: e.message }; }
@@ -176,6 +190,7 @@ export async function issueCaeForSale(prisma, sale) {
         cae: String(cae),
         cae_vto: String(r.CAEFchVto || r.CAEFchVencimiento || ''),
         cae_tipo: cbteTipo,
+        pto_vta: ptoVta,
       };
     } catch (e) {
       const msg = (e.message || String(e)).slice(0, 500);

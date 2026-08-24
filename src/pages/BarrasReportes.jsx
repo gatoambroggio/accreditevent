@@ -6,7 +6,7 @@ import BarStats from '@/components/barras/BarStatCard';
 import BarDateFilter from '@/components/barras/BarDateFilter';
 import BarCharts from '@/components/barras/BarCharts';
 import BarTables from '@/components/barras/BarTables';
-import { filterByRange, aggregateStats, byPaymentMethod, byBar as byBarAgg, hourlySales, topProducts, byOperator, byCategory, exportCsv } from '@/lib/barReports';
+import { filterByRange, aggregateStats, byPaymentMethod, byBar as byBarAgg, hourlySales, topProducts, byOperator, byCategory, exportSalesXlsx } from '@/lib/barReports';
 
 export default function BarrasReportes() {
   const [events, setEvents] = useState([]);
@@ -93,7 +93,7 @@ export default function BarrasReportes() {
             <option value="">Elegí un evento…</option>
             {events.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
-          {eventId && <button onClick={() => exportCsv(paid, eventId)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"><Download className="h-4 w-4" /> Exportar CSV</button>}
+          {eventId && <button onClick={() => exportSalesXlsx(paid, eventId)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"><Download className="h-4 w-4" /> Exportar Excel</button>}
         </div>
       </PageHeader>
 

@@ -656,6 +656,7 @@ model Bar {
   company       String?
   location      String?
   sectors       Json?    @default("[]")
+  afip          Json?
   status        String   @default("active")
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
@@ -724,6 +725,7 @@ model BarSale {
   afip_cae_tipo   Int?
   afip_estado     String   @default("pending") // pending | issued | error | sandbox | none
   afip_error      String?
+  afip_pto_vta    Int?
   status          String   @default("paid")
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt

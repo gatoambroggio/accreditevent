@@ -65,6 +65,7 @@ import Barras from '@/pages/Barras';
 import BarPos from '@/pages/BarPos';
 import BarApp from '@/pages/BarApp';
 import BarrasReportes from '@/pages/BarrasReportes';
+import Caja from '@/pages/Caja';
 
 const AUTH_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password', '/provider-register', '/registro-empresa'];
 // Rutas públicas sin login (tienda de entradas para compradores anónimos).
@@ -145,6 +146,7 @@ const AuthenticatedApp = () => {
         <Route path="/ticket-sales" element={<TicketSales />} />
         <Route path="/barras" element={<Barras />} />
         <Route path="/barras-reportes" element={<BarrasReportes />} />
+        <Route path="/caja" element={<Caja />} />
       </Route>
       <Route path="/entradas" element={<TicketStore />} />
       <Route path="/entradas/:eventId" element={<TicketEvent />} />
