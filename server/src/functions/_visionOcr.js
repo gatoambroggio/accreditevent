@@ -111,6 +111,13 @@ export async function visionExtract(filePath, { prompt, jsonSchema } = {}) {
     ? `${prompt}\n\nDevolvé EXACTAMENTE un JSON con estas claves: ${JSON.stringify(Object.keys(jsonSchema.properties))}.`
     : prompt;
 
+  // qwen3.6-27b (Groq) viene con modo thinking activo por defecto: razona antes
+  // de responder y se come los tokens del tope, dejando la respuesta (el JSON del
+  // DNI) vacía/truncada → readDni cae al PaddleOCR lento (cuelgue). Para Groq lo
+  // apagamos (reasoning_effort:none + reasoning_format:hidden), subimos el tope
+  // a 1024 y bajamos temperature a 0.7 (modo non-thinking recomendado por Groq).
+  // Solo para endpoints de Groq; OpenAI/Azure/Ollama quedan igual.
+  const isGroq = /groq\.com/i.test(cfg.baseUrl);
   const body = {
     model: cfg.model,
     messages: [
@@ -120,8 +127,9 @@ export async function visionExtract(filePath, { prompt, jsonSchema } = {}) {
         { type: 'image_url', image_url: { url: dataUrl } },
       ] },
     ],
-    max_completion_tokens: 400,
-    temperature: 1,
+    max_completion_tokens: isGroq ? 1024 : 400,
+    temperature: isGroq ? 0.7 : 1,
+    ...(isGroq ? { reasoning_effort: 'none', reasoning_format: 'hidden' } : {}),
   };
 
   // Timeout duro de 25s: si Ollama está trabado o el modelo es muy lento en CPU,
