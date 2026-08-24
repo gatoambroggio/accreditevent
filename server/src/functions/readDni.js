@@ -10,7 +10,16 @@
 import fs from 'node:fs';
 import { resolveLocalPath, runTesseract, preprocessForOcr } from './_ocr.js';
 import { visionExtract, visionAvailable } from './_visionOcr.js';
-import { paddleAvailable, paddleOcr } from './_paddleOcr.js';
+// PaddleOCR se importa de forma DINÁMICA: si el archivo falta o python no está
+// instalado, el servidor igual arranca y readDni cae a Visión/Tesseract. Nunca
+// un motor opcional debe poder tirar abajo el arranque del servidor.
+let _paddleMod = null; // null = sin probar | module | false = no disponible
+async function getPaddle() {
+  if (_paddleMod === false) return null;
+  if (_paddleMod) return _paddleMod;
+  try { _paddleMod = await import('./_paddleOcr.js'); return _paddleMod; }
+  catch (e) { console.warn('[readDni] PaddleOCR no disponible:', e.message); _paddleMod = false; return null; }
+}
 
 // ── Camino 1: LLM de visión ─────────────────────────────────────────────────
 async function readDniWithVision(filePath) {
@@ -38,8 +47,8 @@ Devolvé un JSON: {"apellido":"<APELLIDO>","nombre":"<NOMBRE>","dni":"<NNNNNNNN>
 // ── Camino 1b: PaddleOCR (OCR dedicado, preciso en CPU) ──────────────────────
 // Motor de OCR real (no VLM): lee lo impreso sin alucinar. Reutiliza la misma
 // heurística de extractFromText que Tesseract, así no duplica lógica de parsing.
-async function readDniWithPaddle(filePath) {
-  const lines = await paddleOcr(filePath);
+async function readDniWithPaddle(filePath, mod) {
+  const lines = await mod.paddleOcr(filePath);
   const text = lines.map((l) => l.text).join('\n');
   const r = extractFromText(text);
   r.raw_text = `[paddle] ${text.slice(0, 500)}`;
@@ -138,9 +147,11 @@ export async function readDni({ file_url } = {}) {
   const filePath = resolveLocalPath(file_url);
 
   // 1. PaddleOCR — motor de OCR dedicado (preciso en CPU, no alucina). Principal.
-  if (await paddleAvailable()) {
+  // Import dinámico: si el módulo no existe, getPaddle() devuelve null y seguimos.
+  const paddle = await getPaddle();
+  if (paddle && await paddle.paddleAvailable()) {
     try {
-      const r = await readDniWithPaddle(filePath);
+      const r = await readDniWithPaddle(filePath, paddle);
       if (r && (r.dni || r.nombre || r.apellido)) return r;
     } catch (e) {
       console.warn('[readDni] paddle falló, siguiente camino:', e.message);

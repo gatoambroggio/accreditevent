@@ -541,7 +541,7 @@ else
   done
   if [[ -n "$PADDLE_BUNDLE" ]]; then
     log "Instalando PaddleOCR desde bundle local: $PADDLE_BUNDLE"
-    if pip3 install --no-index --find-links="$PADDLE_BUNDLE" "paddlepaddle==2.6.1" "paddleocr==2.7.3" >/dev/null 2>&1; then
+    if pip3 install --no-index --find-links="$PADDLE_BUNDLE" "paddlepaddle==2.6.2" "paddleocr==2.7.3" >/dev/null 2>&1; then
       ok "PaddleOCR instalado desde bundle local"; PADDLE_OK=1
     else
       warn "Falló el bundle local — ver que tenga paddlepaddle + paddleocr + deps."
@@ -550,12 +550,12 @@ else
   # Estrategia 2: pip desde PyPI (requiere internet una sola vez)
   if [[ $PADDLE_OK -eq 0 ]]; then
     log "Instalando PaddleOCR desde PyPI (requiere internet)..."
-    if pip3 install "paddlepaddle==2.6.1" "paddleocr==2.7.3" >/dev/null 2>&1; then
+    if pip3 install "paddlepaddle==2.6.2" "paddleocr==2.7.3" >/dev/null 2>&1; then
       ok "PaddleOCR instalado desde PyPI"; PADDLE_OK=1
     else
       warn "No se pudo instalar PaddleOCR (sin internet ni bundle). OCR sigue con VLM/Tesseract."
       echo "    Air-gapped: en una PC con internet corré"
-      echo "    'pip3 download paddlepaddle==2.6.1 paddleocr==2.7.3 -d server/bin/paddle-packages'"
+      echo "    'pip3 download paddlepaddle==2.6.2 paddleocr==2.7.3 -d server/bin/paddle-packages'"
       echo "    copiá esa carpeta al servidor y volvé a correr: sudo bash server/install.sh"
     fi
   fi

@@ -1,6 +1,8 @@
 // Wrapper de PaddleOCR (Python). Motor de OCR DEDICADO: lee exactamente lo
 // impreso en el DNI, sin alucinar como los VLM (moondream). Corre en CPU.
 // readDni lo usa como camino principal; vision y Tesseract quedan de respaldo.
+// Se carga de forma DINÁMICA desde readDni.js, así que si este archivo o python
+// faltan, el servidor igual arranca y cae a los otros caminos.
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import path from 'node:path';
