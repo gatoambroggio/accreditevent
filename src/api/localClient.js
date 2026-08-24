@@ -60,6 +60,15 @@ const ENTITY_PATH = {
   Ticket: 'tickets',
   TicketType: 'ticket-types',
   TicketSale: 'ticket-sales',
+  // Barras (POS)
+  Bar: 'bars',
+  BarProduct: 'bar-products',
+  EventProduct: 'event-products',
+  BarSale: 'bar-sales',
+  BarOperator: 'bar-operators',
+  BarTablet: 'bar-tablets',
+  BarPosDevice: 'bar-pos-devices',
+  BarCashMovement: 'bar-cash-movements',
 };
 
 async function http(path, { method = 'GET', body, headers, raw } = {}) {

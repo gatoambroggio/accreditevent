@@ -114,6 +114,10 @@ const ENTITY_TO_MODEL = {
   ProviderRequest: 'providerRequest', RequirementItem: 'requirementItem',
   AuditLog: 'auditLog', PendingOperator: 'pendingOperator',
   Ticket: 'ticket', TicketType: 'ticketType', TicketSale: 'ticketSale',
+  // Barras (POS)
+  Bar: 'bar', BarProduct: 'barProduct', EventProduct: 'eventProduct',
+  BarSale: 'barSale', BarOperator: 'barOperator', BarTablet: 'barTablet',
+  BarPosDevice: 'barPosDevice', BarCashMovement: 'barCashMovement',
 };
 
 export function getModel(name) {

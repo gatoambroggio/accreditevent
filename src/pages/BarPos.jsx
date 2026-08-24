@@ -6,6 +6,7 @@ import { base44 } from '@/api/base44Client';
 import { getAgentPrinters, checkAgent } from '@/lib/printAgent';
 import { isOnline, loadCache, saveCache, pendingCount, enqueueSale, syncQueue } from '@/lib/barOffline';
 import BarReceipt from '@/components/barras/BarReceipt';
+import BarCashDrawer from '@/components/barras/BarCashDrawer';
 
 const fmtCur = (n) => `$${Number(n || 0).toLocaleString('es-AR')}`;
 const LS_PRINTER_KEY = 'ae_bar_printer';
@@ -43,6 +44,7 @@ export default function BarPos() {
   const [cardView, setCardView] = useState(null); // { sale_id, total, sale_items, opName, device_alias?, state, result, demo? }
   const [confirming, setConfirming] = useState(null);
   const [lastSale, setLastSale] = useState(null);
+  const [withdrawal, setWithdrawal] = useState(null);
   const [printers, setPrinters] = useState([]);
   const [printerName, setPrinterName] = useState(localStorage.getItem(LS_PRINTER_KEY) || '');
   const operatorSession = (() => { try { return JSON.parse(sessionStorage.getItem('ae_bar_active') || 'null'); } catch { return null; } })();
@@ -360,6 +362,12 @@ export default function BarPos() {
     }
   }, [lastSale, printerName]);
 
+  // Dispara la impresión del comprobante de retiro de efectivo.
+  useEffect(() => {
+    if (!withdrawal || !receiptRef.current) return;
+    receiptRef.current.printWithdrawal(printerName).catch(() => {});
+  }, [withdrawal, printerName]);
+
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
   // Online/offline indicator.
@@ -451,6 +459,7 @@ export default function BarPos() {
               <Printer className="h-3 w-3" /> Agente no detectado
             </span>
           )}
+          <BarCashDrawer barId={barId} operatorId={operatorId} operatorName={operatorName} onWithdrawPrint={(m) => setWithdrawal(m)} />
         </div>
       </header>
 
@@ -677,7 +686,7 @@ export default function BarPos() {
         </div>
       )}
 
-      <BarReceipt ref={receiptRef} sale={lastSale} bar={bar} event={{ name: bar.event_name }} />
+      <BarReceipt ref={receiptRef} sale={lastSale} withdrawal={withdrawal} bar={bar} event={{ name: bar.event_name }} />
     </div>
   );
 }

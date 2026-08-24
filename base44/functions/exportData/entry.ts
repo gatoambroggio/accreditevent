@@ -11,6 +11,11 @@ const ENTITIES = [
   'Document', 'DocumentType', 'AccessLevel', 'ParkingSector', 'PdaStation',
   'DahuaDevice', 'DahuaCommand', 'ZKTecoDevice', 'ZKTecoCommand', 'AccessLog',
   'CustomField', 'PendingOperator', 'AuditLog', 'RequirementItem', 'ProviderRequest',
+  // Barras (POS)
+  'Bar', 'BarProduct', 'EventProduct', 'BarSale', 'BarOperator', 'BarTablet', 'BarPosDevice',
+  'BarCashMovement',
+  // Ticketera
+  'TicketSale', 'TicketType', 'Ticket',
 ];
 
 async function fetchAll(base44, name) {

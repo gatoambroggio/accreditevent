@@ -1,0 +1,282 @@
+{
+  "name": "BarCashMovement",
+  "type": "object",
+  "properties": {
+    "bar_id": {
+      "type": "string",
+      "description": "Barra del movimiento de caja"
+    },
+    "bar_name": {
+      "type": "string",
+      "description": "Nombre de la barra (denormalizado)"
+    },
+    "event_id": {
+      "type": "string",
+      "description": "Evento de la barra (para RLS)"
+    },
+    "event_name": {
+      "type": "string",
+      "description": "Nombre del evento (denormalizado)"
+    },
+    "company": {
+      "type": "string",
+      "description": "Empresa productora (denormalizado para RLS)"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "open",
+        "withdraw",
+        "close"
+      ],
+      "default": "withdraw",
+      "description": "Tipo de movimiento: open (apertura de caja), withdraw (retiro de efectivo), close (cierre de caja)"
+    },
+    "amount": {
+      "type": "number",
+      "default": 0,
+      "description": "Monto del movimiento. Apertura: fondo inicial; Retiro: monto retirado; Cierre: efectivo contado."
+    },
+    "operator_id": {
+      "type": "string",
+      "description": "Operador que registro el movimiento"
+    },
+    "operator_name": {
+      "type": "string",
+      "description": "Nombre del operador (denormalizado)"
+    },
+    "responsible_name": {
+      "type": "string",
+      "description": "Nombre de quien retira el efectivo (para el comprobante de retiro)"
+    },
+    "responsible_dni": {
+      "type": "string",
+      "description": "DNI de quien retira el efectivo (para el comprobante de retiro)"
+    },
+    "note": {
+      "type": "string",
+      "description": "Motivo o aclaracion del movimiento"
+    },
+    "balance_after": {
+      "type": "number",
+      "description": "Saldo de caja estimado despues del movimiento"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "void"
+      ],
+      "default": "active",
+      "description": "Estado del movimiento (void = anulado)"
+    }
+  },
+  "required": [
+    "bar_id",
+    "event_id",
+    "type",
+    "amount"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "control"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "pda"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "barra"
+              }
+            },
+            {
+              "data.bar_id": "{{user.data.bar_id}}"
+            }
+          ]
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "control"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "pda"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "operador"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "barra"
+              }
+            },
+            {
+              "data.bar_id": "{{user.data.bar_id}}"
+            }
+          ]
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        },
+        {
+          "data.event_id": {
+            "$in": "{{user.data.assigned_event_ids}}"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "barra"
+              }
+            },
+            {
+              "data.bar_id": "{{user.data.bar_id}}"
+            }
+          ]
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

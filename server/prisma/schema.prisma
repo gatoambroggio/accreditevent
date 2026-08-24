@@ -180,6 +180,7 @@ model SystemSetting {
   enabled_modules Json? @default("{}")
   vision_ocr    Json?    @default("{}")  // {api_key, base_url, model} — OCR por LLM de visión
   mercadopago   Json?    @default("{}")  // {access_token, public_key, webhook_url, sandbox, back_url_base}
+  bar_email_template String?
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
 
@@ -210,6 +211,7 @@ model Event {
   pickup_lng        Float?
   assigned_user_ids String[] @default([])
   parking_capacities Json?  @default("{}")
+  bar_sectors        Json?  @default("[]")
   custom_fields      Json?  @default("{}")
   insurance_non_repetition_clauses String[] @default([])
   insurance_insured_amount Float?
@@ -581,10 +583,11 @@ model TicketSale {
   description   String?
   address       String?
   terms         String?
-  image_url     String?
-  created_by_id String?
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
+  image_url       String?
+  validation_stages Json?
+  created_by_id   String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
 
   @@index([event_id])
   @@map("ticket_sales")
@@ -628,6 +631,8 @@ model Ticket {
   status          String   @default("pending") // pending|paid|used|refunded|cancelled
   payment_id      String?
   qr_code         String   @unique
+  qr_secret       String?
+  stages_passed   String[] @default([])
   used_at         DateTime?
   verified_by     String?
   created_at      DateTime @default(now())
@@ -638,4 +643,172 @@ model Ticket {
   @@index([ticket_type_id])
   @@index([buyer_email])
   @@map("tickets")
+}
+
+// ─── Barras (POS de bebida/comida) ───
+model Bar {
+  id            String   @id @default(cuid())
+  name          String
+  event_id      String
+  event_name    String?
+  company       String?
+  location      String?
+  sectors       Json?    @default("[]")
+  status        String   @default("active")
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@index([event_id])
+  @@map("bars")
+}
+
+model BarProduct {
+  id            String   @id @default(cuid())
+  bar_id        String
+  bar_name      String?
+  event_id      String
+  event_name    String?
+  company       String?
+  name          String
+  category      String?
+  price         Float
+  sector_prices Json?    @default("{}")
+  sort_order    Int      @default(0)
+  status        String   @default("active")
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@index([bar_id])
+  @@index([event_id])
+  @@map("bar_products")
+}
+
+model EventProduct {
+  id            String   @id @default(cuid())
+  event_id      String
+  event_name    String?
+  company       String?
+  name          String
+  category      String?
+  price         Float
+  sector_prices Json?    @default("{}")
+  sort_order    Int      @default(0)
+  status        String   @default("active")
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@index([event_id])
+  @@map("event_products")
+}
+
+model BarSale {
+  id              String   @id @default(cuid())
+  bar_id          String
+  bar_name        String?
+  event_id        String
+  event_name      String?
+  company         String?
+  operator_name   String?
+  items           Json?    @default("[]")
+  total           Float    @default(0)
+  payment_method  String   @default("cash")
+  payment_id      String?
+  client_uuid     String?
+  point_intent_id String?
+  point_device_id String?
+  manual_confirm  Boolean  @default(false)
+  status          String   @default("paid")
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@index([bar_id])
+  @@index([event_id])
+  @@index([status])
+  @@map("bar_sales")
+}
+
+model BarOperator {
+  id            String   @id @default(cuid())
+  username      String   @unique
+  password_hash String
+  full_name     String?
+  bar_id        String
+  bar_name      String?
+  event_id      String?
+  event_name    String?
+  company       String?
+  blocked       Boolean  @default(false)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@index([bar_id])
+  @@map("bar_operators")
+}
+
+model BarTablet {
+  id            String   @id @default(cuid())
+  device_id     String
+  alias         String?
+  bar_id        String
+  bar_name      String?
+  event_id      String?
+  event_name    String?
+  company       String?
+  operator_id   String?
+  operator_name String?
+  last_seen     DateTime?
+  battery_level Int?
+  charging      Boolean  @default(false)
+  pending_sync  Int      @default(0)
+  status        String   @default("active")
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@index([device_id])
+  @@index([bar_id])
+  @@map("bar_tablets")
+}
+
+model BarPosDevice {
+  id         String   @id @default(cuid())
+  device_id  String
+  alias      String
+  bar_id     String
+  bar_name   String?
+  event_id   String?
+  event_name String?
+  company    String?
+  status     String   @default("active")
+  last_used  DateTime?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([bar_id])
+  @@map("bar_pos_devices")
+}
+
+// ─── Caja de barras (apertura / retiro / cierre) ───
+model BarCashMovement {
+  id               String   @id @default(cuid())
+  bar_id           String
+  bar_name         String?
+  event_id         String
+  event_name       String?
+  company          String?
+  type             String   @default("withdraw")
+  amount           Float    @default(0)
+  operator_id      String?
+  operator_name    String?
+  responsible_name String?
+  responsible_dni  String?
+  note             String?
+  balance_after    Float?
+  status           String   @default("active")
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  @@index([bar_id])
+  @@index([event_id])
+  @@index([type])
+  @@map("bar_cash_movements")
 }

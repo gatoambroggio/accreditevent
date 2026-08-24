@@ -265,6 +265,98 @@ export default async function (req) {
       return Response.json({ sale_id, status: sale.status, total: sale.total });
     }
 
+    // ---- Caja: estado actual (apertura / retiros / cierre) ----
+    if (action === 'get_cash_status') {
+      const { bar_id } = body;
+      if (!bar_id) return Response.json({ error: 'Falta bar_id' }, { status: 400 });
+      const [bar, movements, sales] = await Promise.all([
+        base44.asServiceRole.entities.Bar.get(bar_id).catch(() => null),
+        base44.asServiceRole.entities.BarCashMovement.filter({ bar_id }, '-created_date', 500).catch(() => []),
+        base44.asServiceRole.entities.BarSale.filter({ bar_id, payment_method: 'cash', status: 'paid' }, '-created_date', 500).catch(() => []),
+      ]);
+      if (!bar) return Response.json({ error: 'Barra no encontrada' }, { status: 404 });
+      const active = (movements || []).filter((m) => m.status !== 'void');
+      const openTotal = active.filter((m) => m.type === 'open').reduce((s, m) => s + Number(m.amount || 0), 0);
+      const withdrawTotal = active.filter((m) => m.type === 'withdraw').reduce((s, m) => s + Number(m.amount || 0), 0);
+      const cashSales = (sales || []).reduce((s, sa) => s + Number(sa.total || 0), 0);
+      const balance = openTotal - withdrawTotal + cashSales;
+      const sessionMoves = active
+        .filter((m) => m.type === 'open' || m.type === 'close')
+        .sort((a, b) => String(b.created_date || '').localeCompare(String(a.created_date || '')));
+      const sessionOpen = sessionMoves.length > 0 && sessionMoves[0].type === 'open';
+      return Response.json({
+        bar_id, balance, open_total: openTotal, withdraw_total: withdrawTotal, cash_sales_total: cashSales,
+        session_open: sessionOpen, last_session: sessionMoves[0] || null,
+        movements: (movements || []).slice(0, 50),
+      });
+    }
+
+    // ---- Caja: apertura ----
+    if (action === 'open_cash') {
+      const { bar_id, amount, operator_id, operator_name, note } = body;
+      if (!bar_id) return Response.json({ error: 'Falta bar_id' }, { status: 400 });
+      const amt = Number(amount || 0);
+      if (amt < 0) return Response.json({ error: 'Monto inválido' }, { status: 400 });
+      const bar = await base44.asServiceRole.entities.Bar.get(bar_id).catch(() => null);
+      if (!bar) return Response.json({ error: 'Barra no encontrada' }, { status: 404 });
+      const mov = await base44.asServiceRole.entities.BarCashMovement.create({
+        bar_id, bar_name: bar.name, event_id: bar.event_id, event_name: bar.event_name, company: bar.company,
+        type: 'open', amount: amt, operator_id: operator_id || '', operator_name: operator_name || 'Operador',
+        note: note || 'Apertura de caja', balance_after: amt, status: 'active',
+      });
+      return Response.json({ ok: true, movement: mov });
+    }
+
+    // ---- Caja: retiro de efectivo (imprime comprobante) ----
+    if (action === 'withdraw_cash') {
+      const { bar_id, amount, responsible_name, responsible_dni, note, operator_id, operator_name } = body;
+      if (!bar_id) return Response.json({ error: 'Falta bar_id' }, { status: 400 });
+      const amt = Number(amount || 0);
+      if (amt <= 0) return Response.json({ error: 'El monto del retiro debe ser mayor a 0' }, { status: 400 });
+      const bar = await base44.asServiceRole.entities.Bar.get(bar_id).catch(() => null);
+      if (!bar) return Response.json({ error: 'Barra no encontrada' }, { status: 404 });
+      const [movements, sales] = await Promise.all([
+        base44.asServiceRole.entities.BarCashMovement.filter({ bar_id }, '-created_date', 500).catch(() => []),
+        base44.asServiceRole.entities.BarSale.filter({ bar_id, payment_method: 'cash', status: 'paid' }, '-created_date', 500).catch(() => []),
+      ]);
+      const active = (movements || []).filter((m) => m.status !== 'void');
+      const openTotal = active.filter((m) => m.type === 'open').reduce((s, m) => s + Number(m.amount || 0), 0);
+      const withdrawTotal = active.filter((m) => m.type === 'withdraw').reduce((s, m) => s + Number(m.amount || 0), 0);
+      const cashSales = (sales || []).reduce((s, sa) => s + Number(sa.total || 0), 0);
+      const balanceAfter = openTotal - withdrawTotal + cashSales - amt;
+      const mov = await base44.asServiceRole.entities.BarCashMovement.create({
+        bar_id, bar_name: bar.name, event_id: bar.event_id, event_name: bar.event_name, company: bar.company,
+        type: 'withdraw', amount: amt, operator_id: operator_id || '', operator_name: operator_name || 'Operador',
+        responsible_name: responsible_name || '', responsible_dni: responsible_dni || '',
+        note: note || '', balance_after: balanceAfter, status: 'active',
+      });
+      return Response.json({ ok: true, movement: mov, balance_after: balanceAfter });
+    }
+
+    // ---- Caja: cierre ----
+    if (action === 'close_cash') {
+      const { bar_id, amount, note, operator_id, operator_name } = body;
+      if (!bar_id) return Response.json({ error: 'Falta bar_id' }, { status: 400 });
+      const counted = Number(amount || 0);
+      const bar = await base44.asServiceRole.entities.Bar.get(bar_id).catch(() => null);
+      if (!bar) return Response.json({ error: 'Barra no encontrada' }, { status: 404 });
+      const [movements, sales] = await Promise.all([
+        base44.asServiceRole.entities.BarCashMovement.filter({ bar_id }, '-created_date', 500).catch(() => []),
+        base44.asServiceRole.entities.BarSale.filter({ bar_id, payment_method: 'cash', status: 'paid' }, '-created_date', 500).catch(() => []),
+      ]);
+      const active = (movements || []).filter((m) => m.status !== 'void');
+      const openTotal = active.filter((m) => m.type === 'open').reduce((s, m) => s + Number(m.amount || 0), 0);
+      const withdrawTotal = active.filter((m) => m.type === 'withdraw').reduce((s, m) => s + Number(m.amount || 0), 0);
+      const cashSales = (sales || []).reduce((s, sa) => s + Number(sa.total || 0), 0);
+      const expected = openTotal - withdrawTotal + cashSales;
+      const mov = await base44.asServiceRole.entities.BarCashMovement.create({
+        bar_id, bar_name: bar.name, event_id: bar.event_id, event_name: bar.event_name, company: bar.company,
+        type: 'close', amount: counted, operator_id: operator_id || '', operator_name: operator_name || 'Operador',
+        note: note || 'Cierre de caja', balance_after: expected, status: 'active',
+      });
+      return Response.json({ ok: true, movement: mov, expected_balance: expected, counted, diff: counted - expected });
+    }
+
     return Response.json({ error: 'Acci\u00f3n inv\u00e1lida' }, { status: 400 });
   } catch (error) {
     return Response.json({ error: error.message || 'Error interno' }, { status: 500 });

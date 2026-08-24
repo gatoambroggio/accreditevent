@@ -91,6 +91,15 @@ export function createApp() {
   app.use('/api/tickets', requireAuth, makeCrudRouter('Ticket'));
   app.use('/api/ticket-types', requireAuth, makeCrudRouter('TicketType'));
   app.use('/api/ticket-sales', requireAuth, makeCrudRouter('TicketSale'));
+  // Barras (POS de bebida/comida): CRUD genérico con RLS.
+  app.use('/api/bars', requireAuth, makeCrudRouter('Bar'));
+  app.use('/api/bar-products', requireAuth, makeCrudRouter('BarProduct'));
+  app.use('/api/event-products', requireAuth, makeCrudRouter('EventProduct'));
+  app.use('/api/bar-sales', requireAuth, makeCrudRouter('BarSale'));
+  app.use('/api/bar-operators', requireAuth, makeCrudRouter('BarOperator'));
+  app.use('/api/bar-tablets', requireAuth, makeCrudRouter('BarTablet'));
+  app.use('/api/bar-pos-devices', requireAuth, makeCrudRouter('BarPosDevice'));
+  app.use('/api/bar-cash-movements', requireAuth, makeCrudRouter('BarCashMovement'));
   app.use('/api/tickets-stats', requireAuth, ticketsAdminRouter);
   app.use('/api/ticket-access', requireAuth, ticketAccessRouter);
 

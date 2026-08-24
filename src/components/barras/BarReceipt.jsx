@@ -32,7 +32,7 @@ function printFallback(title, bodyHtml) {
 
 // Imprime comanda (despachador) + comprobante (cliente) vía el Print Agent.
 // Si no hay agente o impresora, cae a window.print() con layout térmico.
-const BarReceipt = forwardRef(function BarReceipt({ sale, bar, event }, ref) {
+const BarReceipt = forwardRef(function BarReceipt({ sale, bar, event, withdrawal }, ref) {
   useImperativeHandle(ref, () => ({
     // Imprime comanda + comprobante de cliente.
     async printBoth(printerName) {
@@ -52,6 +52,15 @@ const BarReceipt = forwardRef(function BarReceipt({ sale, bar, event }, ref) {
       if (!comanda) return;
       if (!printerName) return; // sin impresora/agente: no abrimos ningún diálogo
       await printToAgent(comanda, printerName, 1).catch(() => false);
+    },
+
+    // Imprime el comprobante de retiro de efectivo (con espacio para firma y
+    // aclaración de DNI).
+    async printWithdrawal(printerName) {
+      const el = document.querySelector('.bar-print-retiro');
+      if (!el) return;
+      if (!printerName) return; // sin impresora/agente: no abrimos ningún diálogo
+      await printToAgent(el, printerName, 1).catch(() => false);
     },
   }));
 
@@ -117,6 +126,37 @@ const BarReceipt = forwardRef(function BarReceipt({ sale, bar, event }, ref) {
         <div style={{ borderTop: '2px solid #000', margin: '6px 0' }} />
         <div style={{ textAlign: 'center', fontSize: '9px' }}>¡Gracias por su compra!</div>
       </div>
+
+      {/* ===== COMPROBANTE DE RETIRO DE EFECTIVO ===== */}
+      {withdrawal && (
+        <div className="bar-print-retiro" style={{ width: '280px', padding: '8px', fontFamily: 'Courier New, monospace', color: '#000' }}>
+          <div style={{ textAlign: 'center', fontSize: '15px', fontWeight: 'bold', letterSpacing: '1px' }}>*** RETIRO DE EFECTIVO ***</div>
+          <div style={{ textAlign: 'center', fontSize: '12px', fontWeight: 'bold', marginTop: '4px' }}>{bar?.name || 'Barra'}</div>
+          {event && <div style={{ textAlign: 'center', fontSize: '10px' }}>{event.name}</div>}
+          <div style={{ borderTop: '2px solid #000', margin: '6px 0' }} />
+          <div style={{ fontSize: '11px' }}>{fmtDate(withdrawal.created_at || withdrawal.created_date || Date.now())}</div>
+          <div style={{ fontSize: '10px' }}>Op: {withdrawal.operator_name || 'Operador'}</div>
+          <div style={{ fontSize: '10px' }}>Mov #: {String(withdrawal.id || '').slice(-6).toUpperCase()}</div>
+          <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', fontWeight: 'bold' }}>
+            <span>MONTO RETIRADO</span>
+            <span>${Number(withdrawal.amount || 0).toLocaleString('es-AR')}</span>
+          </div>
+          {withdrawal.note ? <div style={{ fontSize: '10px', marginTop: '4px' }}>Motivo: {String(withdrawal.note).slice(0, 40)}</div> : null}
+          <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
+          <div style={{ fontSize: '11px' }}>Retira: {withdrawal.responsible_name || '____________________'}</div>
+          <div style={{ fontSize: '11px' }}>DNI: {withdrawal.responsible_dni || '____________________'}</div>
+          <div style={{ borderTop: '2px solid #000', margin: '12px 0' }} />
+          <div style={{ fontSize: '11px', marginBottom: '34px' }}>Firma:</div>
+          <div style={{ borderTop: '1px solid #000', marginBottom: '4px' }} />
+          <div style={{ fontSize: '9px' }}>Aclaración</div>
+          <div style={{ fontSize: '11px', marginTop: '24px', marginBottom: '34px' }}>Aclaración DNI:</div>
+          <div style={{ borderTop: '1px solid #000', marginBottom: '4px' }} />
+          <div style={{ fontSize: '9px' }}>DNI</div>
+          <div style={{ borderTop: '2px solid #000', margin: '8px 0' }} />
+          <div style={{ textAlign: 'center', fontSize: '9px' }}>Saldo en caja: ${Number(withdrawal.balance_after || 0).toLocaleString('es-AR')}</div>
+        </div>
+      )}
     </div>
   );
 });

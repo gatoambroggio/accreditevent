@@ -355,4 +355,112 @@ export const policies = {
     ] },
     delete: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }] },
   },
+
+  // ─── Barras (POS) ───
+  Bar: {
+    read: { $or: [
+      { user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } },
+      { user_condition: { role: 'control' } }, { user_condition: { role: 'pda' } },
+      { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] },
+      { 'data.event_id': { $in: '{{user.data.assigned_event_ids}}' } },
+      { $and: [{ user_condition: { role: 'barra' } }, { id: '{{user.data.bar_id}}' }] },
+    ] },
+    create: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }, { 'data.event_id': { $in: '{{user.data.assigned_event_ids}}' } }] },
+    update: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }, { 'data.event_id': { $in: '{{user.data.assigned_event_ids}}' } }, { $and: [{ user_condition: { role: 'barra' } }, { id: '{{user.data.bar_id}}' }] }] },
+    delete: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }] },
+  },
+  BarProduct: {
+    read: { $or: [
+      { user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } },
+      { user_condition: { role: 'control' } }, { user_condition: { role: 'pda' } },
+      { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] },
+      { 'data.event_id': { $in: '{{user.data.assigned_event_ids}}' } },
+    ] },
+    create: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }, { 'data.event_id': { $in: '{{user.data.assigned_event_ids}}' } }] },
+    update: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }, { 'data.event_id': { $in: '{{user.data.assigned_event_ids}}' } }] },
+    delete: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }, { 'data.event_id': { $in: '{{user.data.assigned_event_ids}}' } }] },
+  },
+  EventProduct: {
+    read: { $or: [
+      { user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } },
+      { user_condition: { role: 'control' } }, { user_condition: { role: 'pda' } },
+      { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] },
+      { 'data.event_id': { $in: '{{user.data.assigned_event_ids}}' } },
+      { $and: [{ user_condition: { role: 'barra' } }, { 'data.event_id': '{{user.data.bar_event_id}}' }] },
+    ] },
+    create: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }, { 'data.event_id': { $in: '{{user.data.assigned_event_ids}}' } }] },
+    update: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }, { 'data.event_id': { $in: '{{user.data.assigned_event_ids}}' } }] },
+    delete: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }] },
+  },
+  BarSale: {
+    read: { $or: [
+      { user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } },
+      { user_condition: { role: 'control' } }, { user_condition: { role: 'pda' } },
+      { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] },
+      { 'data.event_id': { $in: '{{user.data.assigned_event_ids}}' } },
+      { created_by_id: '{{user.id}}' },
+      { $and: [{ user_condition: { role: 'barra' } }, { 'data.bar_id': '{{user.data.bar_id}}' }] },
+    ] },
+    create: { $or: [
+      { user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } },
+      { user_condition: { role: 'control' } }, { user_condition: { role: 'pda' } }, { user_condition: { role: 'operador' } },
+      { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] },
+      { 'data.event_id': { $in: '{{user.data.assigned_event_ids}}' } },
+      { $and: [{ user_condition: { role: 'barra' } }, { 'data.bar_id': '{{user.data.bar_id}}' }] },
+    ] },
+    update: { $or: [
+      { user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } },
+      { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] },
+      { 'data.event_id': { $in: '{{user.data.assigned_event_ids}}' } },
+      { $and: [{ user_condition: { role: 'barra' } }, { 'data.bar_id': '{{user.data.bar_id}}' }] },
+    ]},
+    delete: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }] },
+  },
+  BarOperator: {
+    read: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }] },
+    create: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }] },
+    update: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }] },
+    delete: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }] },
+  },
+  BarTablet: {
+    read: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }, { 'data.event_id': { $in: '{{user.data.assigned_event_ids}}' } }] },
+    create: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }] },
+    update: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }] },
+    delete: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }] },
+  },
+  BarPosDevice: {
+    read: { $or: [
+      { user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } },
+      { user_condition: { role: 'control' } }, { user_condition: { role: 'pda' } },
+      { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] },
+      { 'data.event_id': { $in: '{{user.data.assigned_event_ids}}' } }, { created_by_id: '{{user.id}}' },
+      { $and: [{ user_condition: { role: 'barra' } }, { 'data.bar_id': '{{user.data.bar_id}}' }] },
+    ] },
+    create: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }, { 'data.event_id': { $in: '{{user.data.assigned_event_ids}}' } }] },
+    update: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }, { 'data.event_id': { $in: '{{user.data.assigned_event_ids}}' } }] },
+    delete: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }] },
+  },
+  BarCashMovement: {
+    read: { $or: [
+      { user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } },
+      { user_condition: { role: 'control' } }, { user_condition: { role: 'pda' } },
+      { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] },
+      { 'data.event_id': { $in: '{{user.data.assigned_event_ids}}' } },
+      { $and: [{ user_condition: { role: 'barra' } }, { 'data.bar_id': '{{user.data.bar_id}}' }] },
+    ] },
+    create: { $or: [
+      { user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } },
+      { user_condition: { role: 'control' } }, { user_condition: { role: 'pda' } }, { user_condition: { role: 'operador' } },
+      { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] },
+      { 'data.event_id': { $in: '{{user.data.assigned_event_ids}}' } },
+      { $and: [{ user_condition: { role: 'barra' } }, { 'data.bar_id': '{{user.data.bar_id}}' }] },
+    ] },
+    update: { $or: [
+      { user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } },
+      { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] },
+      { 'data.event_id': { $in: '{{user.data.assigned_event_ids}}' } },
+      { $and: [{ user_condition: { role: 'barra' } }, { 'data.bar_id': '{{user.data.bar_id}}' }] },
+    ]},
+    delete: { $or: [{ user_condition: { role: 'superadmin' } }, { user_condition: { role: 'admin' } }, { user_condition: { role: 'coordinator' } }, { $and: [{ user_condition: { role: 'productora' } }, { 'data.company': '{{user.data.company}}' }] }] },
+  },
 };

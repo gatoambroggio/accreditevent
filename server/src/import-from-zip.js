@@ -18,6 +18,11 @@ const ENTITY_ORDER = [
   'Document', 'DocumentType', 'AccessLevel', 'ParkingSector', 'PdaStation',
   'DahuaDevice', 'DahuaCommand', 'ZKTecoDevice', 'ZKTecoCommand', 'AccessLog',
   'CustomField', 'PendingOperator', 'AuditLog', 'RequirementItem', 'ProviderRequest',
+  // Barras (POS)
+  'Bar', 'BarProduct', 'EventProduct', 'BarSale', 'BarOperator', 'BarTablet', 'BarPosDevice',
+  'BarCashMovement',
+  // Ticketera
+  'TicketSale', 'TicketType', 'Ticket',
 ];
 
 const MODEL_KEY = {
@@ -32,6 +37,12 @@ const MODEL_KEY = {
   AccessLog: 'accessLog', CustomField: 'customField',
   PendingOperator: 'pendingOperator', AuditLog: 'auditLog',
   RequirementItem: 'requirementItem', ProviderRequest: 'providerRequest',
+  // Barras (POS)
+  Bar: 'bar', BarProduct: 'barProduct', EventProduct: 'eventProduct',
+  BarSale: 'barSale', BarOperator: 'barOperator', BarTablet: 'barTablet',
+  BarPosDevice: 'barPosDevice', BarCashMovement: 'barCashMovement',
+  // Ticketera
+  TicketSale: 'ticketSale', TicketType: 'ticketType', Ticket: 'ticket',
 };
 
 // Metadatos de campos por modelo desde el DMMF de Prisma (tipos + listas).
