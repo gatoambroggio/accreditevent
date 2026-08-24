@@ -120,7 +120,7 @@ ok "Nginx $(nginx -v 2>&1 | cut -d/ -f2)"
 
 # Tesseract del sistema (binario nativo, no tesseract.js que necesita WASM de
 # internet) + poppler-utils para rasterizar PDFs (pólizas/ART subidas en PDF).
-apt-get install -qq -y tesseract-ocr tesseract-ocr-spa poppler-utils graphicsmagick build-essential python3 >/dev/null 2>&1 || warn "Algunas libs opcionales no se instalaron"
+apt-get install -qq -y unzip imagemagick tesseract-ocr tesseract-ocr-spa poppler-utils graphicsmagick build-essential python3 >/dev/null 2>&1 || warn "Algunas libs opcionales no se instalaron"
 OCR_STATUS="no instalado"
 if has tesseract; then
   _tver="$(tesseract --version 2>/dev/null | head -1 | awk '{print $2}')"
@@ -387,7 +387,25 @@ else
   ok "Modelos de face-api.js presentes (${#MODELS[@]} archivos)"
 fi
 
-# ── 6b. Modelo de visión local (Ollama + minicpm-v) ──────────────────────────
+# ── 6b. NVIDIA GPU + driver (para Ollama con CUDA) ───────────────────────────
+# Ollama trae su propio runtime CUDA bundled, pero necesita el driver de NVIDIA
+# cargado en el kernel. Si hay GPU, le instalamos el driver y Ollama la usa solo
+# (calidad de nube, 2-6s por DNI). Si no hay GPU todavía, avisamos — Ollama igual
+# instala y el OCR cae a Tesseract; cuando pongas la NVIDIA y re-corras install.sh
+# la visión se activa sola.
+step "NVIDIA GPU (driver para visión con CUDA)"
+if has nvidia-smi && nvidia-smi >/dev/null 2>&1; then
+  _gpu="$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1)"
+  ok "GPU NVIDIA detectada: ${_gpu:-ok}. Ollama la usará con CUDA automáticamente."
+elif has lspci && lspci 2>/dev/null | grep -qiE 'nvidia|vga compatible|3d controller'; then
+  log "Placa NVIDIA detectada en lspci pero sin driver. Instalando nvidia-driver-535..."
+  apt-get install -qq -y nvidia-driver-535 >/dev/null 2>&1 || warn "No se pudo instalar nvidia-driver-535. Instalalo a mano y reiniciá el servidor."
+  warn "Reiniciá el servidor para que cargue el driver NVIDIA, luego volvé a correr: sudo bash server/install.sh"
+else
+  warn "No se detectó GPU NVIDIA. Ollama instalará igual pero correrá en CPU (~60s/DNI) — el OCR caerá a Tesseract. Para visión fluida, instalá una NVIDIA y re-ejecutá install.sh."
+fi
+
+# ── 6c. Modelo de visión local (Ollama + minicpm-v) ──────────────────────────
 # OCR por visión con calidad tipo nube, 100% local en el propio servidor
 # (air-gapped). Ollama expone un endpoint OpenAI-compatible en 127.0.0.1:11434
 # que readDni / readPatente ya saben usar (SystemSetting.vision_ocr). Si no se
@@ -584,7 +602,7 @@ server {
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
-        client_max_body_size 16m;
+        client_max_body_size 500m;
     }
 
     location /ws {
