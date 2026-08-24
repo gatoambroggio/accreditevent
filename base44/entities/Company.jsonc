@@ -32,6 +32,62 @@
       },
       "description": "M\u00f3dulos del men\u00fa permitidos para los operadores de esta productora",
       "default": []
+    },
+    "afip": {
+      "type": "object",
+      "description": "Facturaci\u00f3n electr\u00f3nica AFIP de esta empresa productora (wsfev1). Cada empresa emite sus propios comprobantes con su CUIT, certificado y punto de venta. El certificado y la clave viven en disco del servidor (no en la base).",
+      "properties": {
+        "modo": {
+          "type": "string",
+          "enum": [
+            "production",
+            "sandbox",
+            "disabled"
+          ],
+          "default": "disabled",
+          "description": "Modo de facturaci\u00f3n: production (emite CAE real), sandbox (comprobante no fiscal sin llamar a AFIP), disabled (sin facturaci\u00f3n)"
+        },
+        "cuit": {
+          "type": "string",
+          "description": "CUIT del emisor (s\u00f3lo d\u00edgitos)"
+        },
+        "razon_social": {
+          "type": "string",
+          "description": "Raz\u00f3n social del emisor (para el comprobante)"
+        },
+        "pto_vta": {
+          "type": "number",
+          "description": "Punto de venta electr\u00f3nico habilitado en AFIP"
+        },
+        "tipo_cbte": {
+          "type": "number",
+          "default": 6,
+          "description": "Tipo de comprobante: 6 = Factura B, 11 = Factura C, 1 = Factura A"
+        },
+        "cond_iva": {
+          "type": "string",
+          "default": "responsable_inscripto",
+          "description": "Condici\u00f3n frente al IVA del emisor"
+        },
+        "alicuota_iva": {
+          "type": "number",
+          "default": 0,
+          "description": "Al\u00edcuota IVA (%). 0 para no discriminar IVA (Factura B a consumidor final)"
+        },
+        "access_token": {
+          "type": "string",
+          "description": "Token AfipSDK (opcional, si no us\u00e1s certificado propio en disco)"
+        },
+        "cert_path": {
+          "type": "string",
+          "description": "Ruta absoluta del certificado (.pem) en disco del servidor"
+        },
+        "key_path": {
+          "type": "string",
+          "description": "Ruta absoluta de la clave (.pem) en disco del servidor"
+        }
+      },
+      "default": {}
     }
   },
   "required": [
@@ -87,6 +143,18 @@
           "user_condition": {
             "role": "admin"
           }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.name": "{{user.data.company}}"
+            }
+          ]
         }
       ]
     },
