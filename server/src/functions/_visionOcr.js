@@ -124,11 +124,11 @@ export async function visionExtract(filePath, { prompt, jsonSchema } = {}) {
     temperature: 1,
   };
 
-  // moondream en CPU responde en ~15-25s; con GPU en 2-4s. 90s da margen amplio
-  // para CPU lento sin colgar al operador. Nginx proxy_read_timeout está en 120s,
-  // así que el cliente no se corta antes que el fetch.
+  // Timeout duro de 25s: si Ollama está trabado o el modelo es muy lento en CPU,
+  // aborta y readDni cae a Tesseract en vez de colgar al operador en "Procesando".
+  // Con GPU moondream responde en 2-4s, así que 25s es margen suficiente.
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 90000);
+  const timer = setTimeout(() => controller.abort(), 25000);
   let res;
   try {
     res = await fetch(cfg.baseUrl, {
