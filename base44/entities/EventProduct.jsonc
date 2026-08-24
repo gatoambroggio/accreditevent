@@ -95,6 +95,18 @@
           "data.event_id": {
             "$in": "{{user.data.assigned_event_ids}}"
           }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "barra"
+              }
+            },
+            {
+              "data.event_id": "{{user.data.bar_event_id}}"
+            }
+          ]
         }
       ]
     },
@@ -198,11 +210,6 @@
               "data.company": "{{user.data.company}}"
             }
           ]
-        },
-        {
-          "data.event_id": {
-            "$in": "{{user.data.assigned_event_ids}}"
-          }
         }
       ]
     }
