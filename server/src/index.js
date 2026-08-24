@@ -16,6 +16,19 @@ async function main() {
     console.log(`[accreditevent] LAN base: ${env.lanBaseUrl}`);
   });
 
+  // Sincronización automática de CAE pendientes cada 15 minutos. En el servidor
+  // self-hosted (air-gapped) no corre el motor de workflows de Base44, así que lo
+  // disparamos acá. Sólo factura empresas en modo producción con salida a AFIP.
+  setInterval(async () => {
+    try {
+      const { afipSyncPending } = await import('./functions/afipSyncPending.js');
+      const r = await afipSyncPending({}, { prisma });
+      if (r && r.processed) console.log(`[afip-sync] procesadas: ${r.processed} · emitidas: ${r.issued ?? 0} · errores: ${r.errors ?? 0}`);
+    } catch (e) {
+      console.error('[afip-sync] error:', e.message);
+    }
+  }, 15 * 60 * 1000);
+
   const shutdown = async () => {
     console.log('[accreditevent] cerrando...');
     server.close();

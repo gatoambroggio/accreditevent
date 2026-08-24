@@ -5,14 +5,13 @@
 // Acciones: get_pos_data | create | create_card_intent | poll_intent | confirm |
 // status | get_cash_status | open_cash | withdraw_cash | close_cash
 
-import { issueCaeForSale, getAfipConfig, afipReachable } from './_afip.js';
+import { issueCaeForSale } from './_afip.js';
 
 // Intenta emitir el CAE de AFIP para una venta ya pagada y actualiza el registro.
-// No bloquea la venta ante fallos: si no hay config/internet, queda 'pending'.
+// Respeta el modo de la empresa productora (production/sandbox/disabled). No
+// bloquea la venta ante fallos: si no hay config/internet, queda 'pending'.
 async function settleAfip(prisma, sale) {
   try {
-    const cfg = await getAfipConfig();
-    if (!cfg.enabled) return { afip_estado: 'pending' };
     const res = await issueCaeForSale(prisma, sale);
     await prisma.barSale.update({
       where: { id: sale.id },

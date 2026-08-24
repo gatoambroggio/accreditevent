@@ -20,7 +20,7 @@
     },
     "company": {
       "type": "string",
-      "description": "Empresa productora (denormalizado para RLS)"
+      "description": "Empresa productora (denormalizado para RLS). Define qu\u00e9 configuraci\u00f3n AFIP se usa para facturar la venta."
     },
     "operator_name": {
       "type": "string",
@@ -102,10 +102,12 @@
       "enum": [
         "pending",
         "issued",
-        "error"
+        "error",
+        "sandbox",
+        "none"
       ],
       "default": "pending",
-      "description": "Estado de facturaci\u00f3n AFIP: pending (sin CAE, a la espera de internet/config), issued (CAE emitido), error (AFIP rechaz\u00f3)"
+      "description": "Estado de facturaci\u00f3n AFIP: pending (sin CAE, a la espera de internet/config), issued (CAE emitido), error (AFIP rechaz\u00f3), sandbox (modo pruebas, comprobante no fiscal sin AFIP), none (facturaci\u00f3n deshabilitada para esta empresa)"
     },
     "afip_error": {
       "type": "string",

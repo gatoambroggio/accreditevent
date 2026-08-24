@@ -1,0 +1,44 @@
+{
+  "name": "Sincronizar CAE Pendientes",
+  "description": "Factura en lote las ventas del POS de barras pendientes de CAE cada 15 minutos, agrupando por empresa productora en modo producci\u00f3n",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "*/15 * * * *",
+      "one_time_date": null,
+      "timezone": "America/Argentina/Buenos_Aires",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "sync_afip_pending",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "sync_cae": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "afipSyncPending"
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Sincronizar CAE pendientes",
+            "description": "Emite CAE en lote para ventas pendientes de empresas en modo producci\u00f3n"
+          }
+        }
+      }
+    ]
+  }
+}

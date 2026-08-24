@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../db/prisma.js';
 import { invalidateVisionCache, invalidateVisionReachability } from '../functions/_visionOcr.js';
-import { invalidateAfipCache, invalidateAfipReachability } from '../functions/_afip.js';
 
 export const settingsRouter = Router();
 
@@ -39,8 +38,6 @@ async function applyUpdate(id, data) {
   }
   invalidateVisionCache();
   invalidateVisionReachability();
-  invalidateAfipCache();
-  invalidateAfipReachability();
   return s;
 }
 

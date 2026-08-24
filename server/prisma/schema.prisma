@@ -63,6 +63,7 @@ model Company {
   logo_url             String?
   assigned_user_ids    String[] @default([])
   operator_allowed_paths String[] @default([])
+  afip               Json?    @default("{}")  // {modo, cuit, razon_social, pto_vta, tipo_cbte, cond_iva, alicuota_iva, access_token, cert_path, key_path}
   created_at           DateTime @default(now())
   updated_at           DateTime @updatedAt
 
@@ -721,7 +722,7 @@ model BarSale {
   afip_cae        String?
   afip_cae_vto    String?
   afip_cae_tipo   Int?
-  afip_estado     String   @default("pending") // pending | issued | error
+  afip_estado     String   @default("pending") // pending | issued | error | sandbox | none
   afip_error      String?
   status          String   @default("paid")
   created_at      DateTime @default(now())
