@@ -181,6 +181,7 @@ model SystemSetting {
   vision_ocr    Json?    @default("{}")  // {api_key, base_url, model} — OCR por LLM de visión
   mercadopago   Json?    @default("{}")  // {access_token, public_key, webhook_url, sandbox, back_url_base}
   bar_email_template String?
+  afip            Json?    @default("{}")  // {enabled, cuit, razon_social, pto_vta, tipo_cbte, cond_iva, alicuota_iva, access_token, cert_path, key_path}
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
 
@@ -717,6 +718,11 @@ model BarSale {
   point_intent_id String?
   point_device_id String?
   manual_confirm  Boolean  @default(false)
+  afip_cae        String?
+  afip_cae_vto    String?
+  afip_cae_tipo   Int?
+  afip_estado     String   @default("pending") // pending | issued | error
+  afip_error      String?
   status          String   @default("paid")
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
@@ -724,6 +730,7 @@ model BarSale {
   @@index([bar_id])
   @@index([event_id])
   @@index([status])
+  @@index([afip_estado])
   @@map("bar_sales")
 }
 

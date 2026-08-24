@@ -5,6 +5,31 @@
 // Acciones: get_pos_data | create | create_card_intent | poll_intent | confirm |
 // status | get_cash_status | open_cash | withdraw_cash | close_cash
 
+import { issueCaeForSale, getAfipConfig, afipReachable } from './_afip.js';
+
+// Intenta emitir el CAE de AFIP para una venta ya pagada y actualiza el registro.
+// No bloquea la venta ante fallos: si no hay config/internet, queda 'pending'.
+async function settleAfip(prisma, sale) {
+  try {
+    const cfg = await getAfipConfig();
+    if (!cfg.enabled) return { afip_estado: 'pending' };
+    const res = await issueCaeForSale(prisma, sale);
+    await prisma.barSale.update({
+      where: { id: sale.id },
+      data: {
+        afip_estado: res.estado,
+        afip_cae: res.cae || null,
+        afip_cae_vto: res.cae_vto || null,
+        afip_cae_tipo: res.cae_tipo || null,
+        afip_error: res.error || null,
+      },
+    }).catch(() => {});
+    return { afip_estado: res.estado, afip_cae: res.cae || null };
+  } catch {
+    return { afip_estado: 'pending' };
+  }
+}
+
 async function getMpConfig(prisma) {
   const s = await prisma.systemSetting.findFirst();
   return s?.mercadopago || {};
@@ -111,7 +136,8 @@ export async function barSale(body, { prisma }) {
 
     // Efectivo o demo: confirma al instante.
     const sale = await prisma.barSale.create({ data: saleData });
-    return { sale_id: sale.id, status: 'paid', total: calcTotal, demo: demoMode };
+    const afip = await settleAfip(prisma, sale);
+    return { sale_id: sale.id, status: 'paid', total: calcTotal, demo: demoMode, afip_estado: afip.afip_estado, afip_cae: afip.afip_cae };
   }
 
   // ---- Crear intent de Point (tarjeta física) ----
@@ -177,6 +203,10 @@ export async function barSale(body, { prisma }) {
     else if (state === 'process_denied' || state === 'canceled') { result = 'rejected'; saleStatus = 'cancelled'; }
     if (saleStatus !== sale.status) {
       await prisma.barSale.update({ where: { id: sale_id }, data: { status: saleStatus } });
+      if (saleStatus === 'paid') {
+        const fresh = await prisma.barSale.findUnique({ where: { id: sale_id } });
+        await settleAfip(prisma, fresh);
+      }
     }
     return { sale_id, state, result, status: saleStatus, payment: intent.payment || null };
   }
@@ -189,6 +219,8 @@ export async function barSale(body, { prisma }) {
     if (!sale) return { error: 'Venta no encontrada', status: 404 };
     if (sale.status !== 'paid') {
       await prisma.barSale.update({ where: { id: sale_id }, data: { status: 'paid', manual_confirm: sale.payment_method === 'card' } });
+      const fresh = await prisma.barSale.findUnique({ where: { id: sale_id } });
+      await settleAfip(prisma, fresh);
     }
     return { sale_id, status: 'paid' };
   }

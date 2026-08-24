@@ -78,7 +78,7 @@ export default function BarTables({ topProducts, byOperator, byCategory, sales }
       }>
         <div className="max-h-96 overflow-auto">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-white"><tr className="text-left text-xs uppercase text-slate-400"><th className="py-2 pr-3">Fecha</th><th className="py-2 pr-3">Barra</th><th className="py-2 pr-3">Operador</th><th className="py-2 pr-3">Pago</th><th className="py-2 pr-3">Unidades</th><th className="py-2 pr-3 text-right">Total</th><th className="py-2 pr-3">Estado</th></tr></thead>
+            <thead className="sticky top-0 bg-white"><tr className="text-left text-xs uppercase text-slate-400"><th className="py-2 pr-3">Fecha</th><th className="py-2 pr-3">Barra</th><th className="py-2 pr-3">Operador</th><th className="py-2 pr-3">Pago</th><th className="py-2 pr-3">Unidades</th><th className="py-2 pr-3 text-right">Total</th><th className="py-2 pr-3">Estado</th><th className="py-2 pr-3">AFIP</th></tr></thead>
             <tbody>
               {filtered.map((s) => {
                 const d = new Date(s.created_date);
@@ -92,10 +92,19 @@ export default function BarTables({ topProducts, byOperator, byCategory, sales }
                     <td className="py-2 pr-3 text-slate-600">{units}</td>
                     <td className="py-2 pr-3 text-right font-bold text-slate-900">{fmtCur(s.total)}</td>
                     <td className="py-2 pr-3"><span className={`text-xs font-semibold ${s.status === 'paid' ? 'text-emerald-600' : s.status === 'pending' ? 'text-amber-600' : 'text-slate-400'}`}>{s.status}</span></td>
+                    <td className="py-2 pr-3">
+                      {s.afip_estado === 'issued' ? (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700" title={`CAE ${s.afip_cae || ''}`}>CAE</span>
+                      ) : s.afip_estado === 'error' ? (
+                        <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700" title={s.afip_error || ''}>Error</span>
+                      ) : (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Pend.</span>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
-              {filtered.length === 0 && <tr><td colSpan={7} className="py-6 text-center text-slate-400">Sin ventas.</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={8} className="py-6 text-center text-slate-400">Sin ventas.</td></tr>}
             </tbody>
           </table>
         </div>

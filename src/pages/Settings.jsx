@@ -9,6 +9,7 @@ import { checkAgent, getAgentPrinters } from '@/lib/printAgent';
 import { downloadAgentScript } from '@/lib/printAgentFile';
 import PrinterSelect from '@/components/PrinterSelect';
 import SystemUpdate from '@/components/settings/SystemUpdate';
+import AfipConfig from '@/components/settings/AfipConfig';
 
 function Field({ label, value, onChange, type = 'text', placeholder = '', hint }) {
   return (
@@ -290,6 +291,7 @@ export default function Settings() {
         printer_vehicular: settings.printer_vehicular,
         vision_ocr: settings.vision_ocr,
         bar_email_template: settings.bar_email_template,
+        afip: settings.afip,
       });
       setSettings(updated);
       setSuccess(true);
@@ -557,6 +559,8 @@ export default function Settings() {
           <p>Cuando hay API key configurada, el escaneo de DNI y patentes usa el LLM de visión (máxima calidad, requiere internet hacia el endpoint). Sin key o sin conexión, cae a Tesseract local automáticamente — el sistema nunca deja de escanear.</p>
         </div>
       </Section>
+
+      <AfipConfig settings={settings} update={update} />
 
       <Section title="Módulos del sistema" description="Activá o desactivá módulos del sistema desde aquí">
         <div className="space-y-3">

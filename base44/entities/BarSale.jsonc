@@ -85,6 +85,32 @@
       "default": false,
       "description": "Indica si la venta fue confirmada manualmente por el operador (respaldo cuando la terminal Point no respondi\u00f3)"
     },
+    "afip_cae": {
+      "type": "string",
+      "description": "CAE emitido por AFIP (webservice wsfev1). Vac\u00edo si la venta a\u00fan no se factur\u00f3."
+    },
+    "afip_cae_vto": {
+      "type": "string",
+      "description": "Fecha de vencimiento del CAE (yyyymmdd)"
+    },
+    "afip_cae_tipo": {
+      "type": "number",
+      "description": "Tipo de comprobante AFIP del CAE (6=B, 11=C, 1=A)"
+    },
+    "afip_estado": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "issued",
+        "error"
+      ],
+      "default": "pending",
+      "description": "Estado de facturaci\u00f3n AFIP: pending (sin CAE, a la espera de internet/config), issued (CAE emitido), error (AFIP rechaz\u00f3)"
+    },
+    "afip_error": {
+      "type": "string",
+      "description": "Mensaje de error devuelto por AFIP cuando afip_estado=error"
+    },
     "status": {
       "type": "string",
       "enum": [

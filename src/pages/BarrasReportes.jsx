@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Loader2, Wine, Download } from 'lucide-react';
+import { Loader2, Wine, Download, RefreshCw } from 'lucide-react';
 import PageHeader from '@/components/ui/page-header';
 import BarStats from '@/components/barras/BarStatCard';
 import BarDateFilter from '@/components/barras/BarDateFilter';
@@ -16,6 +16,8 @@ export default function BarrasReportes() {
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState('all');
   const [method, setMethod] = useState('all');
+  const [afipSyncing, setAfipSyncing] = useState(false);
+  const [afipResult, setAfipResult] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -51,6 +53,29 @@ export default function BarrasReportes() {
   }, [sales, range, method]);
 
   const stats = useMemo(() => aggregateStats(paid), [paid]);
+
+  const afipCounts = useMemo(() => {
+    const c = { issued: 0, pending: 0, error: 0, none: 0 };
+    for (const s of paid) {
+      const e = s.afip_estado || 'none';
+      c[e] = (c[e] || 0) + 1;
+    }
+    return c;
+  }, [paid]);
+
+  const syncAfip = async () => {
+    setAfipSyncing(true);
+    setAfipResult(null);
+    try {
+      const res = await base44.functions.invoke('afipSyncPending', {});
+      setAfipResult(res?.data ?? res);
+      if (eventId) load(eventId);
+    } catch (e) {
+      setAfipResult({ error: e.message });
+    } finally {
+      setAfipSyncing(false);
+    }
+  };
   const data = useMemo(() => ({
     byBar: byBarAgg(paid),
     hourly: hourlySales(paid),
@@ -82,6 +107,21 @@ export default function BarrasReportes() {
         <div className="space-y-5">
           <BarDateFilter range={range} setRange={setRange} method={method} setMethod={setMethod} />
           <BarStats stats={stats} />
+          <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-slate-900">Facturación AFIP</span>
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">CAE {afipCounts.issued}</span>
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Pend. {afipCounts.pending + afipCounts.none}</span>
+              <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">Error {afipCounts.error}</span>
+            </div>
+            <button onClick={syncAfip} disabled={afipSyncing} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50">
+              {afipSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} Facturar pendientes en AFIP
+            </button>
+            {afipResult && !afipResult.error && (
+              <span className="text-xs font-semibold text-emerald-700">Procesadas: {afipResult.processed ?? 0} · Emitidas: {afipResult.issued ?? 0} · Errores: {afipResult.errors ?? 0}</span>
+            )}
+            {afipResult?.error && <span className="text-xs font-semibold text-red-600">{afipResult.error}</span>}
+          </div>
           <BarCharts byBar={data.byBar} hourly={data.hourly} byMethod={data.byMethod} />
           <BarTables topProducts={data.topProducts} byOperator={data.byOperator} byCategory={data.byCategory} sales={paid} />
         </div>

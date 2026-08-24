@@ -39,6 +39,9 @@ import { webauthnRegister } from '../functions/webauthnRegister.js';
 import { webauthnVerify } from '../functions/webauthnVerify.js';
 import { exportData } from '../functions/exportData.js';
 import { manageBarOperator } from '../functions/manageBarOperator.js';
+import { afipIssue } from '../functions/afipIssue.js';
+import { afipSyncPending } from '../functions/afipSyncPending.js';
+import { afipRetry } from '../functions/afipRetry.js';
 
 export const functionInvokeRouter = Router();
 
@@ -56,6 +59,7 @@ const handlers = {
   dahuaSyncUsers, dahuaRemoteAction, webauthnRegister, webauthnVerify,
   exportData,
   manageBarOperator,
+  afipIssue, afipSyncPending, afipRetry,
 };
 
 functionInvokeRouter.post('/:name', async (req, res, next) => {

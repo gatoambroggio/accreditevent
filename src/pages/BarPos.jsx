@@ -197,8 +197,12 @@ export default function BarPos() {
         payment_method: data.demo ? 'demo' : method,
         operator_name: opName,
         created_at: new Date().toISOString(),
+        afip_cae: data.afip_cae,
+        afip_cae_tipo: data.afip_cae_tipo,
+        afip_cae_vto: data.afip_cae_vto,
+        afip_estado: data.afip_estado,
       });
-      setConfirming({ total: data.total, method: data.demo ? 'demo' : method });
+      setConfirming({ total: data.total, method: data.demo ? 'demo' : method, afip_estado: data.afip_estado, afip_cae: data.afip_cae });
       setCart({});
     } catch (e) {
       alert('Error: ' + (e.message || 'No se pudo procesar la venta'));
@@ -683,6 +687,9 @@ export default function BarPos() {
           {confirming.method === 'cash' && <p className="mt-4 text-sm text-white/70">Efectivo · comanda impresa</p>}
           {confirming.method === 'card' && <p className="mt-4 text-sm text-white/70">Tarjeta · comanda impresa</p>}
           {confirming.method === 'qr' && <p className="mt-4 text-sm text-white/70">QR Mercado Pago · comanda impresa</p>}
+          {confirming.afip_estado === 'issued' && <p className="mt-2 text-xs font-bold text-white/90">CAE AFIP: {String(confirming.afip_cae || '').slice(0, 14)}</p>}
+          {confirming.afip_estado === 'pending' && <p className="mt-2 text-xs text-white/70">CAE pendiente (se factura al reconectar)</p>}
+          {confirming.afip_estado === 'error' && <p className="mt-2 text-xs text-white/70">CAE: error AFIP (revisar en reportes)</p>}
         </div>
       )}
 

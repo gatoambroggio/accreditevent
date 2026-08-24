@@ -17,6 +17,7 @@ import { functionInvokeRouter } from './routes/functions.js';
 import { barFunctionsRouter } from './routes/barFunctions.js';
 import { updatesRouter } from './routes/updates.js';
 import { settingsRouter } from './routes/settings.js';
+import { afipRouter } from './routes/afip.js';
 import { downloadsRouter } from './routes/downloads.js';
 import { importRouter } from './routes/import.js';
 import { usersRouter } from './routes/users.js';
@@ -61,6 +62,7 @@ export function createApp() {
   app.use('/api/patentes', requireAuth, patentesRouter);
   app.use('/api/functions', requireAuth, functionInvokeRouter);
   app.use('/api/settings', requireAuth, settingsRouter);
+  app.use('/api/afip', requireAuth, afipRouter);
   app.use('/api/import', requireAuth, importRouter);
   app.use('/api/updates', requireAuth, updatesRouter);
 

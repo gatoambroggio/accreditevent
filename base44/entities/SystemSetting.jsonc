@@ -121,7 +121,7 @@
           }
         }
       },
-      "description": "Puertas / puntos de control de acceso configurables"
+      "description": "Puertas / Puntos de control de acceso configurables"
     },
     "event_phases": {
       "type": "array",
@@ -250,6 +250,57 @@
       "type": "string",
       "description": "Plantilla de email para crear operadores de barra con usuario libre. Us\u00e1 {u} como placeholder del usuario (ej. barras+{u}@ipx.com.ar). El operador se loguea en la tablet s\u00f3lo con su usuario; el sistema deriva el email real con esta plantilla.",
       "default": ""
+    },
+    "afip": {
+      "type": "object",
+      "description": "Configuraci\u00f3n de facturaci\u00f3n electr\u00f3nica AFIP (webservice wsfev1). Las ventas del POS de barras emiten un CAE en tiempo real si el servidor tiene salida a afip.gob.ar; si no hay internet, la venta se entrega sin CAE y queda pendiente para facturar en lote al recuperar conexi\u00f3n. El certificado y la clave viven en disco del servidor (no en la base).",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Habilita la emisi\u00f3n de CAE en las ventas del POS"
+        },
+        "cuit": {
+          "type": "string",
+          "description": "CUIT del responsable emisor (s\u00f3lo d\u00edgitos)"
+        },
+        "razon_social": {
+          "type": "string",
+          "description": "Raz\u00f3n social del emisor (para el comprobante)"
+        },
+        "pto_vta": {
+          "type": "number",
+          "description": "Punto de venta electr\u00f3nico habilitado en AFIP (ej. 1)"
+        },
+        "tipo_cbte": {
+          "type": "number",
+          "default": 6,
+          "description": "Tipo de comprobante: 6 = Factura B, 11 = Factura C, 1 = Factura A"
+        },
+        "cond_iva": {
+          "type": "string",
+          "default": "responsable_inscripto",
+          "description": "Condici\u00f3n frente al IVA del emisor"
+        },
+        "alicuota_iva": {
+          "type": "number",
+          "default": 21,
+          "description": "Al\u00edcuota de IVA (porcentaje). 0 para no discriminar IVA (Factura B a consumidor final)."
+        },
+        "access_token": {
+          "type": "string",
+          "description": "Token de la plataforma AfipSDK (app.afipsdk.com). Opcional si us\u00e1s certificado propio en disco."
+        },
+        "cert_path": {
+          "type": "string",
+          "description": "Ruta absoluta del certificado (.pem) en disco del servidor"
+        },
+        "key_path": {
+          "type": "string",
+          "description": "Ruta absoluta de la clave (.pem) en disco del servidor"
+        }
+      },
+      "default": {}
     }
   },
   "required": [],
