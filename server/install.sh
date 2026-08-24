@@ -588,6 +588,33 @@ else
   fi
 fi
 
+# ── 6e. zxing-cpp (decodificación PDF417 del DNI) ─────────────────────────────
+# zxing-cpp (motor C++) es significativamente más potente que zbar para leer
+# PDF417 en fotos borrosas/inclinadas/baja luz. Es el motor principal de
+# readDniPdf417 (zbarimg queda como respaldo). Requiere opencv (ya instalado
+# con PaddleOCR) + zxing-cpp vía pip.
+step "zxing-cpp (decodificador PDF417 del DNI)"
+if ! has python3; then
+  warn "python3 no disponible — zxing-cpp salteado. PDF417 usará zbarimg (respaldo)."
+else
+  ZXING_OK=0
+  if python3 -c "import zxingcpp" 2>/dev/null; then
+    ok "zxing-cpp ya instalado"; ZXING_OK=1
+  else
+    log "Instalando zxing-cpp desde PyPI (requiere internet)..."
+    if pip3 install zxing-cpp >/dev/null 2>&1; then
+      ok "zxing-cpp instalado desde PyPI"; ZXING_OK=1
+    else
+      warn "No se pudo instalar zxing-cpp (sin internet). PDF417 usará zbarimg (respaldo)."
+      echo "    Air-gapped: en una PC con internet corré 'pip3 download zxing-cpp -d server/bin/paddle-packages'"
+      echo "    copialo al servidor y volvé a correr: sudo bash server/install.sh"
+    fi
+  fi
+  if [[ $ZXING_OK -eq 1 ]] && python3 -c "import zxingcpp" 2>/dev/null; then
+    ok "zxing-cpp funcional"
+  fi
+fi
+
 # ── 7. systemd ────────────────────────────────────────────────────────────────
 step "Servicio systemd"
 cat > /etc/systemd/system/accreditevent.service <<EOF

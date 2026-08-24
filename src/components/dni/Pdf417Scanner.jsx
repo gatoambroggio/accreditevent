@@ -65,17 +65,33 @@ export default function Pdf417Scanner({ onScanned }) {
   };
   const decodeWithZxing = async (bitmap) => {
     const reader = getZxing();
-    const tryCanvas = async (scale) => {
+    const makeCanvas = (scale, binarize) => {
       const canvas = document.createElement('canvas');
       canvas.width = Math.max(1, Math.round(bitmap.width * scale));
       canvas.height = Math.max(1, Math.round(bitmap.height * scale));
       const ctx = canvas.getContext('2d');
       ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-      const r = await reader.decodeFromCanvasElement(canvas);
-      return r?.getText() || null;
+      // Binariza a B/N puro (threshold 50%) — replica el `convert -threshold 50%`
+      // del pipeline probado, ayuda a ZXing con fotos de bajo contraste.
+      if (binarize) {
+        const id = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const d = id.data;
+        for (let i = 0; i < d.length; i += 4) {
+          const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+          const v = g < 128 ? 0 : 255;
+          d[i] = d[i + 1] = d[i + 2] = v;
+        }
+        ctx.putImageData(id, 0, 0);
+      }
+      return canvas;
     };
-    try { const t = await tryCanvas(1); if (t) return t; } catch {}
-    try { const t = await tryCanvas(2); if (t) return t; } catch {}
+    const tryDecode = async (scale, binarize) => {
+      try { const r = await reader.decodeFromCanvasElement(makeCanvas(scale, binarize)); return r?.getText() || null; } catch { return null; }
+    };
+    for (const [s, b] of [[1, false], [2, false], [2, true], [3, true]]) {
+      const t = await tryDecode(s, b);
+      if (t) return t;
+    }
     return null;
   };
 
