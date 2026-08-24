@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { parsePdf417 } from '@/lib/pdf417Parser';
 import { Camera, Image as ImageIcon, Loader2, ScanLine, X, Check, AlertCircle, RefreshCw, Copy, Hash, User, Calendar, CreditCard } from 'lucide-react';
+import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
 
 // Decodificación del PDF417 del DNI argentino.
 // Camino 1: BarcodeDetector nativo del navegador (pdf417) — Chrome/Edge/Android.
@@ -48,6 +49,34 @@ export default function Pdf417Scanner({ onScanned }) {
   const getDetector = () => {
     if (!detectorRef.current) detectorRef.current = new window.BarcodeDetector({ formats: ['pdf417'] });
     return detectorRef.current;
+  };
+
+  // ZXing: decodificador PDF417 puro JS (sin WASM). Anda en preview y Ubuntu,
+  // más confiable que BarcodeDetector para el PDF417 denso del DNI argentino.
+  const zxingRef = useRef(null);
+  const getZxing = () => {
+    if (!zxingRef.current) {
+      const hints = new Map();
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.PDF_417]);
+      hints.set(DecodeHintType.TRY_HARDER, true);
+      zxingRef.current = new BrowserMultiFormatReader(hints);
+    }
+    return zxingRef.current;
+  };
+  const decodeWithZxing = async (bitmap) => {
+    const reader = getZxing();
+    const tryCanvas = async (scale) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      const r = await reader.decodeFromCanvasElement(canvas);
+      return r?.getText() || null;
+    };
+    try { const t = await tryCanvas(1); if (t) return t; } catch {}
+    try { const t = await tryCanvas(2); if (t) return t; } catch {}
+    return null;
   };
 
   // Parsea el string crudo, detiene cámara y guarda resultado. true si tenía DNI.
@@ -117,19 +146,21 @@ export default function Pdf417Scanner({ onScanned }) {
   const handleFile = async (file) => {
     setScanningFile(true); setError(''); setResult(null);
     try {
+      const bitmap = await window.createImageBitmap(file);
       let raw = null;
-      // Camino 1: lector nativo del navegador (rápido, sin round-trip al server).
+      // Camino 1: BarcodeDetector nativo (rápido, si el navegador soporta pdf417).
       if (pdf417Supported) {
-        try {
-          const bitmap = await window.createImageBitmap(file);
-          raw = await detectWithBrowser(bitmap);
-          bitmap.close?.();
-        } catch {}
+        try { raw = await detectWithBrowser(bitmap); } catch {}
       }
+      // Camino 2: ZXing (puro JS, confiable para PDF417 — anda en preview y Ubuntu).
+      if (!raw) {
+        try { raw = await decodeWithZxing(bitmap); } catch {}
+      }
+      bitmap.close?.();
       if (raw) {
         if (!applyRaw(raw)) throw new Error('Se decodificó un código pero no se reconocieron los datos del DNI.');
       } else {
-        // Camino 2: servidor (zbarimg). Confiable y air-gapped en Ubuntu.
+        // Camino 3: servidor (zbarimg en Ubuntu). Respaldo confiable y air-gapped.
         const data = await decodeOnServer(file);
         if (data.parsed) { setResult(data.parsed); }
         else if (data.raw && applyRaw(data.raw)) { /* ok */ }
@@ -175,13 +206,6 @@ export default function Pdf417Scanner({ onScanned }) {
           </div>
         )}
       </div>
-
-      {pdf417Supported === false && (
-        <div className="mb-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>Este navegador no soporta detección nativa de PDF417 (usá Chrome/Edge). Podés subir la imagen y el servidor (Ubuntu con zbar-tools) la decodifica.</span>
-        </div>
-      )}
 
       {!result && tab === 'camera' && (
         <div className="space-y-3">
