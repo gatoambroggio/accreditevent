@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
-import { Loader2, Plus, Minus, Trash2, CheckCircle2, XCircle, ArrowLeft, Wine, Banknote, CreditCard, QrCode, Printer, X, Cpu, AlertCircle } from 'lucide-react';
+import { Loader2, Plus, Minus, Trash2, CheckCircle2, XCircle, ArrowLeft, Wine, Banknote, CreditCard, QrCode, Printer, X, Cpu, AlertCircle, Wifi, WifiOff } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { getAgentPrinters, checkAgent } from '@/lib/printAgent';
+import { isOnline, loadCache, saveCache, pendingCount, enqueueSale, syncQueue } from '@/lib/barOffline';
 import BarReceipt from '@/components/barras/BarReceipt';
 
 const fmtCur = (n) => `$${Number(n || 0).toLocaleString('es-AR')}`;
@@ -44,24 +45,43 @@ export default function BarPos() {
   const [lastSale, setLastSale] = useState(null);
   const [printers, setPrinters] = useState([]);
   const [printerName, setPrinterName] = useState(localStorage.getItem(LS_PRINTER_KEY) || '');
+  const operatorSession = (() => { try { return JSON.parse(sessionStorage.getItem('ae_bar_active') || 'null'); } catch { return null; } })();
+  const operatorId = operatorSession?.operator_id || '';
+  const [operatorName, setOperatorName] = useState(operatorSession?.full_name || operatorSession?.username || '');
+  const [online, setOnline] = useState(isOnline());
+  const [pending, setPending] = useState(0);
   const receiptRef = useRef(null);
   const pollRef = useRef(null);
   const cardPollStart = useRef(0);
 
   useEffect(() => {
     (async () => {
+      // Cache first: render instantáneo (incluso offline).
+      const c = loadCache(barId);
+      if (c) {
+        setBar(c.bar); setEvent(c.event); setProducts(c.products || []); setDevices(c.devices || []);
+        if (c.bar?.sectors?.length) setSector(c.bar.sectors[0].value);
+      }
+      setPending(pendingCount(barId));
+      if (!isOnline()) {
+        setLoading(false);
+        if (!operatorSession) {
+          try { const me = await base44.auth.me().catch(() => null); if (!me) { window.location.href = '/bar-app'; return; } setOperatorName(me.full_name || me.email || 'Admin'); } catch {}
+        }
+        return;
+      }
       try {
-        const b = await base44.entities.Bar.get(barId);
-        setBar(b);
-        const [ev, ps, devs] = await Promise.all([
-          base44.entities.Event.get(b.event_id).catch(() => null),
-          base44.entities.EventProduct.filter({ event_id: b.event_id, status: 'active' }, 'sort_order', 300),
-          base44.entities.BarPosDevice.filter({ bar_id: barId, status: 'active' }, 'alias', 50),
-        ]);
-        setEvent(ev);
-        setProducts(ps);
-        setDevices(devs);
-        if (b?.sectors?.length) setSector(b.sectors[0].value);
+        const res = await base44.functions.invoke('barSale', { action: 'get_pos_data', bar_id: barId });
+        const d = res?.data || res;
+        if (d?.error) throw new Error(d.error);
+        setBar(d.bar); setEvent(d.event); setProducts(d.products || []); setDevices(d.devices || []);
+        if (d.bar?.sectors?.length) setSector(d.bar.sectors[0].value);
+        saveCache(barId, { bar: d.bar, event: d.event, products: d.products, devices: d.devices });
+        if (!operatorSession) {
+          const me = await base44.auth.me().catch(() => null);
+          if (!me) { window.location.href = '/bar-app'; return; }
+          setOperatorName(me.full_name || me.email || 'Admin');
+        }
       } catch {}
       setLoading(false);
       try {
@@ -103,16 +123,32 @@ export default function BarPos() {
     setPayModal(false);
     setProcessing(true);
     try {
-      const me = await base44.auth.me().catch(() => null);
-      const opName = me?.full_name || me?.email || 'Operador';
+      const opName = operatorName || 'Operador';
       const saleItems = items.map((it) => ({ name: it.product.name, price: it.unit_price ?? it.product.price, qty: it.qty, subtotal: (it.unit_price ?? it.product.price) * it.qty }));
 
+      // Offline: sólo efectivo, encolar localmente y sincronizar después.
+      if (!online) {
+        if (method !== 'cash') { alert('Sin conexión sólo se puede cobrar en efectivo. Tarjeta y QR requieren internet.'); setProcessing(false); return; }
+        const client_uuid = (crypto.randomUUID ? crypto.randomUUID() : 'loc-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+        const sale = { client_uuid, items: saleItems, total, payment_method: 'cash', operator_id: operatorId, operator_name: opName, created_at: new Date().toISOString(), status: 'pending' };
+        enqueueSale(barId, sale);
+        setLastSale({ id: client_uuid, items: saleItems, total, payment_method: 'cash', operator_name: opName, created_at: sale.created_at, offline: true });
+        setConfirming({ total, method: 'cash' });
+        setCart({});
+        setPending(pendingCount(barId));
+        setProcessing(false);
+        return;
+      }
+
+      const client_uuid = (crypto.randomUUID ? crypto.randomUUID() : 'loc-' + Date.now() + '-' + Math.random().toString(36).slice(2));
       const res = await base44.functions.invoke('barSale', {
         action: 'create',
         bar_id: barId,
         items: saleItems,
         payment_method: method,
         operator_name: opName,
+        operator_id: operatorId,
+        client_uuid,
       });
       const data = res.data || res;
 
@@ -326,6 +362,24 @@ export default function BarPos() {
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
+  // Online/offline indicator.
+  useEffect(() => {
+    const setOn = () => setOnline(navigator.onLine);
+    window.addEventListener('online', setOn);
+    window.addEventListener('offline', setOn);
+    return () => { window.removeEventListener('online', setOn); window.removeEventListener('offline', setOn); };
+  }, []);
+
+  // Sincronización de ventas encoladas al reconectar (y cada 20s).
+  useEffect(() => {
+    const flush = () => { if (navigator.onLine) { syncQueue(barId, () => setPending(pendingCount(barId))); } };
+    flush();
+    const t = setInterval(flush, 20000);
+    const onOnline = () => flush();
+    window.addEventListener('online', onOnline);
+    return () => { clearInterval(t); window.removeEventListener('online', onOnline); };
+  }, [barId]);
+
   if (loading) return <div className="flex min-h-screen items-center justify-center bg-slate-50"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>;
   if (!bar) return <div className="flex min-h-screen items-center justify-center bg-slate-50"><p className="text-sm text-slate-500">Barra no encontrada. <Link to="/barras" className="font-bold text-emerald-700">Volver</Link></p></div>;
 
@@ -343,6 +397,14 @@ export default function BarPos() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <span className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-xs font-semibold ${online ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-300 bg-amber-100 text-amber-800'}`}>
+            {online ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />} {online ? 'Online' : 'Offline'}
+          </span>
+          {pending > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-100 px-2 py-1.5 text-xs font-semibold text-amber-800">
+              <Loader2 className="h-3 w-3 animate-spin" /> {pending} sin sincronizar
+            </span>
+          )}
           <span className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-xs font-semibold ${cardAvailable ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
             <Cpu className="h-3 w-3" /> {cardAvailable ? `${devices.length} POS` : 'Sin POS'}
           </span>

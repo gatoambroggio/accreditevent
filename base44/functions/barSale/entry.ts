@@ -17,14 +17,47 @@ export default async function (req) {
     const pointEndpoint = (mp) => (mp.point?.endpoint || 'https://api.mercadopago.com').replace(/\/$/, '');
     const pointToken = (mp) => mp.point?.access_token || mp.access_token;
 
+    // ---- Datos del POS (catálogo + dispositivos) ----
+    // Lo usa la tablet para cargar el POS sin depender de RLS (operadores no son
+    // usuarios de plataforma). Devuelve barra, evento, productos y terminales.
+    if (action === 'get_pos_data') {
+      const { bar_id } = body;
+      if (!bar_id) return Response.json({ error: 'Falta bar_id' }, { status: 400 });
+      const bar = await base44.asServiceRole.entities.Bar.get(bar_id).catch(() => null);
+      if (!bar) return Response.json({ error: 'Barra no encontrada' }, { status: 404 });
+      const [ev, ps, devs] = await Promise.all([
+        base44.asServiceRole.entities.Event.get(bar.event_id).catch(() => null),
+        base44.asServiceRole.entities.EventProduct.filter({ event_id: bar.event_id, status: 'active' }, 'sort_order', 300),
+        base44.asServiceRole.entities.BarPosDevice.filter({ bar_id, status: 'active' }, 'alias', 50),
+      ]);
+      return Response.json({ bar, event: ev, products: ps, devices: devs });
+    }
+
     // ---- Crear venta ----
     if (action === 'create') {
-      const { bar_id, items, payment_method, operator_name } = body;
+      const { bar_id, items, payment_method, operator_name, operator_id, client_uuid } = body;
       if (!bar_id || !items || !Array.isArray(items) || items.length === 0)
         return Response.json({ error: 'Faltan datos de la venta' }, { status: 400 });
 
       const bar = await base44.asServiceRole.entities.Bar.get(bar_id);
       if (!bar) return Response.json({ error: 'Barra no encontrada' }, { status: 404 });
+
+      // Validar operador (si viene): debe existir, estar activo y asignado a esta barra.
+      if (operator_id) {
+        const ops = await base44.asServiceRole.entities.BarOperator.filter({ id: operator_id }).catch(() => []);
+        const op = ops && ops[0];
+        if (!op) return Response.json({ error: 'Operador inválido' }, { status: 403 });
+        if (op.blocked) return Response.json({ error: 'Operador bloqueado' }, { status: 403 });
+        if (op.bar_id !== bar_id) return Response.json({ error: 'El operador no pertenece a esta barra' }, { status: 403 });
+      }
+
+      // Idempotencia: si la venta ya se sincronizó (misma client_uuid), devolverla.
+      if (client_uuid) {
+        const dup = await base44.asServiceRole.entities.BarSale.filter({ client_uuid }).catch(() => []);
+        if (dup && dup.length) {
+          return Response.json({ sale_id: dup[0].id, status: dup[0].status, total: dup[0].total, demo: false, duplicate: true });
+        }
+      }
 
       const calcTotal = items.reduce((s, it) => s + Number(it.price) * Number(it.qty), 0);
       const method = payment_method || 'cash';
@@ -39,6 +72,7 @@ export default async function (req) {
         event_name: bar.event_name,
         company: bar.company,
         operator_name: operator_name || 'Operador',
+        client_uuid: client_uuid || undefined,
         items: items.map((it) => ({
           name: it.name,
           price: Number(it.price),

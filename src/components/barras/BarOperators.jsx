@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2, Plus, Pencil, Ban, KeyRound, Wine } from 'lucide-react';
+import { Loader2, Plus, Pencil, Ban, Wine, Trash2 } from 'lucide-react';
 import BarOperatorModal from './BarOperatorModal';
 
 export default function BarOperators() {
@@ -10,22 +10,18 @@ export default function BarOperators() {
   const [bars, setBars] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null); // { editing } | null
-  const [template, setTemplate] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [opsRes, barList, tplRes] = await Promise.all([
+      const [opsRes, barList] = await Promise.all([
         base44.functions.invoke('manageBarOperator', { action: 'list' }),
         base44.entities.Bar.list('name', 500),
-        base44.functions.invoke('manageBarOperator', { action: 'getTemplate' }),
       ]);
       const opsData = opsRes?.data ?? opsRes;
       if (opsData?.error) throw new Error(opsData.error);
       setOperators(opsData.operators || []);
       setBars((barList || []).filter((b) => b.status === 'active'));
-      const tplData = tplRes?.data ?? tplRes;
-      setTemplate(tplData?.template || '');
     } catch (e) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     }
@@ -36,39 +32,43 @@ export default function BarOperators() {
 
   const save = async (data) => {
     if (data.editing) {
-      const payload = { action: 'update', user_id: data.userId, bar_id: data.bar_id, blocked: data.blocked };
+      const payload = { action: 'update', id: data.id, bar_id: data.bar_id, blocked: data.blocked };
       const res = await base44.functions.invoke('manageBarOperator', payload);
       const body = res?.data ?? res;
       if (body?.error) throw new Error(body.error);
       if (data.changePw && data.password) {
-        const pw = await base44.functions.invoke('manageBarOperator', { action: 'password', user_id: data.userId, newPassword: data.password });
+        const pw = await base44.functions.invoke('manageBarOperator', { action: 'password', id: data.id, newPassword: data.password });
         const pwBody = pw?.data ?? pw;
         if (pwBody?.error) throw new Error(pwBody.error);
       }
     } else {
       const res = await base44.functions.invoke('manageBarOperator', {
-        action: 'create', username: data.username, password: data.password, bar_id: data.bar_id,
+        action: 'create', username: data.username, password: data.password, bar_id: data.bar_id, full_name: data.full_name,
       });
       const body = res?.data ?? res;
       if (body?.error) throw new Error(body.error);
-      if (body?.passwordWarning) toast({ title: 'Atención', description: body.passwordWarning, variant: 'destructive' });
-      if (body?.pending && body?.email) {
-        toast({ title: 'Invitación enviada', description: `Se envió la invitación a ${body.email}. Abrí ese email en el inbox compartido y completá el registro una vez; al hacerlo, el operador queda activo con su contraseña.`, duration: Infinity });
-      } else {
-        toast({ title: 'Operador guardado', description: `Usuario "${data.username}" creado.` });
-      }
+      toast({ title: 'Operador creado', description: `Usuario "${data.username}" listo para usar en la tablet.` });
     }
     setModal(null);
     await load();
-    if (data.editing) toast({ title: 'Operador guardado', description: 'Los cambios se guardaron.' });
   };
 
   const toggleBlock = async (op) => {
     try {
-      const res = await base44.functions.invoke('manageBarOperator', { action: 'update', user_id: op.id, blocked: !op.blocked });
+      const res = await base44.functions.invoke('manageBarOperator', { action: 'update', id: op.id, blocked: !op.blocked });
       const body = res?.data ?? res;
       if (body?.error) throw new Error(body.error);
       setOperators((prev) => prev.map((o) => (o.id === op.id ? { ...o, blocked: !op.blocked } : o)));
+    } catch (e) { toast({ title: 'Error', description: e.message, variant: 'destructive' }); }
+  };
+
+  const remove = async (op) => {
+    if (!confirm(`¿Eliminar el operador "${op.username}"?`)) return;
+    try {
+      const res = await base44.functions.invoke('manageBarOperator', { action: 'delete', id: op.id });
+      const body = res?.data ?? res;
+      if (body?.error) throw new Error(body.error);
+      await load();
     } catch (e) { toast({ title: 'Error', description: e.message, variant: 'destructive' }); }
   };
 
@@ -77,7 +77,7 @@ export default function BarOperators() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-extrabold tracking-tight text-slate-900">Operadores de barra</h2>
-          <p className="text-sm text-slate-500">Usuarios que se loguean en la tablet con usuario y contraseña para usar el POS.</p>
+          <p className="text-sm text-slate-500">Se loguean en la tablet con usuario y contraseña para usar el POS. Sin email ni invitaciones.</p>
         </div>
         <button onClick={() => setModal({ editing: null })} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white hover:bg-slate-800">
           <Plus className="h-4 w-4" /> Nuevo operador
@@ -106,7 +106,8 @@ export default function BarOperators() {
               {operators.map((op) => (
                 <tr key={op.id} className="hover:bg-slate-50/60">
                   <td className="px-4 py-3">
-                    <p className="font-semibold text-slate-900">{op.username || op.full_name}</p>
+                    <p className="font-semibold text-slate-900">{op.username}</p>
+                    {op.full_name && op.full_name !== op.username && <p className="text-xs text-slate-400">{op.full_name}</p>}
                     {op.company && <p className="text-xs text-slate-400">{op.company}</p>}
                   </td>
                   <td className="px-4 py-3 text-slate-600">{op.bar_name || <span className="text-slate-300">—</span>}</td>
@@ -126,6 +127,9 @@ export default function BarOperators() {
                       <button onClick={() => setModal({ editing: op })} title="Editar" className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">
                         <Pencil className="h-4 w-4" />
                       </button>
+                      <button onClick={() => remove(op)} title="Eliminar" className="grid h-8 w-8 place-items-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -142,7 +146,6 @@ export default function BarOperators() {
           onSaved={save}
           bars={bars}
           editing={modal.editing}
-          template={template}
         />
       )}
     </div>

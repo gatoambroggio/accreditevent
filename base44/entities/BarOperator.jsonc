@@ -1,0 +1,174 @@
+{
+  "name": "BarOperator",
+  "type": "object",
+  "properties": {
+    "username": {
+      "type": "string",
+      "description": "Usuario libre del operador (ej. barra1). \u00danico global. Se guarda en min\u00fasculas."
+    },
+    "password_hash": {
+      "type": "string",
+      "description": "Hash PBKDF2-SHA256 de la contrase\u00f1a (formato pbkdf2$iter$salt$hash)"
+    },
+    "full_name": {
+      "type": "string",
+      "description": "Nombre visible del operador"
+    },
+    "bar_id": {
+      "type": "string",
+      "description": "Barra asignada al operador (una sola)"
+    },
+    "bar_name": {
+      "type": "string",
+      "description": "Nombre de la barra (denormalizado)"
+    },
+    "event_id": {
+      "type": "string",
+      "description": "Evento de la barra (denormalizado)"
+    },
+    "event_name": {
+      "type": "string",
+      "description": "Nombre del evento (denormalizado)"
+    },
+    "company": {
+      "type": "string",
+      "description": "Empresa productora (denormalizado para RLS)"
+    },
+    "blocked": {
+      "type": "boolean",
+      "default": false,
+      "description": "Operador bloqueado (sin acceso al POS)"
+    }
+  },
+  "required": [
+    "username",
+    "password_hash",
+    "bar_id"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "superadmin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "coordinator"
+          }
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "productora"
+              }
+            },
+            {
+              "data.company": "{{user.data.company}}"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

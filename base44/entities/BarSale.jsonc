@@ -68,6 +68,10 @@
       "type": "string",
       "description": "ID de pago de Mercado Pago (para pagos QR / webhook)"
     },
+    "client_uuid": {
+      "type": "string",
+      "description": "UUID local de la venta generado en la tablet. Permite deduplicar al sincronizar ventas offline (idempotencia)."
+    },
     "point_intent_id": {
       "type": "string",
       "description": "ID del payment-intent de Mercado Pago Point (cobro con tarjeta en terminal f\u00edsica)"

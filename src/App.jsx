@@ -68,7 +68,7 @@ import BarrasReportes from '@/pages/BarrasReportes';
 
 const AUTH_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password', '/provider-register', '/registro-empresa'];
 // Rutas públicas sin login (tienda de entradas para compradores anónimos).
-const PUBLIC_PREFIXES = ['/entradas', '/bar-app'];
+const PUBLIC_PREFIXES = ['/entradas', '/bar-app', '/barras'];
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, authChecked } = useAuth();
