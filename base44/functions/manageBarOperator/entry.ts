@@ -54,13 +54,17 @@ export default async function (req) {
 
     async function resolveBar(barId) {
       if (!barId) return null;
-      const bars = await base44.asServiceRole.entities.Bar.filter({ id: barId });
+      let bars;
+      try { bars = await base44.asServiceRole.entities.Bar.filter({ id: barId }); }
+      catch { return null; }
       if (!bars || !bars.length) return null;
       const bar = bars[0];
       let event = null;
       if (bar.event_id) {
-        const evs = await base44.asServiceRole.entities.Event.filter({ id: bar.event_id });
-        if (evs && evs.length) event = evs[0];
+        try {
+          const evs = await base44.asServiceRole.entities.Event.filter({ id: bar.event_id });
+          if (evs && evs.length) event = evs[0];
+        } catch {}
       }
       return { bar, event, company: (bar.company || event?.company || '') };
     }
