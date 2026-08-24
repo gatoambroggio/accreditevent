@@ -26,6 +26,7 @@ const isRejected = (s) => s === 'process_denied' || s === 'canceled';
 
 export default function BarPos() {
   const { barId } = useParams();
+  const isBarApp = new URLSearchParams(window.location.search).get('app') === 'bar';
   const [bar, setBar] = useState(null);
   const [products, setProducts] = useState([]);
   const [devices, setDevices] = useState([]);
@@ -334,7 +335,7 @@ export default function BarPos() {
     <div className="flex h-screen flex-col bg-slate-50">
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-3">
         <div className="flex items-center gap-3">
-          <Link to="/barras" className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"><ArrowLeft className="h-4 w-4" /></Link>
+          <Link to={isBarApp ? '/bar-app' : '/barras'} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"><ArrowLeft className="h-4 w-4" /></Link>
           <span className="grid h-9 w-9 place-items-center rounded-lg bg-emerald-600 text-white"><Wine className="h-5 w-5" /></span>
           <div>
             <h1 className="text-lg font-extrabold tracking-tight text-slate-900">{bar.name}</h1>

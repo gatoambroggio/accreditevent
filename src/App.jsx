@@ -63,11 +63,12 @@ import TicketSales from '@/pages/TicketSales';
 import AccessTicketStation from '@/pages/AccessTicketStation';
 import Barras from '@/pages/Barras';
 import BarPos from '@/pages/BarPos';
+import BarApp from '@/pages/BarApp';
 import BarrasReportes from '@/pages/BarrasReportes';
 
 const AUTH_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password', '/provider-register', '/registro-empresa'];
 // Rutas públicas sin login (tienda de entradas para compradores anónimos).
-const PUBLIC_PREFIXES = ['/entradas'];
+const PUBLIC_PREFIXES = ['/entradas', '/bar-app'];
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, authChecked } = useAuth();
@@ -149,6 +150,7 @@ const AuthenticatedApp = () => {
       <Route path="/entradas/:eventId" element={<TicketEvent />} />
       <Route path="/entradas/confirmacion" element={<TicketConfirmation />} />
       <Route path="/control-entradas" element={<AccessTicketStation />} />
+      <Route path="/bar-app" element={<BarApp />} />
       <Route path="/barras/:barId" element={<BarPos />} />
       <Route path="/portal" element={<ProviderPortal />} />
       <Route path="/registro-empresa" element={<EmpresaRegister />} />
