@@ -42,6 +42,7 @@ import { manageBarOperator } from '../functions/manageBarOperator.js';
 import { afipIssue } from '../functions/afipIssue.js';
 import { afipSyncPending } from '../functions/afipSyncPending.js';
 import { afipRetry } from '../functions/afipRetry.js';
+import { readDniPdf417 } from '../functions/readDniPdf417.js';
 
 export const functionInvokeRouter = Router();
 
@@ -60,6 +61,7 @@ const handlers = {
   exportData,
   manageBarOperator,
   afipIssue, afipSyncPending, afipRetry,
+  readDniPdf417: async (p) => readDniPdf417({ file_url: p.file_url || p.fileUrl }),
 };
 
 functionInvokeRouter.post('/:name', async (req, res, next) => {

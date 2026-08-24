@@ -1,10 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { base44 } from '@/api/base44Client';
 import { parsePdf417 } from '@/lib/pdf417Parser';
 import { Camera, Image as ImageIcon, Loader2, ScanLine, X, Check, AlertCircle, RefreshCw, Copy, Hash, User, Calendar, CreditCard } from 'lucide-react';
 
-const FILE_REGION_ID = 'pdf417-file-region';
-
+// Decodificación del PDF417 del DNI argentino.
+// Camino 1: BarcodeDetector nativo del navegador (pdf417) — Chrome/Edge/Android.
+//   Funciona en preview de Base44 (subir imagen) y en Ubuntu (cámara + imagen).
+// Camino 2: servidor `readDniPdf417` (zbarimg en Ubuntu) — respaldo confiable y
+//   air-gapped cuando el navegador no decode o no soporta pdf417 (Firefox/Safari).
 export default function Pdf417Scanner({ onScanned }) {
   const [tab, setTab] = useState('camera');
   const [cameraOn, setCameraOn] = useState(false);
@@ -14,7 +17,7 @@ export default function Pdf417Scanner({ onScanned }) {
   const [fileUrl, setFileUrl] = useState(null);
   const [scanningFile, setScanningFile] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [supported, setSupported] = useState(null); // null=checking, true, false
+  const [pdf417Supported, setPdf417Supported] = useState(null); // null=checking | true | false
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const rafRef = useRef(null);
@@ -26,10 +29,10 @@ export default function Pdf417Scanner({ onScanned }) {
     let alive = true;
     (async () => {
       try {
-        if (!('BarcodeDetector' in window)) { alive && setSupported(false); return; }
+        if (!('BarcodeDetector' in window)) { alive && setPdf417Supported(false); return; }
         const formats = await window.BarcodeDetector.getSupportedFormats();
-        alive && setSupported(formats.includes('pdf417'));
-      } catch { alive && setSupported(false); }
+        alive && setPdf417Supported(Array.isArray(formats) && formats.includes('pdf417'));
+      } catch { alive && setPdf417Supported(false); }
     })();
     return () => { stopCamera(); };
   }, []);
@@ -38,19 +41,20 @@ export default function Pdf417Scanner({ onScanned }) {
     runningRef.current = false;
     if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
     if (streamRef.current) { streamRef.current.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
-    if (videoRef.current) { videoRef.current.srcObject = null; }
+    if (videoRef.current) videoRef.current.srcObject = null;
     setCameraOn(false);
   };
 
-  const onDecode = (text) => {
-    const parsed = parsePdf417(text);
-    if (parsed && parsed.dni) { stopCamera(); setResult(parsed); }
-  };
-
-  // ---- BarcodeDetector nativo (preferido) ----
   const getDetector = () => {
     if (!detectorRef.current) detectorRef.current = new window.BarcodeDetector({ formats: ['pdf417'] });
     return detectorRef.current;
+  };
+
+  // Parsea el string crudo, detiene cámara y guarda resultado. true si tenía DNI.
+  const applyRaw = (raw) => {
+    const parsed = parsePdf417(raw);
+    if (parsed && parsed.dni) { stopCamera(); setResult(parsed); return true; }
+    return false;
   };
 
   const scanLoop = async () => {
@@ -59,102 +63,88 @@ export default function Pdf417Scanner({ onScanned }) {
     if (v && v.readyState >= 2) {
       try {
         const codes = await getDetector().detect(v);
-        if (codes && codes.length) { onDecode(codes[0].rawValue); return; }
+        if (codes && codes.length && codes[0].rawValue && applyRaw(codes[0].rawValue)) return;
       } catch {}
     }
     rafRef.current = requestAnimationFrame(scanLoop);
   };
 
-  const startCameraNative = async () => {
-    setStarting(true);
+  const startCamera = async () => {
+    setStarting(true); setError('');
     const cfg = { video: { facingMode: { ideal: 'environment' } }, audio: false };
-    try {
-      streamRef.current = await navigator.mediaDevices.getUserMedia(cfg);
-    } catch {
-      // Sin cámara trasera (desktop): reintento con la primera cámara disponible.
-      try {
-        streamRef.current = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-      } catch (e) {
-        setError('No se pudo acceder a la cámara. Probá subir la imagen del reverso desde la pestaña "Imagen". ' + (e?.message || ''));
-        setStarting(false);
-        return;
+    try { streamRef.current = await navigator.mediaDevices.getUserMedia(cfg); }
+    catch {
+      try { streamRef.current = await navigator.mediaDevices.getUserMedia({ video: true, audio: false }); }
+      catch (e) {
+        setError('No se pudo acceder a la cámara. Subí la imagen del DNI desde la pestaña "Imagen". ' + (e?.message || ''));
+        setStarting(false); return;
       }
     }
     const v = videoRef.current;
     v.srcObject = streamRef.current;
     await v.play().catch(() => {});
-    runningRef.current = true;
-    setCameraOn(true);
-    setStarting(false);
+    runningRef.current = true; setCameraOn(true); setStarting(false);
     rafRef.current = requestAnimationFrame(scanLoop);
   };
 
-  const handleFileNative = async (file) => {
-    setScanningFile(true);
+  // Prueba el Bitmap tal cual y, si no decode, una versión escalada 1.5x en canvas
+  // (ayuda cuando el PDF417 ocupa una franja chica de la tarjeta completa).
+  const detectWithBrowser = async (bitmap) => {
+    const detector = getDetector();
+    try { const codes = await detector.detect(bitmap); if (codes && codes.length && codes[0].rawValue) return codes[0].rawValue; } catch {}
     try {
-      const bitmap = await window.createImageBitmap(file);
-      const codes = await getDetector().detect(bitmap);
-      bitmap.close?.();
-      if (!codes || !codes.length) throw new Error('No se reconoció el código PDF417 del DNI.');
-      onDecode(codes[0].rawValue);
+      const scale = 1.5;
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(bitmap.width * scale);
+      canvas.height = Math.round(bitmap.height * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      const codes = await detector.detect(canvas);
+      if (codes && codes.length && codes[0].rawValue) return codes[0].rawValue;
+    } catch {}
+    return null;
+  };
+
+  // Sube la imagen y pide al servidor (zbarimg en Ubuntu) que decode el PDF417.
+  const decodeOnServer = async (file) => {
+    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+    const res = await base44.functions.invoke('readDniPdf417', { file_url });
+    const data = res?.data ?? res;
+    if (!data || data.ok === false || data.error) throw new Error(data?.error || 'No se pudo decodificar en el servidor.');
+    return data;
+  };
+
+  const handleFile = async (file) => {
+    setScanningFile(true); setError(''); setResult(null);
+    try {
+      let raw = null;
+      // Camino 1: lector nativo del navegador (rápido, sin round-trip al server).
+      if (pdf417Supported) {
+        try {
+          const bitmap = await window.createImageBitmap(file);
+          raw = await detectWithBrowser(bitmap);
+          bitmap.close?.();
+        } catch {}
+      }
+      if (raw) {
+        if (!applyRaw(raw)) throw new Error('Se decodificó un código pero no se reconocieron los datos del DNI.');
+      } else {
+        // Camino 2: servidor (zbarimg). Confiable y air-gapped en Ubuntu.
+        const data = await decodeOnServer(file);
+        if (data.parsed) { setResult(data.parsed); }
+        else if (data.raw && applyRaw(data.raw)) { /* ok */ }
+        else throw new Error('No se encontró el código PDF417 del DNI.');
+      }
     } catch (e) {
-      setError('No se pudo decodificar el PDF417. Usá una foto nítida del reverso, bien iluminada y sin reflejos. ' + (e?.message || ''));
+      setError(e.message || 'No se pudo decodificar el DNI.');
     } finally {
       setScanningFile(false);
     }
   };
 
-  // ---- Fallback html5-qrcode (sin BarcodeDetector) ----
-  const startCameraFallback = async () => {
-    setStarting(true);
-    const cfg = { fps: 10, qrbox: { width: 300, height: 150 }, aspectRatio: 2.0 };
-    const make = () => new Html5Qrcode('pdf417-cam-fallback', { formatsToSupport: [Html5QrcodeSupportedFormats.PDF_417], verbose: false });
-    try {
-      const html5 = make();
-      await html5.start({ facingMode: { ideal: 'environment' } }, cfg, onDecode, () => {});
-      setCameraOn(true);
-    } catch (e) {
-      try {
-        const cams = await Html5Qrcode.getCameras();
-        if (cams && cams.length) { const html5 = make(); await html5.start(cams[0].id, cfg, onDecode, () => {}); setCameraOn(true); return; }
-      } catch {}
-      setError('No se pudo acceder a la cámara. Probá subir la imagen del reverso desde la pestaña "Imagen". ' + (e?.message || ''));
-    } finally {
-      setStarting(false);
-    }
-  };
-  const stopCameraFallback = async () => {
-    try { const h = Html5Qrcode; /* instancia administrada por lib */ } catch {}
-    setCameraOn(false);
-  };
-  const handleFileFallback = async (file) => {
-    setScanningFile(true);
-    try {
-      const html5 = new Html5Qrcode(FILE_REGION_ID, { formatsToSupport: [Html5QrcodeSupportedFormats.PDF_417], verbose: false });
-      const text = await html5.scanFile(file, false);
-      const parsed = parsePdf417(text);
-      if (!parsed || !parsed.dni) throw new Error('No se reconoció el código PDF417 del DNI.');
-      setResult(parsed);
-    } catch (e) {
-      setError('No se pudo decodificar el PDF417. Usá una foto nítida del reverso, bien iluminada y sin reflejos. ' + (e?.message || ''));
-    } finally {
-      setScanningFile(false);
-    }
-  };
-
-  const startCamera = supported ? startCameraNative : startCameraFallback;
-  const stopCameraAll = supported ? stopCamera : stopCameraFallback;
-  const handleFile = supported ? handleFileNative : handleFileFallback;
-
-  const copyRaw = () => {
-    if (!result?.raw) return;
-    navigator.clipboard?.writeText(result.raw);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-
+  const copyRaw = () => { if (result?.raw) { navigator.clipboard?.writeText(result.raw); setCopied(true); setTimeout(() => setCopied(false), 1500); } };
   const reset = () => { setResult(null); setFileUrl(null); setError(''); };
-  const switchTab = (t) => { stopCameraAll(); setTab(t); };
+  const switchTab = (t) => { stopCamera(); setTab(t); };
 
   const Field = ({ icon: Icon, label, value, mono }) => (
     <div className="rounded-lg bg-slate-50 p-3">
@@ -168,7 +158,7 @@ export default function Pdf417Scanner({ onScanned }) {
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold text-slate-900">Lector QR</h2>
-          <p className="text-xs text-slate-500">Escaneá el código de barras del reverso del DNI y devolvé los datos del titular.</p>
+          <p className="text-xs text-slate-500">Escaneá el código de barras 2D (PDF417) del DNI y devolvé los datos del titular.</p>
         </div>
         {result ? (
           <button onClick={reset} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">
@@ -186,46 +176,49 @@ export default function Pdf417Scanner({ onScanned }) {
         )}
       </div>
 
-      {supported === false && (
+      {pdf417Supported === false && (
         <div className="mb-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>Este navegador no soporta detección nativa de PDF417; usando el lector de respaldo (menos confiable). Recomendá Chrome/Edge actualizado.</span>
+          <span>Este navegador no soporta detección nativa de PDF417 (usá Chrome/Edge). Podés subir la imagen y el servidor (Ubuntu con zbar-tools) la decodifica.</span>
         </div>
       )}
 
       {!result && tab === 'camera' && (
         <div className="space-y-3">
-          {supported ? (
-            <div className="overflow-hidden rounded-xl bg-slate-900" style={{ height: 300 }}>
-              <video ref={videoRef} className="h-full w-full object-cover" playsInline muted />
+          {pdf417Supported === false ? (
+            <div className="rounded-xl bg-slate-50 p-6 text-center text-sm text-slate-500">
+              La cámara requiere un navegador con soporte de PDF417 (Chrome/Edge). Usá la pestaña <b>Imagen</b>.
             </div>
           ) : (
-            <div id="pdf417-cam-fallback" className="w-full overflow-hidden rounded-xl bg-slate-900" style={{ minHeight: cameraOn ? 240 : 0 }} />
+            <>
+              <div className="overflow-hidden rounded-xl bg-slate-900" style={{ height: 300 }}>
+                <video ref={videoRef} className="h-full w-full object-cover" playsInline muted />
+              </div>
+              {!cameraOn ? (
+                <button onClick={startCamera} disabled={starting} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-50">
+                  {starting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
+                  {starting ? 'Iniciando cámara…' : 'Iniciar cámara'}
+                </button>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700"><ScanLine className="h-4 w-4 animate-pulse" /> Enfocá el código del DNI…</span>
+                  <button onClick={stopCamera} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">
+                    <X className="h-3.5 w-3.5" /> Detener
+                  </button>
+                </div>
+              )}
+              <p className="text-xs text-slate-400">El recuadro debe abarcar el código completo. Si no hay cámara, usá la pestaña "Imagen".</p>
+            </>
           )}
-          {!cameraOn ? (
-            <button onClick={startCamera} disabled={starting} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-50">
-              {starting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
-              {starting ? 'Iniciando cámara…' : 'Iniciar cámara'}
-            </button>
-          ) : (
-            <div className="flex items-center gap-3">
-              <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700"><ScanLine className="h-4 w-4 animate-pulse" /> Enfocá el código del reverso del DNI…</span>
-              <button onClick={stopCameraAll} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">
-                <X className="h-3.5 w-3.5" /> Detener
-              </button>
-            </div>
-          )}
-          <p className="text-xs text-slate-400">El recuadro debe abarcar el código completo. Si no hay cámara, usá la pestaña "Imagen".</p>
         </div>
       )}
 
       {!result && tab === 'file' && (
         <div className="space-y-3">
-          <div id={FILE_REGION_ID} className="hidden" />
           {fileUrl ? (
             <div className="space-y-3">
               <div className="overflow-hidden rounded-xl border border-slate-200">
-                <img src={fileUrl} alt="Reverso DNI" className="w-full" />
+                <img src={fileUrl} alt="DNI" className="w-full" />
               </div>
               {scanningFile && (
                 <div className="flex items-center justify-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Decodificando PDF417…</div>
@@ -235,8 +228,8 @@ export default function Pdf417Scanner({ onScanned }) {
             <button onClick={() => fileInputRef.current?.click()} className="flex w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-12 text-slate-500 transition hover:border-emerald-400 hover:bg-emerald-50">
               <ImageIcon className="h-8 w-8" />
               <div className="text-center">
-                <p className="text-sm font-bold text-slate-700">Subir foto del reverso del DNI</p>
-                <p className="text-xs text-slate-400">JPG, PNG · Con el código PDF417 visible</p>
+                <p className="text-sm font-bold text-slate-700">Subir foto del DNI</p>
+                <p className="text-xs text-slate-400">JPG, PNG · La cara con el código de barras 2D (PDF417)</p>
               </div>
             </button>
           )}

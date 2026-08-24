@@ -120,7 +120,7 @@ ok "Nginx $(nginx -v 2>&1 | cut -d/ -f2)"
 
 # Tesseract del sistema (binario nativo, no tesseract.js que necesita WASM de
 # internet) + poppler-utils para rasterizar PDFs (pólizas/ART subidas en PDF).
-apt-get install -qq -y unzip imagemagick tesseract-ocr tesseract-ocr-spa poppler-utils graphicsmagick build-essential python3 >/dev/null 2>&1 || warn "Algunas libs opcionales no se instalaron"
+apt-get install -qq -y unzip imagemagick zbar-tools tesseract-ocr tesseract-ocr-spa poppler-utils graphicsmagick build-essential python3 >/dev/null 2>&1 || warn "Algunas libs opcionales no se instalaron"
 OCR_STATUS="no instalado"
 if has tesseract; then
   _tver="$(tesseract --version 2>/dev/null | head -1 | awk '{print $2}')"
