@@ -95,8 +95,12 @@ export default function BarTables({ topProducts, byOperator, byCategory, sales }
                     <td className="py-2 pr-3">
                       {s.afip_estado === 'issued' ? (
                         <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700" title={`CAE ${s.afip_cae || ''}`}>CAE</span>
+                      ) : s.afip_estado === 'sandbox' ? (
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700" title={s.afip_error || ''}>Pruebas</span>
                       ) : s.afip_estado === 'error' ? (
                         <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700" title={s.afip_error || ''}>Error</span>
+                      ) : s.afip_estado === 'none' ? (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">—</span>
                       ) : (
                         <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Pend.</span>
                       )}

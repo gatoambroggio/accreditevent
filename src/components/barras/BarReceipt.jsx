@@ -124,12 +124,16 @@ const BarReceipt = forwardRef(function BarReceipt({ sale, bar, event, withdrawal
           <span style={{ fontWeight: 'bold' }}>{payLabel}</span>
         </div>
         <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
-        {sale.afip_cae ? (
+        {sale.afip_estado === 'issued' && sale.afip_cae ? (
           <div style={{ fontSize: '9px', marginTop: '2px' }}>
             <div style={{ fontWeight: 'bold' }}>CAE AFIP: {String(sale.afip_cae).slice(0, 14)}</div>
             {sale.afip_cae_vto ? <div>Vto: {String(sale.afip_cae_vto).slice(0, 8)}</div> : null}
             <div>Comprobante: {sale.afip_cae_tipo === 6 ? 'B' : sale.afip_cae_tipo === 1 ? 'A' : sale.afip_cae_tipo === 11 ? 'C' : String(sale.afip_cae_tipo || '')}</div>
           </div>
+        ) : sale.afip_estado === 'sandbox' ? (
+          <div style={{ fontSize: '9px', marginTop: '2px', fontWeight: 'bold' }}>Comprobante no fiscal (modo pruebas)</div>
+        ) : sale.afip_estado === 'none' ? (
+          <div style={{ fontSize: '9px', marginTop: '2px' }}>Sin facturación AFIP</div>
         ) : (
           <div style={{ fontSize: '9px', marginTop: '2px' }}>CAE AFIP: pendiente de facturación</div>
         )}

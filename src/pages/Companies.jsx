@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useCrud } from '@/lib/crud';
-import { Plus, Pencil, Search, Building2, Copy, Users } from 'lucide-react';
+import { Plus, Pencil, Search, Building2, Copy, Users, Receipt } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { slugify } from '@/lib/slugify';
 import EntityModal from '@/components/EntityModal';
+import AfipCompanyModal from '@/components/barras/AfipCompanyModal';
 import PageHeader from '@/components/ui/page-header';
 import SearchInput from '@/components/ui/search-input';
 import DataTable, { Th, Td, Tr } from '@/components/ui/data-table';
@@ -11,12 +12,13 @@ import { btnPrimary, btnIcon } from '@/components/ui/button-styles';
 import { logAudit } from '@/lib/audit';
 
 export default function Companies() {
-  const { items, loading, create, update, remove } = useCrud('Company');
+  const { items, loading, create, update, remove, reload } = useCrud('Company');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [query, setQuery] = useState('');
   const [users, setUsers] = useState([]);
   const [copiedId, setCopiedId] = useState(null);
+  const [afipCompany, setAfipCompany] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -144,9 +146,14 @@ export default function Companies() {
                 </button>
               </Td>
               <Td className="text-right">
-                <button onClick={() => openEdit(c)} className={btnIcon}>
-                  <Pencil className="h-3.5 w-3.5" />
-                </button>
+                <div className="flex items-center justify-end gap-1.5">
+                  <button onClick={() => setAfipCompany(c)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50" title="Configurar facturación AFIP">
+                    <Receipt className="h-3.5 w-3.5" /> AFIP
+                  </button>
+                  <button onClick={() => openEdit(c)} className={btnIcon}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </Td>
             </Tr>
           ))}
@@ -165,6 +172,10 @@ export default function Companies() {
         canDelete={!!editing}
         submitLabel={editing ? 'Guardar cambios' : 'Crear empresa'}
       />
+
+      {afipCompany && (
+        <AfipCompanyModal company={afipCompany} onClose={() => setAfipCompany(null)} onSaved={reload} />
+      )}
     </div>
   );
 }

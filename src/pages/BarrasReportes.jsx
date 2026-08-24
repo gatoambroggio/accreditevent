@@ -55,7 +55,7 @@ export default function BarrasReportes() {
   const stats = useMemo(() => aggregateStats(paid), [paid]);
 
   const afipCounts = useMemo(() => {
-    const c = { issued: 0, pending: 0, error: 0, none: 0 };
+    const c = { issued: 0, pending: 0, error: 0, sandbox: 0, none: 0 };
     for (const s of paid) {
       const e = s.afip_estado || 'none';
       c[e] = (c[e] || 0) + 1;
@@ -112,6 +112,7 @@ export default function BarrasReportes() {
               <span className="text-sm font-bold text-slate-900">Facturación AFIP</span>
               <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">CAE {afipCounts.issued}</span>
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Pend. {afipCounts.pending + afipCounts.none}</span>
+              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700">Pruebas {afipCounts.sandbox}</span>
               <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">Error {afipCounts.error}</span>
             </div>
             <button onClick={syncAfip} disabled={afipSyncing} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50">

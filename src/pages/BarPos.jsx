@@ -689,6 +689,8 @@ export default function BarPos() {
           {confirming.method === 'qr' && <p className="mt-4 text-sm text-white/70">QR Mercado Pago · comanda impresa</p>}
           {confirming.afip_estado === 'issued' && <p className="mt-2 text-xs font-bold text-white/90">CAE AFIP: {String(confirming.afip_cae || '').slice(0, 14)}</p>}
           {confirming.afip_estado === 'pending' && <p className="mt-2 text-xs text-white/70">CAE pendiente (se factura al reconectar)</p>}
+          {confirming.afip_estado === 'sandbox' && <p className="mt-2 text-xs text-white/70">Comprobante no fiscal (modo pruebas)</p>}
+          {confirming.afip_estado === 'none' && <p className="mt-2 text-xs text-white/60">Sin facturación AFIP</p>}
           {confirming.afip_estado === 'error' && <p className="mt-2 text-xs text-white/70">CAE: error AFIP (revisar en reportes)</p>}
         </div>
       )}
