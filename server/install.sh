@@ -412,6 +412,10 @@ fi
 # puede instalar (sin internet y sin binario/modelo local), el OCR sigue con
 # Tesseract — no rompe nada.
 step "Modelo de visión local (Ollama + moondream) — OCR de DNI/patentes"
+# Sin GPU NVIDIA, Ollama/moondream se OMITE: en CPU tarda ~60s/DNI y alucina datos.
+# El OCR del DNI/patentes queda en PaddleOCR (preciso, CPU) + Tesseract (respaldo).
+VISION_STATUS="omitido (sin GPU — PaddleOCR/Tesseract)"
+if has nvidia-smi && nvidia-smi >/dev/null 2>&1; then
 # moondream (1.8b) corre en CPU en ~15-25s y lee el DNI mucho mejor que Tesseract.
 # Si más adelante ponés GPU NVIDIA, el modelo sigue funcionando (y mucho más rápido).
 VISION_MODEL_NAME="${VISION_MODEL_NAME:-moondream}"
@@ -523,6 +527,7 @@ EOF
     warn "Ollama instalado pero no responde en 127.0.0.1:11434 — ver: journalctl -u ollama -n 30"
   fi
 fi
+fi   # fin del guard GPU — sin GPU se omite Ollama y el OCR usa PaddleOCR/Tesseract
 
 # ── 6d. PaddleOCR (OCR dedicado, preciso en CPU) ──────────────────────────────
 # A diferencia de los VLM (moondream) que ALUCINAN datos que no están impresos,
