@@ -51,6 +51,8 @@ export default function TicketEvent() {
       });
       if (res.init_point) {
         window.location.href = res.init_point;
+      } else if (res.demo && res.ticket_id) {
+        navigate(`/entradas/confirmacion?ticket_id=${res.ticket_id}&status=success&demo=1`);
       } else {
         navigate(`/entradas/confirmacion?ticket_id=${res.ticket_id}&status=failure`);
       }

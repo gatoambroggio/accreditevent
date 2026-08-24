@@ -272,6 +272,10 @@ export default function TicketSales() {
                 <input type="checkbox" checked={!!mpConfig.sandbox} onChange={(e) => setMpConfig({ ...mpConfig, sandbox: e.target.checked })} className="h-4 w-4 accent-emerald-600" />
                 <span className="text-sm text-slate-700">Modo sandbox (pruebas)</span>
               </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={!!mpConfig.demo_mode} onChange={(e) => setMpConfig({ ...mpConfig, demo_mode: e.target.checked })} className="h-4 w-4 accent-emerald-600" />
+                <span className="text-sm text-slate-700">Modo demo (sin Mercado Pago: confirma la entrada sin cobrar)</span>
+              </label>
               <button onClick={saveMp} disabled={savingMp} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-50">
                 <Save className="h-4 w-4" /> {savingMp ? 'Guardando…' : 'Guardar credenciales'}
               </button>

@@ -8,6 +8,7 @@ export default function TicketConfirmation() {
   const [params] = useSearchParams();
   const ticketId = params.get('ticket_id');
   const initialStatus = params.get('status');
+  const isDemo = params.get('demo') === '1';
   const [ticket, setTicket] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -85,6 +86,11 @@ export default function TicketConfirmation() {
         <div className={`rounded-2xl border px-5 py-4 text-center ${paid ? 'border-emerald-200 bg-emerald-50' : ticket.status === 'pending' ? 'border-amber-200 bg-amber-50' : 'border-red-200 bg-red-50'}`}>
           {paid ? (
             <>
+              {isDemo && (
+                <span className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold uppercase tracking-wide text-amber-700 ring-1 ring-amber-300">
+                  Modo demo
+                </span>
+              )}
               <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" />
               <p className="mt-2 text-lg font-extrabold text-emerald-800">¡Entrada confirmada!</p>
               <p className="text-sm text-emerald-700">Presentá este QR en la puerta.</p>

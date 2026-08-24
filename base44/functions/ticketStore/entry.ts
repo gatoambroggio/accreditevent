@@ -115,11 +115,12 @@ export default async function (req) {
       // Crear la preferencia de Mercado Pago.
       const settings = await base44.asServiceRole.entities.SystemSetting.list('-created_date', 1);
       const mp = settings[0]?.mercadopago || {};
-      if (!mp.access_token) {
-        // Sin MP no se puede cobrar: cancelo y libero stock.
-        await base44.asServiceRole.entities.TicketType.update(ticket_type_id, { sold: Math.max(0, (type.sold || 0)) });
-        await base44.asServiceRole.entities.Ticket.update(ticket.id, { status: 'cancelled' });
-        return Response.json({ error: 'Mercado Pago no está configurado' }, { status: 500 });
+      const demoMode = mp.demo_mode === true || !mp.access_token;
+      if (demoMode) {
+        // Modo demo: confirma la entrada sin cobrar. Útil para probar el flujo
+        // completo (QR + confirmación) sin credenciales reales de Mercado Pago.
+        await base44.asServiceRole.entities.Ticket.update(ticket.id, { status: 'paid' });
+        return Response.json({ ticket_id: ticket.id, demo: true });
       }
       const backBase = mp.back_url_base || app_base_url || '';
       const prefBody = {
