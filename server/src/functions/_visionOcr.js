@@ -8,6 +8,7 @@
 //   3) Ninguna → las funciones caen a Tesseract local.
 import fs from 'node:fs';
 import path from 'node:path';
+import net from 'node:net';
 import { prisma } from '../db/prisma.js';
 
 const ENV_KEY = process.env.VISION_API_KEY || '';
@@ -53,9 +54,46 @@ function imageToDataUrl(filePath) {
   return `data:${mime};base64,${buf.toString('base64')}`;
 }
 
+// Probe rápido de alcanzabilidad del endpoint de visión (<2s). En un servidor
+// air-gapped sin internet, la API key está configurada pero el endpoint no se
+// alcanza: detectarlo rápido evita esperar el timeout de fetch (30s) en cada
+// OCR y cae de inmediato al Tesseract local. Se cachea el resultado 60s.
+let _reachCache = null;
+let _reachAt = 0;
+async function isReachable(baseUrl, timeoutMs = 1500) {
+  const now = Date.now();
+  if (_reachCache !== null && now - _reachAt < 60000) return _reachCache;
+  _reachAt = now;
+  let ok = false;
+  try {
+    const u = new URL(baseUrl);
+    const host = u.hostname;
+    const port = u.port ? Number(u.port) : (u.protocol === 'https:' ? 443 : 80);
+    ok = await Promise.race([
+      new Promise((resolve) => {
+        const sock = net.createConnection({ host, port });
+        const t = setTimeout(() => { sock.destroy(); resolve(false); }, timeoutMs);
+        sock.once('connect', () => { clearTimeout(t); sock.destroy(); resolve(true); });
+        sock.once('error', () => { clearTimeout(t); resolve(false); });
+      }),
+      new Promise((resolve) => setTimeout(() => resolve(false), timeoutMs + 500)),
+    ]);
+  } catch {
+    ok = false;
+  }
+  _reachCache = ok;
+  return ok;
+}
+
+export function invalidateVisionReachability() {
+  _reachCache = null;
+  _reachAt = 0;
+}
+
 export async function visionAvailable() {
   const cfg = await getVisionConfig();
-  return !!cfg.apiKey;
+  if (!cfg.apiKey) return false;
+  return isReachable(cfg.baseUrl);
 }
 
 // Llama a un endpoint OpenAI-compatible con visión. Devuelve el contenido de

@@ -132,3 +132,33 @@ export async function ocrDocument(filePath, { psm = 3, lang = 'spa' } = {}) {
   }
   return chunks.join('\n\n');
 }
+
+// ── Preprocesado de imagen para OCR ──────────────────────────────────────────
+// Usa ImageMagick (`convert`) si está disponible: pasa a grises, escala 2x,
+// normaliza el contraste, despeckle y sharpen. Mejora mucho la precisión de
+// Tesseract sobre fotos de cámara de DNIs. Si convert no existe, devuelve el
+// archivo original (Tesseract igual corre, con menor calidad).
+let _hasConvert;
+async function hasConvert() {
+  if (_hasConvert === undefined) {
+    try { await execFileAsync('convert', ['-version'], { timeout: 5000 }); _hasConvert = true; }
+    catch { _hasConvert = false; }
+  }
+  return _hasConvert;
+}
+
+export async function preprocessForOcr(filePath) {
+  if (!(await hasConvert())) return filePath;
+  const os = await import('node:os');
+  const out = path.join(os.tmpdir(), `ae-ocr-${Date.now()}-${Math.random().toString(36).slice(2)}.png`);
+  try {
+    await execFileAsync('convert', [
+      filePath, '-colorspace', 'Gray', '-resize', '200%',
+      '-normalize', '-despeckle', '-sharpen', '0x1', out,
+    ], { timeout: 25000, maxBuffer: 8 * 1024 * 1024 });
+    return out;
+  } catch {
+    try { fs.unlinkSync(out); } catch {}
+    return filePath;
+  }
+}

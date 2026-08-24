@@ -1,13 +1,14 @@
 // OCR de DNI argentino.
-// 1) Si hay VISION_API_KEY: usa un LLM de visión (igual que Base44 cloud con
-//    InvokeLLM) — extrae nombre/apellido/dni como JSON, máxima calidad.
-// 2) Si no: cae a Tesseract local con heurística basada en etiquetas (offline).
-//    El DNI imprime "APELLIDO"/"NOMBRE"/"DOCUMENTO" como etiquetas y el valor
-//    real va en la línea siguiente; detectamos la etiqueta y tomamos ese valor.
-//    El resultado es editable en el modal, así que la heurística imperfecta
-//    alcanza: el usuario corrige lo que haga falta.
+// 1) Si hay VISION_API_KEY y el endpoint es alcanzable (offline-aware): LLM de
+//    visión — extrae nombre/apellido/dni como JSON, máxima calidad.
+// 2) Si no: pipeline Tesseract mejorado — preprocesado con ImageMagick (grises,
+//    upscale 2x, normalizar, sharpen), multi-PSM (6/4/3) sobre original + imagen
+//    preprocesada, y se elige el resultado con mejor score (DNI válido + nombre
+//    + apellido). El resultado es editable en el modal, así que la heurística
+//    imperfecta alcanza: el usuario corrige lo que haga falta.
 
-import { resolveLocalPath, runTesseract } from './_ocr.js';
+import fs from 'node:fs';
+import { resolveLocalPath, runTesseract, preprocessForOcr } from './_ocr.js';
 import { visionExtract, visionAvailable } from './_visionOcr.js';
 
 // ── Camino 1: LLM de visión ─────────────────────────────────────────────────
@@ -34,23 +35,13 @@ Devolvé un JSON: {"apellido":"<APELLIDO>","nombre":"<NOMBRE>","dni":"<NNNNNNNN>
 }
 
 // ── Camino 2: Tesseract local (offline) ─────────────────────────────────────
-// Líneas que son exactamente una etiqueta del DNI (no son valores).
 const LABEL_EXACT = /^(apellido|nombre|nombres|documento|dni|cuil|cuit|domicilio|fecha\s*de\s*nacimiento|sexo|lugar\s*de\s*nacimiento|provincia|nacionalidad|estado\s*civil|expira|vencimiento|entidad|nacionalidad|de\s+apellido|de\s+nombre)$/i;
-// Líneas de decoración del DNI que no contienen datos del titular.
 const DECORATION = /(republica\s+argentina|meridiano|estado\s+plurinacional|nacionalidad\s+argentina|guia|identidad|documento\s+nacional|«|»|^\s*\W+\s*$)/i;
 
 function normalizeName(s) {
-  return s
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // quitar acentos
-    .toUpperCase()
-    .replace(/[^A-ZÑ ]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-ZÑ ]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-// Busca el valor asociado a una etiqueta: primero el resto de la misma línea
-// después de la etiqueta, luego la próxima línea con contenido que no sea
-// etiqueta ni decoración.
 function findValueAfterLabel(lines, labelRe) {
   for (let i = 0; i < lines.length; i++) {
     const m = lines[i].match(labelRe);
@@ -67,25 +58,8 @@ function findValueAfterLabel(lines, labelRe) {
   return '';
 }
 
-async function readDniWithTesseract(filePath) {
-  // Probar PSM 6 (bloque uniforme) y 4 (columna) — respetan el orden de líneas
-  // del DNI. Si ninguno devuelve texto, caemos a PSM 3 (auto página).
-  let text = '';
-  for (const psm of [6, 4, 3]) {
-    try {
-      const t = await runTesseract(filePath, { psm });
-      if (t && t.trim().length > (text.trim().length || 0)) text = t;
-      if (text.trim()) break;
-    } catch {}
-  }
-  if (!text.trim()) {
-    return { nombre: '', apellido: '', dni: '', raw_text: '(Tesseract no devolvió texto)' };
-  }
-
+function extractFromText(text) {
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
-
-  // DNI: etiqueta DOCUMENTO/DNI/CUIL seguida de dígitos (misma o próxima línea),
-  // luego primera línea con 7-8 dígitos, luego primer bloque 7-8 en el texto.
   let dni = '';
   const dniLabel = /^(dni|documento|cuil|cuit)\b/i;
   for (let i = 0; i < lines.length; i++) {
@@ -99,24 +73,13 @@ async function readDniWithTesseract(filePath) {
   if (!dni || dni.length < 7 || dni.length > 8) {
     for (const l of lines) {
       const m = l.match(/(\d[\d.]{6,9}\d)/);
-      if (m) {
-        const d = m[1].replace(/\D/g, '');
-        if (d.length >= 7 && d.length <= 8) { dni = d; break; }
-      }
+      if (m) { const d = m[1].replace(/\D/g, ''); if (d.length >= 7 && d.length <= 8) { dni = d; break; } }
     }
   }
-  if (!dni) {
-    const m = text.match(/\b(\d{7,8})\b/);
-    if (m) dni = m[1];
-  }
+  if (!dni) { const m = text.match(/\b(\d{7,8})\b/); if (m) dni = m[1]; }
 
-  // Apellido y nombre: valor asociado a la etiqueta correspondiente.
   let apellido = normalizeName(findValueAfterLabel(lines, /^apellido\b/i));
   let nombre = normalizeName(findValueAfterLabel(lines, /^nombre(s)?\b/i));
-
-  // Fallback: si no halló etiquetas, usar las primeras dos líneas con letras
-  // (>=3 letras, sin dígitos largos, sin etiquetas ni decoración). En el DNI
-  // argentino el apellido aparece antes que el nombre.
   if (!apellido && !nombre) {
     const nameLines = lines.filter((l) => {
       if (LABEL_EXACT.test(l) || DECORATION.test(l)) return false;
@@ -126,13 +89,37 @@ async function readDniWithTesseract(filePath) {
     apellido = normalizeName(nameLines[0] || '');
     nombre = normalizeName(nameLines[1] || '');
   }
+  return { nombre, apellido, dni, raw_text: text.slice(0, 500) };
+}
 
-  return {
-    nombre,
-    apellido,
-    dni,
-    raw_text: text.slice(0, 500),
-  };
+function scoreResult(r) {
+  let s = 0;
+  if (r.dni && r.dni.length >= 7 && r.dni.length <= 8) s += 4;
+  if (r.apellido && r.apellido.length >= 3) s += 2;
+  if (r.nombre && r.nombre.length >= 3) s += 2;
+  return s;
+}
+
+async function readDniWithTesseract(filePath) {
+  // Candidatos: imagen original + imagen preprocesada (grises/upscale/sharpen).
+  const candidates = [filePath];
+  let pre = filePath;
+  try { pre = await preprocessForOcr(filePath); } catch {}
+  if (pre && pre !== filePath && fs.existsSync(pre)) candidates.push(pre);
+
+  let best = { nombre: '', apellido: '', dni: '', raw_text: '' };
+  for (const cand of candidates) {
+    for (const psm of [6, 4, 3]) {
+      let text = '';
+      try { text = await runTesseract(cand, { psm }); } catch {}
+      if (!text || !text.trim()) continue;
+      const r = extractFromText(text);
+      if (scoreResult(r) > scoreResult(best)) best = r;
+    }
+  }
+  // Limpieza del preprocesado temporal.
+  if (pre !== filePath) { try { fs.unlinkSync(pre); } catch {} }
+  return best;
 }
 
 export async function readDni({ file_url } = {}) {

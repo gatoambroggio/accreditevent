@@ -2,7 +2,7 @@
 // create/update/delete aplicando la policy del motor.
 
 import { Router } from 'express';
-import { buildWhere, getPolicy, canAccess, mergeWhere, getModel } from './engine.js';
+import { buildWhere, getPolicy, canAccess, mergeWhere, getModel, modelHasField } from './engine.js';
 import { broadcast } from '../realtime/ws.js';
 
 // Normaliza un where de query (puede venir con operadores $in, $ne, $or, $and).
@@ -59,7 +59,8 @@ export function makeCrudRouter(entityName) {
   router.post('/', async (req, res, next) => {
     try {
       const policy = getPolicy(entityName, 'create');
-      const data = { ...req.body, created_by_id: req.user.id };
+      const data = { ...req.body };
+      if (modelHasField(entityName, 'created_by_id') && req.user?.id) data.created_by_id = req.user.id;
       if (!canAccess(policy, req.user, data)) return res.status(403).json({ error: 'El registro no cumple el contexto de creación' });
       const rec = await model.create({ data });
       broadcast(entityName, { id: rec.id, type: 'create', data: rec });

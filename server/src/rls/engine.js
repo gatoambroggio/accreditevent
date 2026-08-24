@@ -137,3 +137,24 @@ export function mergeWhere(userWhere, rlsWhere) {
   if (!userWhere || Object.keys(userWhere).length === 0) return rlsWhere;
   return { AND: [userWhere, rlsWhere] };
 }
+
+// ── Detección de campos del modelo vía el DMMF de Prisma ──────────────────────
+// Permite al CRUD genérico saber si un modelo define `created_by_id` antes de
+// inyectarlo en el create (Bar/BarProduct/BarSale/etc. no lo tienen y rompen con
+// "Unknown argument created_by_id"). Si el DMMF no está disponible, se preserva
+// el comportamiento anterior (inyectar siempre) para no perder la auditoría.
+const _accessorFields = new Map();
+try {
+  const models = prisma._dmmf?.datamodel?.models || [];
+  for (const m of models) {
+    _accessorFields.set(m.name.toLowerCase(), new Set((m.fields || []).map((f) => f.name)));
+  }
+} catch {}
+
+export function modelHasField(entityName, field) {
+  const accessor = ENTITY_TO_MODEL[entityName];
+  if (!accessor) return false;
+  if (_accessorFields.size === 0) return true; // DMMF no disponible: preserva comportamiento previo
+  const fields = _accessorFields.get(accessor.toLowerCase());
+  return fields ? fields.has(field) : false;
+}

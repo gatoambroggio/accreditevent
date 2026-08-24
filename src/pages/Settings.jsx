@@ -8,6 +8,7 @@ import ListEditor from '@/components/ui/list-editor';
 import { checkAgent, getAgentPrinters } from '@/lib/printAgent';
 import { downloadAgentScript } from '@/lib/printAgentFile';
 import PrinterSelect from '@/components/PrinterSelect';
+import SystemUpdate from '@/components/settings/SystemUpdate';
 
 function Field({ label, value, onChange, type = 'text', placeholder = '', hint }) {
   return (
@@ -730,6 +731,13 @@ export default function Settings() {
             </div>
           )}
         </Section>
+      )}
+
+      {user?.role === 'superadmin' && (
+        <div className="space-y-1.5">
+          <p className="font-mono text-[10px] uppercase tracking-wider text-emerald-600">Mantenimiento</p>
+          <SystemUpdate />
+        </div>
       )}
 
       <Section title="Catálogos" description="Acceso rápido a la gestión de catálogos del sistema">

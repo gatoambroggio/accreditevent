@@ -14,6 +14,8 @@ import { pdaRouter } from './routes/pda.js';
 import { filesRouter } from './routes/files.js';
 import { patentesRouter } from './routes/patentes.js';
 import { functionInvokeRouter } from './routes/functions.js';
+import { barFunctionsRouter } from './routes/barFunctions.js';
+import { updatesRouter } from './routes/updates.js';
 import { settingsRouter } from './routes/settings.js';
 import { downloadsRouter } from './routes/downloads.js';
 import { importRouter } from './routes/import.js';
@@ -50,6 +52,9 @@ export function createApp() {
   // Webhook + tienda pública de entradas: públicos (Mercado Pago y compradores anónimos).
   app.use('/api/webhooks/mercadopago', mercadoPagoRouter);
   app.use('/api/public/tickets', ticketsPublicRouter);
+  // Funciones de barra para la tablet (login, venta, heartbeat) — sin token de
+  // plataforma. manageBarOperator queda en /api/functions (la llama el admin).
+  app.use('/api/bar-fn', barFunctionsRouter);
 
   // Todo lo demás requiere auth (adjunta user a req.user).
   app.use('/api/files', requireAuth, filesRouter);
@@ -57,6 +62,7 @@ export function createApp() {
   app.use('/api/functions', requireAuth, functionInvokeRouter);
   app.use('/api/settings', requireAuth, settingsRouter);
   app.use('/api/import', requireAuth, importRouter);
+  app.use('/api/updates', requireAuth, updatesRouter);
 
   // CRUD genérico con RLS por entidad.
   app.use('/api/events', requireAuth, eventsRouter);

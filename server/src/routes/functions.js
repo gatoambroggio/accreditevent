@@ -38,6 +38,7 @@ import { dahuaRemoteAction } from '../functions/dahuaRemoteAction.js';
 import { webauthnRegister } from '../functions/webauthnRegister.js';
 import { webauthnVerify } from '../functions/webauthnVerify.js';
 import { exportData } from '../functions/exportData.js';
+import { manageBarOperator } from '../functions/manageBarOperator.js';
 
 export const functionInvokeRouter = Router();
 
@@ -54,6 +55,7 @@ const handlers = {
   deletePerson, cleanupDatabase, closeExpiredEvents,
   dahuaSyncUsers, dahuaRemoteAction, webauthnRegister, webauthnVerify,
   exportData,
+  manageBarOperator,
 };
 
 functionInvokeRouter.post('/:name', async (req, res, next) => {

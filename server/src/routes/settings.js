@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../db/prisma.js';
-import { invalidateVisionCache } from '../functions/_visionOcr.js';
+import { invalidateVisionCache, invalidateVisionReachability } from '../functions/_visionOcr.js';
 
 export const settingsRouter = Router();
 
@@ -37,6 +37,7 @@ async function applyUpdate(id, data) {
     }
   }
   invalidateVisionCache();
+  invalidateVisionReachability();
   return s;
 }
 

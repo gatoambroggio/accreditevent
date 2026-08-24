@@ -204,9 +204,13 @@ const auth = {
 };
 
 // --- Funciones backend (mismo contrato que base44.functions.invoke) ---
+// Funciones de barra que usa la TABLET (sin token de plataforma) van a la ruta
+// pública /bar-fn; el resto a /functions (requiere auth).
+const BAR_FNS = new Set(['barOperatorLogin', 'barSale', 'barTabletHeartbeat']);
 const functions = {
   async invoke(name, payload) {
-    const res = await http(`/functions/${name}`, { method: 'POST', body: payload });
+    const p = BAR_FNS.has(name) ? `/bar-fn/${name}` : `/functions/${name}`;
+    const res = await http(p, { method: 'POST', body: payload });
     // el servidor responde { data: ... } para emular el SDK
     return res;
   },
