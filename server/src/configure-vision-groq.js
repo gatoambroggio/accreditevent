@@ -11,7 +11,7 @@ import { prisma } from './db/prisma.js';
 
 const GROQ_KEY = process.env.GROQ_API_KEY || process.argv[2] || '';
 const GROQ_BASE = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = process.env.GROQ_MODEL || 'meta-llama/llama-4-scout-17b-16e-instruct';
+const GROQ_MODEL = process.env.GROQ_MODEL || 'qwen/qwen3.6-27b';
 
 async function main() {
   if (!GROQ_KEY) {
