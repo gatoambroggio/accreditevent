@@ -8,7 +8,7 @@
 import { prisma } from './db/prisma.js';
 
 async function main() {
-  const model = process.env.VISION_MODEL_NAME || 'minicpm-v';
+  const model = process.env.VISION_MODEL_NAME || 'moondream';
   const vision = {
     // Ollama no exige auth, pero visionAvailable() requiere una api_key presente
     // para habilitar el camino de visión (si no, cae a Tesseract). 'ollama' es un

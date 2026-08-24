@@ -411,8 +411,10 @@ fi
 # que readDni / readPatente ya saben usar (SystemSetting.vision_ocr). Si no se
 # puede instalar (sin internet y sin binario/modelo local), el OCR sigue con
 # Tesseract — no rompe nada.
-step "Modelo de visión local (Ollama + minicpm-v) — OCR de DNI/patentes"
-VISION_MODEL_NAME="${VISION_MODEL_NAME:-minicpm-v}"
+step "Modelo de visión local (Ollama + moondream) — OCR de DNI/patentes"
+# moondream (1.8b) corre en CPU en ~15-25s y lee el DNI mucho mejor que Tesseract.
+# Si más adelante ponés GPU NVIDIA, el modelo sigue funcionando (y mucho más rápido).
+VISION_MODEL_NAME="${VISION_MODEL_NAME:-moondream}"
 OLLAMA_OK=0
 VISION_STATUS="no instalado (OCR usa Tesseract)"
 
@@ -475,7 +477,7 @@ EOF
     if systemctl cat ollama 2>/dev/null | grep -qE '^User=ollama'; then OLLAMA_USER="ollama"; fi
 
     if ! sudo -u "$OLLAMA_USER" ollama list 2>/dev/null | grep -qw "$VISION_MODEL_NAME"; then
-      log "Cargando modelo de visión $VISION_MODEL_NAME (la 1ra vez baja ~2.5GB y puede tardar varios minutos)..."
+      log "Cargando modelo de visión $VISION_MODEL_NAME (la 1ra vez baja ~1.9GB y puede tardar varios minutos)..."
       # Estrategia 1: pull desde Ollama (internet)
       if sudo -u "$OLLAMA_USER" ollama pull "$VISION_MODEL_NAME" >/dev/null 2>&1; then
         ok "Modelo $VISION_MODEL_NAME descargado desde Ollama"
@@ -497,7 +499,7 @@ EOF
           rm -rf "$TMP_MOD"
         else
           warn "No se pudo bajar $VISION_MODEL_NAME (sin internet ni .gguf local). Visión queda en espera; OCR sigue con Tesseract."
-          echo "    Descargá el .gguf de minicpm-v en una PC con internet, copialo a"
+          echo "    Descargá el .gguf de moondream en una PC con internet, copialo a"
           echo "    server/models/$VISION_MODEL_NAME.gguf y volvé a correr: sudo bash server/install.sh"
         fi
       fi

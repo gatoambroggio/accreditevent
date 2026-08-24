@@ -124,11 +124,11 @@ export async function visionExtract(filePath, { prompt, jsonSchema } = {}) {
     temperature: 1,
   };
 
-  // Una API de visión cloud (Groq/OpenAI) responde en 2-4s. 30s da margen amplio
-  // y, si el endpoint tarda más, aborta y cae rápido al fallback Tesseract en
-  // vez de colgar al operador (que antes esperaba 2-3 min hasta el 504).
+  // moondream en CPU responde en ~15-25s; con GPU en 2-4s. 90s da margen amplio
+  // para CPU lento sin colgar al operador. Nginx proxy_read_timeout está en 120s,
+  // así que el cliente no se corta antes que el fetch.
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 30000);
+  const timer = setTimeout(() => controller.abort(), 90000);
   let res;
   try {
     res = await fetch(cfg.baseUrl, {
