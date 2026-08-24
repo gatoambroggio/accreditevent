@@ -107,7 +107,7 @@ export default function Barras() {
         </div>
       )}
 
-      {barModal && <BarFormModal bar={barModal} onClose={() => setBarModal(null)} onSave={saveBar} />}
+      {barModal && <BarFormModal bar={barModal} sectors={events.find((e) => e.id === eventId)?.bar_sectors || []} onClose={() => setBarModal(null)} onSave={saveBar} />}
     </div>
   );
 }

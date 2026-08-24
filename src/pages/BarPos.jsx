@@ -60,7 +60,7 @@ export default function BarPos() {
         setEvent(ev);
         setProducts(ps);
         setDevices(devs);
-        if (ev?.bar_sectors?.length) setSector(ev.bar_sectors[0].value);
+        if (b?.sectors?.length) setSector(b.sectors[0].value);
       } catch {}
       setLoading(false);
       try {
@@ -351,9 +351,9 @@ export default function BarPos() {
 
       <div className="flex flex-1 overflow-hidden">
         <div className="flex flex-1 flex-col overflow-hidden">
-          {event?.bar_sectors?.length > 0 && (
+          {bar?.sectors?.length > 0 && (
             <div className="flex gap-2 overflow-x-auto border-b border-slate-200 bg-white px-5 py-2">
-              {event.bar_sectors.map((s) => (
+              {bar.sectors.map((s) => (
                 <button key={s.value} onClick={() => setSector(s.value)} className={`whitespace-nowrap rounded-xl px-5 py-2.5 text-sm font-extrabold transition ${sector === s.value ? 'bg-indigo-600 text-white shadow' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
                   {s.label}
                 </button>

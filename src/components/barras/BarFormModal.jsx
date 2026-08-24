@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 
-export default function BarFormModal({ bar, onClose, onSave }) {
+export default function BarFormModal({ bar, sectors = [], onClose, onSave }) {
   const [b, setB] = useState(bar);
+  const toggleSector = (s) => {
+    const cur = b.sectors || [];
+    const has = cur.find((x) => x.value === s.value);
+    setB({ ...b, sectors: has ? cur.filter((x) => x.value !== s.value) : [...cur, s] });
+  };
+  const isSel = (val) => (b.sectors || []).some((x) => x.value === val);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={onClose}>
       <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
@@ -15,6 +21,20 @@ export default function BarFormModal({ bar, onClose, onSave }) {
             <label className="mb-1 block text-xs font-semibold text-slate-600">Ubicación</label>
             <input value={b.location || ''} onChange={(e) => setB({ ...b, location: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="Sector VIP, junto al escenario…" />
           </div>
+          {sectors.length > 0 && (
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-600">Sectores que atiende</label>
+              <p className="mb-2 text-[11px] text-slate-400">Elegí los sectores del evento que esta barra cobra. En el POS se seleccionan con botones y cambian los precios.</p>
+              <div className="flex flex-wrap gap-2">
+                {sectors.map((s) => (
+                  <button type="button" key={s.value} onClick={() => toggleSector(s)} className={`rounded-xl border px-3 py-1.5 text-sm font-bold transition ${isSel(s.value) ? 'border-indigo-500 bg-indigo-600 text-white' : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+              {(b.sectors || []).length === 0 && <p className="mt-1 text-xs text-slate-400">Sin sectores elegidos · el POS usará precio base.</p>}
+            </div>
+          )}
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={b.status === 'active'} onChange={(e) => setB({ ...b, status: e.target.checked ? 'active' : 'inactive' })} className="h-4 w-4 accent-emerald-600" />
             <span className="text-sm text-slate-700">Barra activa</span>
