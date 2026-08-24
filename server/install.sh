@@ -538,7 +538,9 @@ PADDLE_OK=0
 if ! has python3; then
   warn "python3 no disponible — PaddleOCR salteado. OCR sigue con VLM/Tesseract."
 else
-  apt-get install -qq -y python3-pip >/dev/null 2>&1 || true
+  # Libs de sistema que OpenCV (dep de PaddleOCR) necesita en un server sin
+  # escritorio: sin libgl1 el import de cv2 truena con "libGL.so.1 not found".
+  apt-get install -qq -y python3-pip libgl1 libglib2.0-0 libgomp1 libsm6 libxext6 libxrender1 >/dev/null 2>&1 || warn "Algunas libs de sistema no se instalaron — PaddleOCR podría fallar al importar cv2."
   # Estrategia 1: bundle local de wheels (air-gapped, sin internet)
   PADDLE_BUNDLE=""
   for b in "$REPO_DIR/server/bin/paddle-packages" "$APP_HOME/server/bin/paddle-packages"; do
@@ -564,16 +566,19 @@ else
       echo "    copiá esa carpeta al servidor y volvé a correr: sudo bash server/install.sh"
     fi
   fi
-  # Warmup como APP_USER: la 1ra vez PaddleOCR baja los modelos de detección +
-  # reconocimiento (~100MB). Hacerlo ahora (ventana de internet) y bajo el
-  # usuario del servicio, para que air-gapped los encuentre en su home.
+  # Warmup como APP_USER contra la copia INSTALADA en APP_HOME (no el repo
+  # fuente, que accreditevent no puede leer → "Permission denied"). La 1ra vez
+  # PaddleOCR baja los modelos de detección + reconocimiento (~100MB) bajo el
+  # usuario del servicio, para que air-gapped los encuentre en su home. No
+  # silenciamos stderr: si falla, el error real queda visible en el log.
+  PADDLE_PY="$APP_HOME/server/src/functions/_paddleOcr.py"
   if [[ $PADDLE_OK -eq 1 ]]; then
     log "Precargando modelos de PaddleOCR (descarga única ~100MB la 1ra vez)..."
-    if sudo -u "$APP_USER" -H bash -lc "python3 '$REPO_DIR/server/src/functions/_paddleOcr.py' --warmup" >/dev/null 2>&1; then
+    if sudo -u "$APP_USER" -H bash -lc "python3 '$PADDLE_PY' --warmup"; then
       ok "PaddleOCR funcional (modelos cargados para $APP_USER)"
     else
-      warn "PaddleOCR instalado pero el warmup falló (¿sin internet para modelos?)."
-      echo "    Copiá ~/.paddleocr de un equipo con internet a ~$APP_USER/.paddleocr en el server."
+      warn "PaddleOCR instalado pero el warmup falló — ver error arriba ↑"
+      echo "    Si es por modelos: copiá ~/.paddleocr de un equipo con internet a ~$APP_USER/.paddleocr."
     fi
   fi
 fi
