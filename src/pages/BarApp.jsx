@@ -101,7 +101,7 @@ export default function BarApp() {
               autoCorrect="off"
               autoComplete="username"
               placeholder="ej. barra1"
-              className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-4 text-lg font-semibold text-white outline-none placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30"
+              className="normal-case w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-4 text-lg font-semibold text-white outline-none placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30"
             />
           </label>
           <label className="block">
@@ -112,7 +112,7 @@ export default function BarApp() {
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
               placeholder="••••••"
-              className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-4 text-lg font-semibold text-white outline-none placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30"
+              className="normal-case w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-4 text-lg font-semibold text-white outline-none placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30"
             />
           </label>
           {loginError && (
