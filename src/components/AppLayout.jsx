@@ -192,10 +192,13 @@ export default function AppLayout() {
   }), [navItems, settings, isProvider, isEmpresa, hasRestriction, effectivePaths, role, userLevel]);
   const isActive = (path) => (path === '/' ? location.pathname === '/' : location.pathname.startsWith(path));
   const navEntries = React.useMemo(() => resolveNav({ settings, role, allItems: NAV_ITEMS, visibleItems }), [settings, role, visibleItems]);
-  useEffect(() => {
+  const activeGroupKey = React.useMemo(() => {
     const e = navEntries.find((en) => en.type === 'group' && en.group.items.some((it) => isActive(it.path)));
-    setExpandedNav(e ? 'group:' + e.group.id : null);
-  }, [location.pathname, navEntries]);
+    return e ? 'group:' + e.group.id : null;
+  }, [navEntries, location.pathname]);
+  useEffect(() => {
+    setExpandedNav(activeGroupKey);
+  }, [activeGroupKey]);
 
   return (
     <div className="min-h-screen bg-background">

@@ -674,7 +674,7 @@ export default function Settings() {
         </div>
       </Section>
 
-      <Section title="Grupos de módulos" description="Agrupá módulos del menú lateral en grupos colapsables (ej. Estacionamiento, Vehículos, Barras). Reordená grupos y módulos con ▲▼. Elegí por rol si ve el menú agrupado o plano. La posición de cada grupo en el menú la da el orden de su primer módulo en la matriz de arriba (▲▼ allí mueve el grupo); el orden dentro del grupo se define acá.">
+      <Section title="Grupos de módulos" description="Agrupá módulos del menú lateral en grupos colapsables (ej. Estacionamiento, Vehículos, Barras). En el menú, primero aparecen los módulos comunes (sueltos) en el orden de la matriz de arriba, y después los grupos (en el orden que definas acá con ▲▼). Reordená también los módulos dentro de cada grupo con ▲▼. Elegí por rol si ve el menú agrupado o plano.">
         <ModuleGroupsEditor settings={settings} update={update} />
       </Section>
 
