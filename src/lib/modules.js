@@ -1,3 +1,9 @@
+// Fuente de verdad única de los módulos del sistema (menú lateral + matriz de
+// acceso por roles). El orden de este array es el orden default del menú; el
+// administrador puede reordenar desde Configuración → Acceso por roles
+// (se persiste en SystemSetting.module_order y lo respetan el menú y la matriz).
+// Cada módulo DEBE tener su entrada en DEFAULT_ROLE_ACCESS para que el acceso
+// por roles sea efectivo al guardar.
 export const MODULES = [
   { path: '/', label: 'Resumen' },
   { path: '/events', label: 'Eventos' },
@@ -17,18 +23,25 @@ export const MODULES = [
   { path: '/zkteco-devices', label: 'Terminales ZKTeco' },
   { path: '/dahua-devices', label: 'Terminales Dahua' },
   { path: '/reports', label: 'Reportes' },
+  { path: '/notifications', label: 'Notificaciones' },
   { path: '/messages', label: 'Mensajes' },
   { path: '/documents', label: 'Documentos' },
   { path: '/registered-people', label: 'Personas registradas' },
   { path: '/registered-vehicles', label: 'Vehículos registrados' },
   { path: '/vehicles', label: 'Vehículos acreditados' },
   { path: '/patentes', label: 'Lector de patentes' },
-  { path: '/parking-sectors', label: 'Estacionamiento' },
+  { path: '/parking-sectors', label: 'Sectores de estacionamiento' },
+  { path: '/parking-capacities', label: 'Capacidades por evento' },
   { path: '/ticket-sales', label: 'Venta de entradas' },
   { path: '/control-entradas', label: 'Control de entradas' },
+  { path: '/barras', label: 'Barras y bebida' },
+  { path: '/barras-reportes', label: 'Reportes de barras' },
+  { path: '/caja', label: 'Caja y retiros' },
   { path: '/companies', label: 'Empresas' },
   { path: '/users', label: 'Usuarios y roles' },
   { path: '/audit', label: 'Auditoría' },
+  { path: '/custom-fields', label: 'Campos personalizados' },
+  { path: '/apariencia', label: 'Apariencia' },
   { path: '/settings', label: 'Configuración' },
 ];
 
@@ -53,6 +66,7 @@ export const DEFAULT_ROLE_ACCESS = {
   '/zkteco-devices': ['coordinator', 'productora', 'admin', 'superadmin'],
   '/dahua-devices': ['coordinator', 'productora', 'admin', 'superadmin'],
   '/reports': ['coordinator', 'productora', 'admin', 'superadmin'],
+  '/notifications': ['coordinator', 'productora', 'admin', 'superadmin'],
   '/messages': ['coordinator', 'productora', 'admin', 'superadmin'],
   '/documents': ['coordinator', 'productora', 'admin', 'superadmin'],
   '/registered-people': ['coordinator', 'productora', 'admin', 'superadmin'],
@@ -60,10 +74,16 @@ export const DEFAULT_ROLE_ACCESS = {
   '/vehicles': ['coordinator', 'productora', 'admin', 'superadmin'],
   '/patentes': ['control', 'coordinator', 'productora', 'admin', 'superadmin'],
   '/parking-sectors': ['coordinator', 'productora', 'admin', 'superadmin'],
+  '/parking-capacities': ['coordinator', 'productora', 'admin', 'superadmin'],
   '/ticket-sales': ['coordinator', 'productora', 'admin', 'superadmin'],
   '/control-entradas': ['control', 'coordinator', 'productora', 'admin', 'superadmin'],
+  '/barras': ['coordinator', 'productora', 'admin', 'superadmin'],
+  '/barras-reportes': ['coordinator', 'productora', 'admin', 'superadmin'],
+  '/caja': ['coordinator', 'productora', 'admin', 'superadmin'],
   '/companies': ['productora', 'admin', 'superadmin'],
   '/users': ['admin', 'superadmin'],
   '/audit': ['admin', 'superadmin'],
+  '/custom-fields': ['admin', 'superadmin'],
+  '/apariencia': ['admin', 'superadmin'],
   '/settings': ['admin', 'superadmin'],
 };

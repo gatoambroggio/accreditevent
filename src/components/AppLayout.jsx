@@ -75,10 +75,8 @@ const NAV_ITEMS = [
   { path: '/registered-vehicles', label: 'Vehículos registrados', icon: ClipboardList, minLevel: 1 },
   { path: '/vehicles', label: 'Vehículos acreditados', icon: Car, minLevel: 1 },
   { path: '/patentes', label: 'Lector de patentes', icon: ScanSearch, minLevel: 0 },
-  { path: '/parking', label: 'Estacionamiento', icon: SquareParking, minLevel: 1, expandable: true, children: [
-    { path: '/parking-sectors', label: 'Sectores de estacionamiento' },
-    { path: '/parking-capacities', label: 'Capacidades por evento' },
-  ] },
+  { path: '/parking-sectors', label: 'Sectores de estacionamiento', icon: SquareParking, minLevel: 1 },
+  { path: '/parking-capacities', label: 'Capacidades por evento', icon: SquareParking, minLevel: 1 },
   // Venta de entradas (ticketera)
   { path: '/ticket-sales', label: 'Venta de entradas', icon: Ticket, minLevel: 1 },
   { path: '/control-entradas', label: 'Control de entradas', icon: ScanSearch, minLevel: 0 },
@@ -171,7 +169,13 @@ export default function AppLayout() {
   const userAllowedPaths = user?.allowed_paths || user?.data?.allowed_paths || [];
   const effectivePaths = (Array.isArray(operatorModules) && operatorModules.length > 0) ? operatorModules : userAllowedPaths;
   const hasRestriction = Array.isArray(effectivePaths) && effectivePaths.length > 0;
-  const visibleItems = NAV_ITEMS.filter((item) => {
+  const navItems = React.useMemo(() => {
+    const order = settings?.module_order;
+    if (!order || !order.length) return NAV_ITEMS;
+    const rank = (p) => { const i = order.indexOf(p); return i < 0 ? Number.MAX_SAFE_INTEGER : i; };
+    return [...NAV_ITEMS].sort((a, b) => rank(a.path) - rank(b.path));
+  }, [settings?.module_order]);
+  const visibleItems = navItems.filter((item) => {
     if (item.module && !settings?.enabled_modules?.[item.module]) return false;
     if (item.providerOnly) return isProvider;
     if (isProvider) return false;

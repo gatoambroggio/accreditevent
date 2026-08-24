@@ -93,6 +93,14 @@
       "type": "object",
       "description": "Mapa de path de m\u00f3dulo a array de roles con acceso permitido"
     },
+    "module_order": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Orden de los m\u00f3dulos en el men\u00fa lateral y en la matriz de acceso por roles (array de paths). Si est\u00e1 vac\u00edo se usa el orden default de MODULES.",
+      "default": []
+    },
     "zones": {
       "type": "array",
       "items": {

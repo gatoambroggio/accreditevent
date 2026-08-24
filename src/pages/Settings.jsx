@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { Loader2, Save, Upload, ArrowRight, DatabaseZap, ShieldCheck, Download, Printer, Wifi, WifiOff, RefreshCw, ScanLine, Zap } from 'lucide-react';
+import { Loader2, Save, Upload, ArrowRight, DatabaseZap, ShieldCheck, Download, Printer, Wifi, WifiOff, RefreshCw, ScanLine, Zap, ChevronUp, ChevronDown } from 'lucide-react';
 import { MODULES, ROLES, DEFAULT_ROLE_ACCESS } from '@/lib/modules';
 import ListEditor from '@/components/ui/list-editor';
 import { checkAgent, getAgentPrinters } from '@/lib/printAgent';
@@ -156,6 +156,7 @@ export default function Settings() {
             system_name: 'AccreditEvent',
             organization_name: 'Acceso Eventos',
             role_access: DEFAULT_ROLE_ACCESS,
+            module_order: MODULES.map((m) => m.path),
             event_phases: DEFAULT_PHASES,
             employment_types: DEFAULT_EMPLOYMENT,
             person_types: DEFAULT_PERSON_TYPES,
@@ -205,6 +206,26 @@ export default function Settings() {
       return { ...s, role_access: { ...(s.role_access || {}), [path]: newList } };
     });
   };
+
+  const moveModule = (path, dir) => {
+    setSettings((s) => {
+      const base = (s.module_order?.length ? s.module_order : MODULES.map((m) => m.path)).slice();
+      const idx = base.indexOf(path);
+      if (idx < 0) return s;
+      const j = idx + dir;
+      if (j < 0 || j >= base.length) return s;
+      base.splice(idx, 1);
+      base.splice(j, 0, path);
+      return { ...s, module_order: base };
+    });
+  };
+
+  const sortedModules = (() => {
+    const base = settings?.module_order?.length ? settings.module_order : MODULES.map((m) => m.path);
+    const ordered = base.map((p) => MODULES.find((m) => m.path === p)).filter(Boolean);
+    const rest = MODULES.filter((m) => !base.includes(m.path));
+    return [...ordered, ...rest];
+  })();
 
   const handleLogoUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -267,6 +288,7 @@ export default function Settings() {
     setError('');
     setSuccess(false);
     try {
+      const fullRoleAccess = Object.fromEntries(MODULES.map((m) => [m.path, settings.role_access?.[m.path] ?? DEFAULT_ROLE_ACCESS[m.path] ?? []]));
       const updated = await base44.entities.SystemSetting.update(settings.id, {
         system_name: settings.system_name,
         organization_name: settings.organization_name,
@@ -278,7 +300,8 @@ export default function Settings() {
         mail_password: settings.mail_password,
         whatsapp_token: settings.whatsapp_token,
         whatsapp_phone_id: settings.whatsapp_phone_id,
-        role_access: settings.role_access,
+        role_access: fullRoleAccess,
+        module_order: settings.module_order ?? MODULES.map((m) => m.path),
         event_phases: settings.event_phases,
         employment_types: settings.employment_types,
         person_types: settings.person_types,
@@ -604,9 +627,9 @@ export default function Settings() {
         </div>
       </Section>
 
-      <Section title="Acceso por roles" description="Marcá qué roles pueden acceder a cada módulo del sistema">
+      <Section title="Acceso por roles y orden de módulos" description="Marcá qué roles pueden acceder a cada módulo. Usá ▲▼ para reordenarlos: ese orden se refleja en el menú lateral. Al guardar, todos los módulos quedan con su acceso por roles explícito.">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[600px] text-left">
+          <table className="w-full min-w-[640px] text-left">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
                 <th className="px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500">Módulo</th>
@@ -616,9 +639,17 @@ export default function Settings() {
               </tr>
             </thead>
             <tbody>
-              {MODULES.map((m) => (
+              {sortedModules.map((m, i) => (
                 <tr key={m.path} className="border-b border-slate-50">
-                  <td className="px-4 py-3 text-sm font-semibold text-slate-900">{m.label}</td>
+                  <td className="px-4 py-3 text-sm font-semibold text-slate-900">
+                    <div className="flex items-center gap-2">
+                      <span>{m.label}</span>
+                      <span className="inline-flex flex-col leading-none">
+                        <button type="button" onClick={() => moveModule(m.path, -1)} disabled={i === 0} className="text-slate-400 hover:text-emerald-600 disabled:opacity-30"><ChevronUp className="h-3.5 w-3.5" /></button>
+                        <button type="button" onClick={() => moveModule(m.path, 1)} disabled={i === sortedModules.length - 1} className="text-slate-400 hover:text-emerald-600 disabled:opacity-30"><ChevronDown className="h-3.5 w-3.5" /></button>
+                      </span>
+                    </div>
+                  </td>
                   {ROLES.map((r) => {
                     const checked = settings.role_access?.[m.path]?.includes(r) ?? DEFAULT_ROLE_ACCESS[m.path]?.includes(r) ?? false;
                     return (
