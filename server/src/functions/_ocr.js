@@ -15,7 +15,9 @@ const execFileAsync = promisify(execFile);
 export function resolveLocalPath(input) {
   if (!input) throw new Error('No se recibió imagen.');
   let filePath = input;
-  if (typeof input === 'string' && /^https?:\/\//.test(input)) {
+  if (typeof input === 'string' && input.startsWith('/uploads/')) {
+    filePath = path.join(env.uploadDir, path.basename(input));
+  } else if (typeof input === 'string' && /^https?:\/\//.test(input)) {
     let pathname = input;
     try { pathname = new URL(input).pathname; } catch {}
     if (pathname.startsWith('/uploads/')) {

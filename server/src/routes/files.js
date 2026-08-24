@@ -25,6 +25,6 @@ const upload = multer({
 
 filesRouter.post('/upload', upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Archivo requerido' });
-  const file_url = `${env.lanBaseUrl}/uploads/${req.file.filename}`;
+  const file_url = `/uploads/${req.file.filename}`;
   res.json({ file_url, original_name: req.file.originalname, size: req.file.size, mime_type: req.file.mimetype });
 });
