@@ -40,20 +40,32 @@ export default function Pdf417Scanner({ onScanned }) {
   const startCamera = async () => {
     setError(''); setResult(null);
     setStarting(true);
+    const cfg = { fps: 10, qrbox: { width: 300, height: 150 }, aspectRatio: 2.0 };
+    const make = () => new Html5Qrcode(CAM_REGION_ID, {
+      formatsToSupport: [Html5QrcodeSupportedFormats.PDF_417],
+      verbose: false,
+    });
     try {
-      const html5 = new Html5Qrcode(CAM_REGION_ID, {
-        formatsToSupport: [Html5QrcodeSupportedFormats.PDF_417],
-        verbose: false,
-      });
+      // Pedimos cámara trasera como ideal (no obligatoria): en desktop sin
+      // cámara trasera el navegador rechazaba el constraint exacto y la
+      // cámara nunca arrancaba. Con "ideal" cae a la webcam disponible.
+      const html5 = make();
       scannerRef.current = html5;
-      await html5.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 300, height: 150 }, aspectRatio: 2.0 },
-        onDecode,
-        () => {}
-      );
+      await html5.start({ facingMode: { ideal: 'environment' } }, cfg, onDecode, () => {});
       setCameraOn(true);
     } catch (e) {
+      // Reintento con la primera cámara enumerada (webcam de desktop).
+      try {
+        if (scannerRef.current) { try { await scannerRef.current.clear(); } catch {} scannerRef.current = null; }
+        const cams = await Html5Qrcode.getCameras();
+        if (cams && cams.length) {
+          const html5 = make();
+          scannerRef.current = html5;
+          await html5.start(cams[0].id, cfg, onDecode, () => {});
+          setCameraOn(true);
+          return;
+        }
+      } catch {}
       setError('No se pudo acceder a la cámara. Probá subir la imagen del reverso del DNI desde la pestaña "Imagen". ' + (e?.message || ''));
     } finally {
       setStarting(false);
@@ -100,8 +112,8 @@ export default function Pdf417Scanner({ onScanned }) {
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold text-slate-900">Escaneo PDF417 (reverso del DNI)</h2>
-          <p className="text-xs text-slate-500">Decodifica el código de barras 2D del reverso y devuelve los datos del titular.</p>
+          <h2 className="text-lg font-bold text-slate-900">Lector QR</h2>
+          <p className="text-xs text-slate-500">Escaneá el código de barras del reverso del DNI y devolvé los datos del titular.</p>
         </div>
         {result ? (
           <button onClick={reset} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">
