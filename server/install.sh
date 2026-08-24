@@ -524,6 +524,55 @@ EOF
   fi
 fi
 
+# ── 6d. PaddleOCR (OCR dedicado, preciso en CPU) ──────────────────────────────
+# A diferencia de los VLM (moondream) que ALUCINAN datos que no están impresos,
+# PaddleOCR es un motor de OCR real: lee EXACTAMENTE lo que está en el DNI.
+# Es el camino principal de readDni. Corre en CPU en 1-3s por imagen (sin GPU).
+step "PaddleOCR (OCR dedicado para DNI en CPU)"
+PADDLE_OK=0
+if ! has python3; then
+  warn "python3 no disponible — PaddleOCR salteado. OCR sigue con VLM/Tesseract."
+else
+  apt-get install -qq -y python3-pip >/dev/null 2>&1 || true
+  # Estrategia 1: bundle local de wheels (air-gapped, sin internet)
+  PADDLE_BUNDLE=""
+  for b in "$REPO_DIR/server/bin/paddle-packages" "$APP_HOME/server/bin/paddle-packages"; do
+    [[ -d "$b" ]] && { PADDLE_BUNDLE="$b"; break; }
+  done
+  if [[ -n "$PADDLE_BUNDLE" ]]; then
+    log "Instalando PaddleOCR desde bundle local: $PADDLE_BUNDLE"
+    if pip3 install --no-index --find-links="$PADDLE_BUNDLE" "paddlepaddle==2.6.1" "paddleocr==2.7.3" >/dev/null 2>&1; then
+      ok "PaddleOCR instalado desde bundle local"; PADDLE_OK=1
+    else
+      warn "Falló el bundle local — ver que tenga paddlepaddle + paddleocr + deps."
+    fi
+  fi
+  # Estrategia 2: pip desde PyPI (requiere internet una sola vez)
+  if [[ $PADDLE_OK -eq 0 ]]; then
+    log "Instalando PaddleOCR desde PyPI (requiere internet)..."
+    if pip3 install "paddlepaddle==2.6.1" "paddleocr==2.7.3" >/dev/null 2>&1; then
+      ok "PaddleOCR instalado desde PyPI"; PADDLE_OK=1
+    else
+      warn "No se pudo instalar PaddleOCR (sin internet ni bundle). OCR sigue con VLM/Tesseract."
+      echo "    Air-gapped: en una PC con internet corré"
+      echo "    'pip3 download paddlepaddle==2.6.1 paddleocr==2.7.3 -d server/bin/paddle-packages'"
+      echo "    copiá esa carpeta al servidor y volvé a correr: sudo bash server/install.sh"
+    fi
+  fi
+  # Warmup como APP_USER: la 1ra vez PaddleOCR baja los modelos de detección +
+  # reconocimiento (~100MB). Hacerlo ahora (ventana de internet) y bajo el
+  # usuario del servicio, para que air-gapped los encuentre en su home.
+  if [[ $PADDLE_OK -eq 1 ]]; then
+    log "Precargando modelos de PaddleOCR (descarga única ~100MB la 1ra vez)..."
+    if sudo -u "$APP_USER" -H bash -lc "python3 '$REPO_DIR/server/src/functions/_paddleOcr.py' --warmup" >/dev/null 2>&1; then
+      ok "PaddleOCR funcional (modelos cargados para $APP_USER)"
+    else
+      warn "PaddleOCR instalado pero el warmup falló (¿sin internet para modelos?)."
+      echo "    Copiá ~/.paddleocr de un equipo con internet a ~$APP_USER/.paddleocr en el server."
+    fi
+  fi
+fi
+
 # ── 7. systemd ────────────────────────────────────────────────────────────────
 step "Servicio systemd"
 cat > /etc/systemd/system/accreditevent.service <<EOF

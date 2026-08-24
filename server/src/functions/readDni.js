@@ -1,15 +1,16 @@
-// OCR de DNI argentino.
-// 1) Si hay VISION_API_KEY y el endpoint es alcanzable (offline-aware): LLM de
-//    visión — extrae nombre/apellido/dni como JSON, máxima calidad.
-// 2) Si no: pipeline Tesseract mejorado — preprocesado con ImageMagick (grises,
-//    upscale 2x, normalizar, sharpen), multi-PSM (6/4/3) sobre original + imagen
-//    preprocesada, y se elige el resultado con mejor score (DNI válido + nombre
-//    + apellido). El resultado es editable en el modal, así que la heurística
+// OCR de DNI argentino. Tres caminos en orden de calidad:
+// 1) PaddleOCR — motor de OCR dedicado (PP-OCRv4, español). Lee EXACTAMENTE lo
+//    impreso, no alucina como los VLM. Corre en CPU en 1-3s. Principal.
+// 2) LLM de visión (Ollama/moondream) — extrae nombre/apellido/dni como JSON.
+//    Respaldo: puede alucinar, por eso va después de PaddleOCR.
+// 3) Tesseract mejorado — preprocesado con ImageMagick, multi-PSM, mejor score.
+//    Último recurso. El resultado es editable en el modal, así que la heurística
 //    imperfecta alcanza: el usuario corrige lo que haga falta.
 
 import fs from 'node:fs';
 import { resolveLocalPath, runTesseract, preprocessForOcr } from './_ocr.js';
 import { visionExtract, visionAvailable } from './_visionOcr.js';
+import { paddleAvailable, paddleOcr } from './_paddleOcr.js';
 
 // ── Camino 1: LLM de visión ─────────────────────────────────────────────────
 async function readDniWithVision(filePath) {
@@ -32,6 +33,17 @@ Devolvé un JSON: {"apellido":"<APELLIDO>","nombre":"<NOMBRE>","dni":"<NNNNNNNN>
     dni,
     raw_text: `[vision] ${content.slice(0, 300)}`,
   };
+}
+
+// ── Camino 1b: PaddleOCR (OCR dedicado, preciso en CPU) ──────────────────────
+// Motor de OCR real (no VLM): lee lo impreso sin alucinar. Reutiliza la misma
+// heurística de extractFromText que Tesseract, así no duplica lógica de parsing.
+async function readDniWithPaddle(filePath) {
+  const lines = await paddleOcr(filePath);
+  const text = lines.map((l) => l.text).join('\n');
+  const r = extractFromText(text);
+  r.raw_text = `[paddle] ${text.slice(0, 500)}`;
+  return r;
 }
 
 // ── Camino 2: Tesseract local (offline) ─────────────────────────────────────
@@ -125,6 +137,17 @@ async function readDniWithTesseract(filePath) {
 export async function readDni({ file_url } = {}) {
   const filePath = resolveLocalPath(file_url);
 
+  // 1. PaddleOCR — motor de OCR dedicado (preciso en CPU, no alucina). Principal.
+  if (await paddleAvailable()) {
+    try {
+      const r = await readDniWithPaddle(filePath);
+      if (r && (r.dni || r.nombre || r.apellido)) return r;
+    } catch (e) {
+      console.warn('[readDni] paddle falló, siguiente camino:', e.message);
+    }
+  }
+
+  // 2. Visión (VLM) — respaldo; puede alucinar, por eso va después de PaddleOCR.
   if (await visionAvailable()) {
     try {
       const r = await readDniWithVision(filePath);
@@ -134,5 +157,6 @@ export async function readDni({ file_url } = {}) {
     }
   }
 
+  // 3. Tesseract local — último recurso.
   return readDniWithTesseract(filePath);
 }
