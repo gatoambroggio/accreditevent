@@ -245,6 +245,11 @@
         }
       },
       "default": {}
+    },
+    "bar_email_template": {
+      "type": "string",
+      "description": "Plantilla de email para crear operadores de barra con usuario libre. Us\u00e1 {u} como placeholder del usuario (ej. barras+{u}@ipx.com.ar). El operador se loguea en la tablet s\u00f3lo con su usuario; el sistema deriva el email real con esta plantilla.",
+      "default": ""
     }
   },
   "required": [],

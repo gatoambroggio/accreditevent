@@ -13,7 +13,7 @@
     "desired_role": {
       "type": "string",
       "default": "operador",
-      "description": "Rol que se aplicar\u00e1 al usuario cuando complete el registro (pda, operador, control, etc.)"
+      "description": "Rol que se aplicar\u00e1 al usuario cuando complete el registro (pda, operador, control, barra, etc.)"
     },
     "assigned_event_ids": {
       "type": "array",
@@ -43,6 +43,22 @@
       ],
       "default": "pending",
       "description": "Estado de la asignaci\u00f3n pendiente"
+    },
+    "bar_id": {
+      "type": "string",
+      "description": "Barra asignada al operador de barra (cuando desired_role=barra)"
+    },
+    "bar_event_id": {
+      "type": "string",
+      "description": "Evento de la barra asignada (denormalizado)"
+    },
+    "bar_username": {
+      "type": "string",
+      "description": "Usuario libre del operador de barra (ej. B1)"
+    },
+    "bar_password": {
+      "type": "string",
+      "description": "Contrase\u00f1a inicial a setear al confirmar el registro del operador de barra (transitoria: se limpia tras aplicarse)"
     }
   },
   "required": [
