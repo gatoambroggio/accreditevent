@@ -44,6 +44,7 @@ import {
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { applyTheme } from '@/lib/useTheme';
+import { resolveNav } from '@/lib/navGroups';
 
 export const ROLE_LEVEL = { provider: -1, empresa: -1, barra: 0, control: 0, operador: 0, coordinator: 1, productora: 1, admin: 2, superadmin: 3 };
 
@@ -106,7 +107,6 @@ export default function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [settings, setSettings] = useState(null);
   const [expandedNav, setExpandedNav] = useState(null);
-  const [navSubItems, setNavSubItems] = useState({});
   const [operatorModules, setOperatorModules] = useState([]);
 
   useEffect(() => {
@@ -157,9 +157,6 @@ export default function AppLayout() {
 
   useEffect(() => {
     setMobileOpen(false);
-    if (location.pathname.startsWith('/parking')) {
-      setExpandedNav('/parking');
-    }
   }, [location.pathname]);
 
   // effectivePaths: módulos permitidos para el usuario actual. Prioriza la lista
@@ -175,14 +172,13 @@ export default function AppLayout() {
     const rank = (p) => { const i = order.indexOf(p); return i < 0 ? Number.MAX_SAFE_INTEGER : i; };
     return [...NAV_ITEMS].sort((a, b) => rank(a.path) - rank(b.path));
   }, [settings?.module_order]);
-  const visibleItems = navItems.filter((item) => {
+  const visibleItems = React.useMemo(() => navItems.filter((item) => {
     if (item.module && !settings?.enabled_modules?.[item.module]) return false;
     if (item.providerOnly) return isProvider;
     if (isProvider) return false;
     if (isEmpresa) return false;
     if (hasRestriction) {
       if (item.path === '/') return true;
-      if (item.expandable && item.children?.some((c) => effectivePaths.includes(c.path))) return true;
       if (!effectivePaths.includes(item.path)) return false;
       return true;
     }
@@ -193,32 +189,13 @@ export default function AppLayout() {
       return settings.role_access[item.path].includes(role);
     }
     return userLevel >= item.minLevel;
-  });
-
+  }), [navItems, settings, isProvider, isEmpresa, hasRestriction, effectivePaths, role, userLevel]);
   const isActive = (path) => (path === '/' ? location.pathname === '/' : location.pathname.startsWith(path));
-
-  const urlParams = new URLSearchParams(location.search);
-  const activeCompany = urlParams.get('company');
-
-  const toggleNavExpand = async (item) => {
-    const key = item.path;
-    if (expandedNav === key) {
-      setExpandedNav(null);
-      return;
-    }
-    setExpandedNav(key);
-    if (!navSubItems[key]) {
-      try {
-        let companies = [];
-        if (key === '/provider-companies') {
-          companies = await base44.entities.ProviderCompany.list('name', 500);
-        }
-        setNavSubItems((prev) => ({ ...prev, [key]: companies }));
-      } catch {
-        setNavSubItems((prev) => ({ ...prev, [key]: [] }));
-      }
-    }
-  };
+  const navEntries = React.useMemo(() => resolveNav({ settings, role, allItems: NAV_ITEMS, visibleItems }), [settings, role, visibleItems]);
+  useEffect(() => {
+    const e = navEntries.find((en) => en.type === 'group' && en.group.items.some((it) => isActive(it.path)));
+    setExpandedNav(e ? 'group:' + e.group.id : null);
+  }, [location.pathname, navEntries]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -262,70 +239,54 @@ export default function AppLayout() {
           <p className="mt-0.5 truncate text-sm font-semibold text-white">{orgName}</p>
         </div>
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3">
-          {visibleItems.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item.path);
-            const isExpanded = expandedNav === item.path;
-            const subItems = navSubItems[item.path] || [];
-            return (
-              <div key={item.path}>
-                {item.expandable ? (
+          {navEntries.map((entry) => {
+            if (entry.type === 'group') {
+              const g = entry.group;
+              const key = 'group:' + g.id;
+              const isExpanded = expandedNav === key;
+              const anyActive = g.items.some((it) => isActive(it.path));
+              return (
+                <div key={key}>
                   <button
-                    onClick={() => toggleNavExpand(item)}
-                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
-                      active || isExpanded ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                    }`}
+                    onClick={() => setExpandedNav(isExpanded ? null : key)}
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${anyActive || isExpanded ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
                   >
-                    <Icon className="h-5 w-5 shrink-0" strokeWidth={active ? 2.5 : 2} />
-                    <span className="flex-1 text-left">{item.label}</span>
+                    <span className="flex-1 text-left">{g.label}</span>
                     <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                   </button>
-                ) : (
-                  <Link
-                    to={item.path}
-                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
-                      active ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                    }`}
-                  >
-                    <Icon className="h-5 w-5 shrink-0" strokeWidth={active ? 2.5 : 2} />
-                    <span>{item.label}</span>
-                  </Link>
-                )}
-                {item.expandable && isExpanded && (
-                  <div className="mt-0.5 ml-4 space-y-0.5 border-l border-white/10 pl-2">
-                    {item.children ? (
-                      item.children.map((child) => {
-                        const childActive = isActive(child.path);
+                  {isExpanded && (
+                    <div className="mt-0.5 ml-4 space-y-0.5 border-l border-white/10 pl-2">
+                      {g.items.map((it) => {
+                        const Icon = it.icon;
+                        const active = isActive(it.path);
                         return (
                           <Link
-                            key={child.path}
-                            to={child.path}
-                            className={`flex items-center rounded-lg px-3 py-2 text-xs font-medium transition ${
-                              childActive ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                            }`}
+                            key={it.path}
+                            to={it.path}
+                            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium transition ${active ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
                           >
-                            {child.label}
+                            <Icon className="h-4 w-4 shrink-0" strokeWidth={active ? 2.5 : 2} />
+                            <span>{it.label}</span>
                           </Link>
                         );
-                      })
-                    ) : subItems.length === 0 ? (
-                      <div className="px-3 py-2 text-xs text-slate-500">Sin empresas</div>
-                    ) : (
-                      subItems.map((company) => (
-                        <Link
-                          key={company.id}
-                          to={`${item.path}?company=${encodeURIComponent(company.name)}`}
-                          className={`flex items-center rounded-lg px-3 py-2 text-xs font-medium transition ${
-                            activeCompany === company.name ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                          }`}
-                        >
-                          {company.name}
-                        </Link>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            const item = entry.item;
+            const Icon = item.icon;
+            const active = isActive(item.path);
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${active ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
+              >
+                <Icon className="h-5 w-5 shrink-0" strokeWidth={active ? 2.5 : 2} />
+                <span>{item.label}</span>
+              </Link>
             );
           })}
         </nav>

@@ -98,8 +98,38 @@
       "items": {
         "type": "string"
       },
-      "description": "Orden de los m\u00f3dulos en el men\u00fa lateral y en la matriz de acceso por roles (array de paths). Si est\u00e1 vac\u00edo se usa el orden default de MODULES.",
+      "description": "Orden de los m\u00f3dulos en el men\u00fa lateral (plano) y posici\u00f3n de los grupos (por su primer miembro). Si est\u00e1 vac\u00edo se usa el orden default de MODULES.",
       "default": []
+    },
+    "module_groups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "ID \u00fanico del grupo"
+          },
+          "label": {
+            "type": "string",
+            "description": "Nombre visible del grupo en el men\u00fa"
+          },
+          "module_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Paths de los m\u00f3dulos del grupo, en orden de visualizaci\u00f3n"
+          }
+        }
+      },
+      "description": "Grupos de m\u00f3dulos del men\u00fa lateral (array ordenado). Los m\u00f3dulos no incluidos en ning\u00fan grupo se muestran como \u00edtems sueltos. Si el campo no existe (no es array) se derivan los grupos por defecto (Estacionamiento, Veh\u00edculos, Barras).",
+      "default": []
+    },
+    "grouped_by_role": {
+      "type": "object",
+      "description": "Mapa rol\u2192boolean que indica si ese rol ve el men\u00fa agrupado (true) o plano (false). Si un rol no est\u00e1 en el mapa, admin/superadmin ven agrupado por defecto y el resto plano.",
+      "default": {}
     },
     "zones": {
       "type": "array",

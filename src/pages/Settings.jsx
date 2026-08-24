@@ -9,6 +9,7 @@ import { checkAgent, getAgentPrinters } from '@/lib/printAgent';
 import { downloadAgentScript } from '@/lib/printAgentFile';
 import PrinterSelect from '@/components/PrinterSelect';
 import SystemUpdate from '@/components/settings/SystemUpdate';
+import ModuleGroupsEditor from '@/components/settings/ModuleGroupsEditor';
 
 function Field({ label, value, onChange, type = 'text', placeholder = '', hint }) {
   return (
@@ -157,6 +158,7 @@ export default function Settings() {
             organization_name: 'Acceso Eventos',
             role_access: DEFAULT_ROLE_ACCESS,
             module_order: MODULES.map((m) => m.path),
+            grouped_by_role: { admin: true, superadmin: true },
             event_phases: DEFAULT_PHASES,
             employment_types: DEFAULT_EMPLOYMENT,
             person_types: DEFAULT_PERSON_TYPES,
@@ -302,6 +304,8 @@ export default function Settings() {
         whatsapp_phone_id: settings.whatsapp_phone_id,
         role_access: fullRoleAccess,
         module_order: settings.module_order ?? MODULES.map((m) => m.path),
+        module_groups: settings.module_groups,
+        grouped_by_role: settings.grouped_by_role,
         event_phases: settings.event_phases,
         employment_types: settings.employment_types,
         person_types: settings.person_types,
@@ -668,6 +672,10 @@ export default function Settings() {
             </tbody>
           </table>
         </div>
+      </Section>
+
+      <Section title="Grupos de módulos" description="Agrupá módulos del menú lateral en grupos colapsables (ej. Estacionamiento, Vehículos, Barras). Reordená grupos y módulos con ▲▼. Elegí por rol si ve el menú agrupado o plano. La posición de cada grupo en el menú la da el orden de su primer módulo en la matriz de arriba (▲▼ allí mueve el grupo); el orden dentro del grupo se define acá.">
+        <ModuleGroupsEditor settings={settings} update={update} />
       </Section>
 
       <Section title="Mantenimiento de base de datos" description="Reenlaza y normaliza todos los campos del sistema sin eliminar datos. Normaliza mayúsculas en empresas/usuarios, reenlaza productora, nombres de eventos, y datos denormalizados en acreditaciones, vehículos, documentos, biometría y registros de acceso.">
