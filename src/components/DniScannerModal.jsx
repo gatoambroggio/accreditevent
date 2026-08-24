@@ -46,7 +46,10 @@ export default function DniScannerModal({ open, onClose, onScanned }) {
       const { file_url: dniImageUrl } = await base44.integrations.Core.UploadFile({ file: enhancedFile });
 
       const [ocrResult, faceResult] = await Promise.allSettled([
-        base44.functions.invoke('readDni', { file_url: dniImageUrl }),
+        Promise.race([
+          base44.functions.invoke('readDni', { file_url: dniImageUrl }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('El escaneo tardó demasiado. Configurá la API key de Groq en Configuración → OCR por Visión para que lea el DNI rápido.')), 45000)),
+        ]),
         (async () => {
           const img = document.createElement('img');
           img.src = dniUrl;

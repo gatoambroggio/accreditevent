@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { Loader2, Save, Upload, ArrowRight, DatabaseZap, ShieldCheck, Download, Printer, Wifi, WifiOff, RefreshCw, ScanLine } from 'lucide-react';
+import { Loader2, Save, Upload, ArrowRight, DatabaseZap, ShieldCheck, Download, Printer, Wifi, WifiOff, RefreshCw, ScanLine, Zap } from 'lucide-react';
 import { MODULES, ROLES, DEFAULT_ROLE_ACCESS } from '@/lib/modules';
 import ListEditor from '@/components/ui/list-editor';
 import { checkAgent, getAgentPrinters } from '@/lib/printAgent';
@@ -534,8 +534,19 @@ export default function Settings() {
       </Section>
 
       <Section title="OCR por Visión (LLM)" description="Configurá un modelo de visión (OpenAI-compatible) para que el lector de DNI y patentes use IA multimodal — igual de preciso que Base44 cloud. Sin API key cae automáticamente a Tesseract local (offline, menor calidad). Funciona con OpenAI, Azure OpenAI, Groq, Ollama, etc.">
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg bg-emerald-50 p-3 ring-1 ring-emerald-200">
+          <Zap className="h-4 w-4 flex-shrink-0 text-emerald-600" />
+          <p className="flex-1 text-xs text-emerald-800">Recomendado: usá <strong>Groq</strong> (gratis, rápido y sin tarjeta). Conseguí tu key en <code className="rounded bg-white px-1">console.groq.com → API Keys</code> y pegala en el campo API Key. El botón rellena el endpoint y el modelo correctos.</p>
+          <button
+            type="button"
+            onClick={() => update('vision_ocr', { ...(settings.vision_ocr || {}), model: 'qwen/qwen3.6-27b', base_url: 'https://api.groq.com/openai/v1/chat/completions' })}
+            className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-800"
+          >
+            <Zap className="h-3.5 w-3.5" /> Usar Groq (gratis)
+          </button>
+        </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="API Key" type="password" value={settings.vision_ocr?.api_key} onChange={(v) => update('vision_ocr', { ...(settings.vision_ocr || {}), api_key: v })} placeholder="sk-..." hint="Se guarda en el servidor. Se lee solo al escanear." />
+          <Field label="API Key" type="password" value={settings.vision_ocr?.api_key} onChange={(v) => update('vision_ocr', { ...(settings.vision_ocr || {}), api_key: v })} placeholder="gsk_..." hint="Pegá acá tu key de Groq (empieza con gsk_). Se guarda en el servidor." />
           <Field label="Modelo" value={settings.vision_ocr?.model} onChange={(v) => update('vision_ocr', { ...(settings.vision_ocr || {}), model: v })} placeholder="gpt-4o-mini" hint="Cualquier modelo con visión del endpoint elegido" />
           <div className="sm:col-span-2">
             <Field label="Endpoint (Base URL)" value={settings.vision_ocr?.base_url} onChange={(v) => update('vision_ocr', { ...(settings.vision_ocr || {}), base_url: v })} placeholder="https://api.openai.com/v1/chat/completions" hint="Debe ser compatible con la API de chat completions de OpenAI" />
