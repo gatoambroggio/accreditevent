@@ -97,6 +97,18 @@
         },
         {
           "created_by_id": "{{user.id}}"
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "barra"
+              }
+            },
+            {
+              "data.bar_id": "{{user.data.bar_id}}"
+            }
+          ]
         }
       ]
     },
