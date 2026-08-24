@@ -4,7 +4,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Loader2, Plus, Minus, Trash2, CheckCircle2, XCircle, ArrowLeft, Wine, Banknote, CreditCard, QrCode, Printer, X, Cpu, AlertCircle, Wifi, WifiOff } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { getAgentPrinters, checkAgent } from '@/lib/printAgent';
-import { isOnline, loadCache, saveCache, pendingCount, enqueueSale, syncQueue } from '@/lib/barOffline';
+import { isOnline, loadCache, saveCache, pendingCount, enqueueSale, syncQueue, loadPadron, savePadron } from '@/lib/barOffline';
 import BarReceipt from '@/components/barras/BarReceipt';
 import BarCashDrawer from '@/components/barras/BarCashDrawer';
 
@@ -52,6 +52,7 @@ export default function BarPos() {
   const [operatorName, setOperatorName] = useState(operatorSession?.full_name || operatorSession?.username || '');
   const [online, setOnline] = useState(isOnline());
   const [pending, setPending] = useState(0);
+  const [padron, setPadron] = useState(() => loadPadron(barId));
   const receiptRef = useRef(null);
   const pollRef = useRef(null);
   const cardPollStart = useRef(0);
@@ -65,6 +66,7 @@ export default function BarPos() {
         if (c.bar?.sectors?.length) setSector(c.bar.sectors[0].value);
       }
       setPending(pendingCount(barId));
+      setPadron(loadPadron(barId));
       if (!isOnline()) {
         setLoading(false);
         if (!operatorSession) {
@@ -79,6 +81,13 @@ export default function BarPos() {
         setBar(d.bar); setEvent(d.event); setProducts(d.products || []); setDevices(d.devices || []);
         if (d.bar?.sectors?.length) setSector(d.bar.sectors[0].value);
         saveCache(barId, { bar: d.bar, event: d.event, products: d.products, devices: d.devices });
+        if (d.bar?.event_id) {
+          try {
+            const po = await base44.entities.WithdrawOperator.filter({ event_id: d.bar.event_id }, 'last_name', 500);
+            setPadron(po || []);
+            savePadron(barId, po || []);
+          } catch {}
+        }
         if (!operatorSession) {
           const me = await base44.auth.me().catch(() => null);
           if (!me) { window.location.href = '/bar-app'; return; }
@@ -463,7 +472,7 @@ export default function BarPos() {
               <Printer className="h-3 w-3" /> Agente no detectado
             </span>
           )}
-          <BarCashDrawer barId={barId} operatorId={operatorId} operatorName={operatorName} onWithdrawPrint={(m) => setWithdrawal(m)} />
+          <BarCashDrawer barId={barId} operatorId={operatorId} operatorName={operatorName} padron={padron} onWithdrawPrint={(m) => setWithdrawal(m)} />
         </div>
       </header>
 

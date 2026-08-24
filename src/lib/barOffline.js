@@ -104,3 +104,12 @@ export async function syncQueue(barId, onDone) {
   }
   onDone?.({ synced });
 }
+
+// ---- Padrón de retiradores (cache offline para lookup por DNI en el POS) ----
+const PADRON_PREFIX = 'ae_bar_padron_';
+export function loadPadron(barId) {
+  try { return JSON.parse(localStorage.getItem(PADRON_PREFIX + barId) || 'null') || []; } catch { return []; }
+}
+export function savePadron(barId, arr) {
+  try { localStorage.setItem(PADRON_PREFIX + barId, JSON.stringify(arr || [])); } catch {}
+}

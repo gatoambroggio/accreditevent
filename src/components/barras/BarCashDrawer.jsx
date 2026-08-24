@@ -9,7 +9,7 @@ const fmtTime = (d) => {
 };
 const TYPE_LABEL = { open: 'Apertura', withdraw: 'Retiro', close: 'Cierre' };
 
-export default function BarCashDrawer({ barId, operatorId, operatorName, onWithdrawPrint }) {
+export default function BarCashDrawer({ barId, operatorId, operatorName, onWithdrawPrint, padron }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState(null);
@@ -20,6 +20,21 @@ export default function BarCashDrawer({ barId, operatorId, operatorName, onWithd
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [dniOpen, setDniOpen] = useState(false);
+  const dniMatches = (modal === 'withdraw' && padron && responsibleDni.length >= 1)
+    ? padron.filter((o) => o.status !== 'inactive' && String(o.dni || '').includes(responsibleDni)).slice(0, 6)
+    : [];
+  const pickDni = (o) => {
+    setResponsibleDni(o.dni);
+    setResponsibleName(`${o.first_name} ${o.last_name}`.trim());
+    setDniOpen(false);
+  };
+  const onDniChange = (v) => {
+    setResponsibleDni(v);
+    setDniOpen(true);
+    const exact = padron?.find((o) => o.dni === v && o.status !== 'inactive');
+    if (exact) setResponsibleName(`${exact.first_name} ${exact.last_name}`.trim());
+  };
 
   const load = async () => {
     setLoading(true);
@@ -34,13 +49,13 @@ export default function BarCashDrawer({ barId, operatorId, operatorName, onWithd
 
   useEffect(() => { if (open) { setErr(''); load(); } }, [open, barId]);
 
-  const reset = () => { setAmount(''); setResponsibleName(''); setResponsibleDni(''); setNote(''); setErr(''); setModal(null); };
+  const reset = () => { setAmount(''); setResponsibleName(''); setResponsibleDni(''); setNote(''); setErr(''); setDniOpen(false); setModal(null); };
 
   const submit = async () => {
     setErr('');
     const amt = Number(amount);
     if (!amt || amt < 0) { setErr('Ingresá un monto válido'); return; }
-    if (modal === 'withdraw' && (!responsibleName || !responsibleDni)) { setErr('Nombre y DNI de quien retira son obligatorios'); return; }
+    if (modal === 'withdraw' && !responsibleDni) { setErr('El DNI de quien retira es obligatorio'); return; }
     setBusy(true);
     try {
       const action = modal === 'open' ? 'open_cash' : modal === 'withdraw' ? 'withdraw_cash' : 'close_cash';
@@ -146,12 +161,40 @@ export default function BarCashDrawer({ barId, operatorId, operatorName, onWithd
               {modal === 'withdraw' && (
                 <>
                   <label className="block">
-                    <span className="mb-1 block text-xs font-semibold text-slate-600">Nombre de quien retira *</span>
-                    <input value={responsibleName} onChange={(e) => setResponsibleName(e.target.value)} placeholder="Nombre y apellido" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+                    <span className="mb-1 block text-xs font-semibold text-slate-600">DNI de quien retira *</span>
+                    <div className="relative">
+                      <input
+                        value={responsibleDni}
+                        onChange={(e) => onDniChange(e.target.value)}
+                        onFocus={() => setDniOpen(true)}
+                        onBlur={() => setTimeout(() => setDniOpen(false), 150)}
+                        placeholder="DNI"
+                        autoFocus
+                        className="normal-case w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                      />
+                      {dniOpen && dniMatches.length > 0 && (
+                        <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+                          {dniMatches.map((o) => (
+                            <button
+                              key={o.id}
+                              type="button"
+                              onMouseDown={(e) => { e.preventDefault(); pickDni(o); }}
+                              className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-emerald-50"
+                            >
+                              <span className="font-semibold text-slate-800">{o.last_name}, {o.first_name}</span>
+                              <span className="font-mono text-xs text-slate-500">{o.dni}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {padron && padron.length > 0 && (
+                      <span className="mt-1 block text-[11px] text-slate-400">Si el DNI está en el padrón, se completa el nombre solo.</span>
+                    )}
                   </label>
                   <label className="block">
-                    <span className="mb-1 block text-xs font-semibold text-slate-600">DNI de quien retira *</span>
-                    <input value={responsibleDni} onChange={(e) => setResponsibleDni(e.target.value)} placeholder="DNI" className="normal-case w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
+                    <span className="mb-1 block text-xs font-semibold text-slate-600">Nombre (opcional)</span>
+                    <input value={responsibleName} onChange={(e) => setResponsibleName(e.target.value)} placeholder="Nombre y apellido" className="normal-case w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" />
                   </label>
                 </>
               )}

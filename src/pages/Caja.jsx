@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { Loader2, Wallet, Download, Search, Filter, CheckCircle2 } from 'lucide-react';
 import PageHeader from '@/components/ui/page-header';
 import RecepcionRetiros from '@/components/caja/RecepcionRetiros';
+import PadronRetiradores from '@/components/caja/PadronRetiradores';
 import { useAuth } from '@/lib/AuthContext';
 import {
   RANGES,
@@ -118,7 +119,12 @@ export default function Caja() {
         </div>
       </PageHeader>
 
-      {eventId && !loading && <RecepcionRetiros onConfirmed={() => load(eventId)} />}
+      {eventId && !loading && (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <PadronRetiradores eventId={eventId} event={events.find((e) => e.id === eventId)} />
+          <RecepcionRetiros eventId={eventId} onConfirmed={() => load(eventId)} />
+        </div>
+      )}
 
       {!eventId ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center">
