@@ -7,6 +7,12 @@ import PageHeader from '@/components/ui/page-header';
 const API_BASE = (import.meta.env?.VITE_API_URL) || '/api';
 const fmtCur = (n) => `$${Number(n || 0).toLocaleString('es-AR')}`;
 const toLocalInput = (iso) => (iso ? new Date(iso).toISOString().slice(0, 16) : '');
+const DEFAULT_STAGES = [
+  { value: 'pre_ingreso', label: 'Pre-ingreso' },
+  { value: 'ingreso', label: 'Ingreso' },
+  { value: 'ingreso_vip', label: 'Ingreso VIP' },
+];
+const slugStage = (s) => String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 
 export default function TicketSales() {
   const { toast } = useToast();
@@ -47,7 +53,11 @@ export default function TicketSales() {
         base44.entities.TicketSale.filter({ event_id: id }, '-created_date', 5),
         base44.entities.TicketType.filter({ event_id: id }, 'sort_order', 100),
       ]);
-      setSale(sales[0] || { event_id: id, event_name: ev.name, company: ev.company, enabled: false, open_at: '', close_at: '', description: '', address: '', terms: '', image_url: '' });
+      const existing = sales[0];
+      const stages = existing?.validation_stages?.length ? existing.validation_stages : DEFAULT_STAGES;
+      setSale(existing
+        ? { ...existing, validation_stages: stages }
+        : { event_id: id, event_name: ev.name, company: ev.company, enabled: false, open_at: '', close_at: '', description: '', address: '', terms: '', image_url: '', validation_stages: DEFAULT_STAGES });
       setTypes(tps);
       await refreshStats(id);
       await refreshTickets(id, 'all');
@@ -197,6 +207,50 @@ export default function TicketSales() {
             <button onClick={saveSale} disabled={savingSale} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-50">
               <Save className="h-4 w-4" /> {savingSale ? 'Guardando…' : 'Guardar venta'}
             </button>
+
+            {/* Etapas de control */}
+            <div className="mt-6 border-t border-slate-100 pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">Etapas de control</h4>
+                  <p className="text-xs text-slate-500">Cuantas etapas quieras. La entrada debe pasarlas en orden; la última marca "usada".</p>
+                </div>
+                <button onClick={() => setSale({ ...sale, validation_stages: [...(sale?.validation_stages || []), { value: '', label: '' }] })} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800">
+                  <Plus className="h-4 w-4" /> Agregar etapa
+                </button>
+              </div>
+              <div className="mt-3 space-y-2">
+                {(sale?.validation_stages || []).map((s, i) => (
+                  <div key={i} className="flex items-center gap-2 rounded-lg border border-slate-200 px-2 py-2">
+                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-bold text-slate-500">{i + 1}</span>
+                    <input
+                      value={s.label}
+                      onChange={(e) => {
+                        const arr = [...(sale.validation_stages || [])];
+                        arr[i] = { ...arr[i], label: e.target.value, value: arr[i].value || slugStage(e.target.value) };
+                        setSale({ ...sale, validation_stages: arr });
+                      }}
+                      placeholder="Ej. Pre-ingreso"
+                      className="flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                    />
+                    <input
+                      value={s.value}
+                      onChange={(e) => {
+                        const arr = [...(sale.validation_stages || [])];
+                        arr[i] = { ...arr[i], value: slugStage(e.target.value) };
+                        setSale({ ...sale, validation_stages: arr });
+                      }}
+                      placeholder="slug"
+                      className="w-28 rounded-lg border border-slate-200 px-2 py-1.5 text-sm font-mono text-slate-500"
+                    />
+                    <button onClick={() => setSale({ ...sale, validation_stages: (sale.validation_stages || []).filter((_, idx) => idx !== i) })} className="grid h-8 w-8 place-items-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+                {(!sale?.validation_stages || sale.validation_stages.length === 0) && <p className="text-sm text-slate-400">Sin etapas: un solo escaneo marca la entrada como usada.</p>}
+              </div>
+            </div>
           </section>
 
           {/* Stats */}

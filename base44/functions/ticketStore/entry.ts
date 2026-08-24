@@ -4,6 +4,7 @@
 // Acciones: list | event | order | ticket.
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import { randomHex } from '../../shared/totp.ts';
 
 export default async function (req) {
   try {
@@ -95,6 +96,7 @@ export default async function (req) {
       // Reservar stock y crear el ticket en estado pending.
       await base44.asServiceRole.entities.TicketType.update(ticket_type_id, { sold: (type.sold || 0) + qty });
       const qr = 'TKT-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+      const secret = randomHex(20);
       const ticket = await base44.asServiceRole.entities.Ticket.create({
         event_id,
         event_name: ev.name,
@@ -110,6 +112,8 @@ export default async function (req) {
         total: Number(type.price) * qty,
         status: 'pending',
         qr_code: qr,
+        qr_secret: secret,
+        stages_passed: [],
       });
 
       // Crear la preferencia de Mercado Pago.
@@ -162,12 +166,26 @@ export default async function (req) {
       if (!ticket_id) return Response.json({ error: 'Falta ticket_id' }, { status: 400 });
       const t = await base44.asServiceRole.entities.Ticket.get(ticket_id);
       if (!t) return Response.json({ error: 'Entrada no encontrada' }, { status: 404 });
+      // validation_stages del evento para mostrar progreso de etapas en la confirmación.
+      let validation_stages = [];
+      try {
+        const sales = await base44.asServiceRole.entities.TicketSale.filter({ event_id: t.event_id });
+        const st = sales[0]?.validation_stages;
+        validation_stages = st && st.length ? st : [
+          { value: 'pre_ingreso', label: 'Pre-ingreso' },
+          { value: 'ingreso', label: 'Ingreso' },
+          { value: 'ingreso_vip', label: 'Ingreso VIP' },
+        ];
+      } catch {}
       return Response.json({
         id: t.id,
         status: t.status,
         event_name: t.event_name,
         ticket_type_name: t.ticket_type_name,
         qr_code: t.qr_code,
+        qr_secret: t.qr_secret || '',
+        stages_passed: t.stages_passed || [],
+        validation_stages,
         buyer_name: t.buyer_name,
         buyer_dni: t.buyer_dni,
         quantity: t.quantity,

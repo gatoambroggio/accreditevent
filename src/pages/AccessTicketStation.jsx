@@ -15,6 +15,8 @@ export default function AccessTicketStation() {
   const [cycle, setCycle] = useState(0);
   const [verifying, setVerifying] = useState(false);
   const [result, setResult] = useState(null);
+  const [stages, setStages] = useState([]);
+  const [stage, setStage] = useState('');
   const qrCooldown = useRef(false);
 
   useEffect(() => {
@@ -34,6 +36,30 @@ export default function AccessTicketStation() {
     setPhase('active');
     setCycle((c) => c + 1);
     setResult(null);
+    loadStages(evt.id);
+  };
+
+  const loadStages = async (eventId) => {
+    try {
+      let data;
+      try {
+        const res = await base44.functions.invoke('ticketAccess', { action: 'stages', event_id: eventId });
+        data = res.data || res;
+      } catch {
+        const res = await fetch(`${API_BASE}/ticket-access/stages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('ae_access_token') || ''}` },
+          body: JSON.stringify({ event_id: eventId }),
+        });
+        data = await res.json();
+      }
+      const st = data.stages || [];
+      setStages(st);
+      setStage(st[0]?.value || '');
+    } catch {
+      setStages([]);
+      setStage('');
+    }
   };
 
   const handleQrDetected = async (rawCode) => {
@@ -45,14 +71,14 @@ export default function AccessTicketStation() {
       let data;
       try {
         // Base44 cloud: función autenticada (el operador tiene token).
-        const res = await base44.functions.invoke('ticketAccess', { action: 'validate', qr_code: code, event_id: selectedEvent.id });
+        const res = await base44.functions.invoke('ticketAccess', { action: 'validate', qr_code: code, event_id: selectedEvent.id, stage });
         data = res.data;
       } catch {
         // Fallback al servidor self-hosted.
         const res = await fetch(`${API_BASE}/ticket-access/validate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('ae_access_token') || ''}` },
-          body: JSON.stringify({ qr_code: code, event_id: selectedEvent.id }),
+          body: JSON.stringify({ qr_code: code, event_id: selectedEvent.id, stage }),
         });
         data = await res.json();
       }
@@ -128,6 +154,14 @@ export default function AccessTicketStation() {
                 <p className="text-sm text-slate-500">Enfocá el QR de la entrada.</p>
               </div>
             </div>
+            {stages.length > 0 && (
+              <div className="mb-4">
+                <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">Etapa de control</label>
+                <select value={stage} onChange={(e) => setStage(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
+                  {stages.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
+              </div>
+            )}
             {verifying ? (
               <div className="flex flex-col items-center justify-center py-16"><Loader2 className="h-10 w-10 animate-spin text-emerald-600" /><span className="mt-3 text-sm text-slate-500">Verificando…</span></div>
             ) : (
@@ -145,6 +179,14 @@ export default function AccessTicketStation() {
             <>
               <p className="mt-4 text-xl font-bold text-white">{result.ticket.buyer_name}</p>
               <p className="mt-1 text-white/80">{result.ticket.ticket_type_name} · {result.ticket.quantity} entrada(s)</p>
+              {result.stage && (
+                <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-sm font-bold text-white">
+                  {result.stage.label}{result.is_final && ' · ingreso final'}
+                </p>
+              )}
+              {result.stages_remaining?.length > 0 && (
+                <p className="mt-2 text-sm text-white/80">Restan: {result.stages_remaining.length} etapa(s)</p>
+              )}
             </>
           )}
           {!result.ok && result.message && <p className="mt-2 max-w-md px-6 text-center text-sm text-white/80">{result.message}</p>}
