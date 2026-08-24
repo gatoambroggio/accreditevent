@@ -1,8 +1,14 @@
 import React, { useState } from 'react';
 
 // Modal para crear/editar productos del catálogo del evento.
-export default function EventProductEditorModal({ product, onClose, onSave }) {
+export default function EventProductEditorModal({ product, sectors = [], onClose, onSave }) {
   const [p, setP] = useState(product);
+  const setSectorPrice = (val, price) => {
+    const sp = { ...(p.sector_prices || {}) };
+    if (price === '' || price == null) delete sp[val];
+    else sp[val] = Number(price);
+    setP({ ...p, sector_prices: sp });
+  };
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={onClose}>
       <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
@@ -23,6 +29,20 @@ export default function EventProductEditorModal({ product, onClose, onSave }) {
               <input type="number" value={p.price} onChange={(e) => setP({ ...p, price: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
             </div>
           </div>
+          {sectors.length > 0 && (
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-600">Precios por sector</label>
+              <div className="space-y-2">
+                {sectors.map((s) => (
+                  <div key={s.value} className="flex items-center gap-2">
+                    <span className="w-28 truncate text-xs font-semibold text-slate-600">{s.label}</span>
+                    <input type="number" value={p.sector_prices?.[s.value] ?? ''} onChange={(e) => setSectorPrice(s.value, e.target.value)} placeholder={p.price} className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                  </div>
+                ))}
+              </div>
+              <p className="mt-1 text-[11px] text-slate-400">Dejá vacío para usar el precio base.</p>
+            </div>
+          )}
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={p.status === 'active'} onChange={(e) => setP({ ...p, status: e.target.checked ? 'active' : 'inactive' })} className="h-4 w-4 accent-emerald-600" />
             <span className="text-sm text-slate-700">Producto activo</span>

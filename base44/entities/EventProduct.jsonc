@@ -24,7 +24,12 @@
     },
     "price": {
       "type": "number",
-      "description": "Precio unitario base (ARS). Cada barra puede tener un precio distinto (ej. VIP)."
+      "description": "Precio unitario base (ARS). Se usa cuando el sector seleccionado en el POS no tiene precio espec\u00edfico."
+    },
+    "sector_prices": {
+      "type": "object",
+      "description": "Precios por sector del evento (clave = value del sector). Si el sector elegido en el POS no est\u00e1, se usa price base.",
+      "default": {}
     },
     "sort_order": {
       "type": "number",

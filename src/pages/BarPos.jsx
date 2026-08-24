@@ -29,6 +29,7 @@ export default function BarPos() {
   const [bar, setBar] = useState(null);
   const [products, setProducts] = useState([]);
   const [devices, setDevices] = useState([]);
+  const [event, setEvent] = useState(null);
   const [sector, setSector] = useState('');
   const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState({});
@@ -51,13 +52,15 @@ export default function BarPos() {
       try {
         const b = await base44.entities.Bar.get(barId);
         setBar(b);
-        if (b?.sectors?.length) setSector(b.sectors[0].value);
-        const [ps, devs] = await Promise.all([
-          base44.entities.BarProduct.filter({ bar_id: barId, status: 'active' }, 'sort_order', 200),
+        const [ev, ps, devs] = await Promise.all([
+          base44.entities.Event.get(b.event_id).catch(() => null),
+          base44.entities.EventProduct.filter({ event_id: b.event_id, status: 'active' }, 'sort_order', 300),
           base44.entities.BarPosDevice.filter({ bar_id: barId, status: 'active' }, 'alias', 50),
         ]);
+        setEvent(ev);
         setProducts(ps);
         setDevices(devs);
+        if (ev?.bar_sectors?.length) setSector(ev.bar_sectors[0].value);
       } catch {}
       setLoading(false);
       try {
@@ -330,9 +333,9 @@ export default function BarPos() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {bar?.sectors?.length > 0 && (
+          {event?.bar_sectors?.length > 0 && (
             <select value={sector} onChange={(e) => setSector(e.target.value)} className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-bold text-slate-700">
-              {bar.sectors.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              {event.bar_sectors.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
           )}
           <span className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-xs font-semibold ${cardAvailable ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>

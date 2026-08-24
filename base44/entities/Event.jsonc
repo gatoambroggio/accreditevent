@@ -112,6 +112,22 @@
       "description": "Capacidad m\u00e1xima de veh\u00edculos por sector para este evento ({ sectorValue: number })",
       "default": {}
     },
+    "bar_sectors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "default": [],
+      "description": "Sectores/ubicaciones del evento para barras (ej. General, VIP). Se definen en el men\u00fa del evento; el POS de barra usa un selector para cambiar los precios seg\u00fan el sector elegido."
+    },
     "custom_fields": {
       "type": "object",
       "description": "Campos personalizados definidos por el administrador",
