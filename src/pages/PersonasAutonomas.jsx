@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useCrud } from '@/lib/crud';
 import { Plus, Pencil, Download, Trash2, ScanLine, ShieldCheck, ShieldX, FileCheck2, FileWarning, IdCard, Loader2, FileText } from 'lucide-react';
 import DniScannerModal from '@/components/DniScannerModal';
+import Pdf417ScannerModal from '@/components/Pdf417ScannerModal';
 import { exportToExcel } from '@/lib/exportUtils';
 import { base44 } from '@/api/base44Client';
 import { useZones } from '@/lib/useZones';
@@ -99,6 +100,7 @@ export default function PersonasAutonomas() {
   const [docFilter, setDocFilter] = useState('');
   const [detailPerson, setDetailPerson] = useState(null);
   const [dniScannerOpen, setDniScannerOpen] = useState(false);
+  const [pdf417Open, setPdf417Open] = useState(false);
   const [dniPrefill, setDniPrefill] = useState(null);
   const [selected, setSelected] = useState(new Set());
   const [events, setEvents] = useState([]);
@@ -344,6 +346,17 @@ export default function PersonasAutonomas() {
     setModalOpen(true);
   };
 
+  // Escaneo PDF417 (código de barras 2D del DNI). No extrae foto — el rostro se
+  // carga después en el formulario (campo "Registro facial").
+  const handlePdf417Scanned = (data) => {
+    setEditing(null);
+    setDniPrefill({
+      full_name: `${data.nombre} ${data.apellido}`.trim(),
+      document: data.dni,
+    });
+    setModalOpen(true);
+  };
+
   const handleSubmit = async (data) => {
     const { face_photo_url, face_descriptor, ...personData } = data;
     personData.person_type = personData.access_area || 'general';
@@ -471,6 +484,11 @@ export default function PersonasAutonomas() {
         {canManageRecords && (
           <button onClick={() => setDniScannerOpen(true)} className={btnOutline}>
             <ScanLine className="h-4 w-4" /> Escanear DNI
+          </button>
+        )}
+        {canManageRecords && (
+          <button onClick={() => setPdf417Open(true)} className={btnOutline}>
+            <ScanLine className="h-4 w-4" /> Escanear PDF417
           </button>
         )}
         {canManageRecords && (
@@ -603,6 +621,8 @@ export default function PersonasAutonomas() {
       />
 
       <DniScannerModal open={dniScannerOpen} onClose={() => setDniScannerOpen(false)} onScanned={handleDniScanned} />
+
+      <Pdf417ScannerModal open={pdf417Open} onClose={() => setPdf417Open(false)} onScanned={handlePdf417Scanned} />
 
       <PersonDocUploadModal
         person={docUploadPerson}
