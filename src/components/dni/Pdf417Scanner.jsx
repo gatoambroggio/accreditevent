@@ -2,13 +2,13 @@ import React, { useState, useRef, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { parsePdf417 } from '@/lib/pdf417Parser';
 import { Camera, Image as ImageIcon, Loader2, ScanLine, X, Check, AlertCircle, RefreshCw, Copy, Hash, User, Calendar, CreditCard } from 'lucide-react';
-import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
 
 // Decodificación del PDF417 del DNI argentino.
-// Camino 1: BarcodeDetector nativo del navegador (pdf417) — Chrome/Edge/Android.
-//   Funciona en preview de Base44 (subir imagen) y en Ubuntu (cámara + imagen).
-// Camino 2: servidor `readDniPdf417` (zbarimg en Ubuntu) — respaldo confiable y
-//   air-gapped cuando el navegador no decode o no soporta pdf417 (Firefox/Safari).
+// Motor principal: ZXing-C++ WebAssembly (zxing-wasm) — el mismo motor C++ que
+// anda en el servidor, corriendo en el navegador. Funciona en todos los navegadores,
+// incluido iPhone/Chrome (donde no existe BarcodeDetector nativo).
+// Camino 2 (cámara): BarcodeDetector nativo si soporta pdf417 (Chrome/Edge/Android).
+// Respaldo (imagen): servidor `readDniPdf417` (zxing-cpp en Ubuntu) — air-gapped.
 export default function Pdf417Scanner({ onScanned }) {
   const [tab, setTab] = useState('camera');
   const [cameraOn, setCameraOn] = useState(false);
@@ -19,6 +19,7 @@ export default function Pdf417Scanner({ onScanned }) {
   const [scanningFile, setScanningFile] = useState(false);
   const [copied, setCopied] = useState(false);
   const [pdf417Supported, setPdf417Supported] = useState(null); // null=checking | true | false
+  const [engineLoading, setEngineLoading] = useState(false); // cargando el motor WASM
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const rafRef = useRef(null);
@@ -51,53 +52,34 @@ export default function Pdf417Scanner({ onScanned }) {
     return detectorRef.current;
   };
 
-  // ZXing: decodificador PDF417 puro JS (sin WASM). Anda en preview y Ubuntu,
-  // más confiable que BarcodeDetector para el PDF417 denso del DNI argentino.
-  const zxingRef = useRef(null);
-  const lastZxingRef = useRef(0);
-  const getZxing = () => {
-    if (!zxingRef.current) {
-      const hints = new Map();
-      hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.PDF_417]);
-      hints.set(DecodeHintType.TRY_HARDER, true);
-      zxingRef.current = new BrowserMultiFormatReader(hints);
+  // Motor WASM: ZXing-C++ compilado a WebAssembly (zxing-wasm). Carga diferida
+  // (dynamic import) para no inflar el bundle inicial; cacheado para reusar.
+  const wasmPromiseRef = useRef(null);
+  const lastWasmRef = useRef(0);
+  const getWasm = () => {
+    if (!wasmPromiseRef.current) {
+      wasmPromiseRef.current = import('zxing-wasm').then((m) => m.readBarcodes);
     }
-    return zxingRef.current;
+    return wasmPromiseRef.current;
   };
-  // Decodifica cualquier source dibujable (ImageBitmap o frame de video) con ZXing,
-  // probando escalado y binarización. Reutilizado por imagen subida y cámara.
-  const decodeDrawableWithZxing = async (drawable, w, h) => {
-    const reader = getZxing();
-    const makeCanvas = (scale, binarize) => {
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.max(1, Math.round(w * scale));
-      canvas.height = Math.max(1, Math.round(h * scale));
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(drawable, 0, 0, canvas.width, canvas.height);
-      // Binariza a B/N puro (threshold 50%) — replica el `convert -threshold 50%`
-      // del pipeline probado, ayuda a ZXing con fotos de bajo contraste.
-      if (binarize) {
-        const id = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const d = id.data;
-        for (let i = 0; i < d.length; i += 4) {
-          const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-          const v = g < 128 ? 0 : 255;
-          d[i] = d[i + 1] = d[i + 2] = v;
-        }
-        ctx.putImageData(id, 0, 0);
-      }
-      return canvas;
-    };
-    const tryDecode = async (scale, binarize) => {
-      try { const r = await reader.decodeFromCanvasElement(makeCanvas(scale, binarize)); return r?.getText() || null; } catch { return null; }
-    };
-    for (const [s, b] of [[1, false], [2, false], [2, true], [3, true]]) {
-      const t = await tryDecode(s, b);
-      if (t) return t;
-    }
+  // Decodifica PDF417 de cualquier source que acepte readBarcodes (Blob/File,
+  // ImageBitmap, HTMLCanvasElement, HTMLVideoElement, ImageData, etc.).
+  const decodeWithWasm = async (source) => {
+    try {
+      const readBarcodes = await getWasm();
+      const results = await readBarcodes(source, { formats: ['PDF417'] });
+      if (results && results.length) return results[0].text || null;
+    } catch {}
     return null;
   };
-  const decodeWithZxing = async (bitmap) => decodeDrawableWithZxing(bitmap, bitmap.width, bitmap.height);
+  // Dibuja un frame de video a canvas a resolución nativa para pasarlo al wasm.
+  const videoToCanvas = (v) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, v.videoWidth);
+    canvas.height = Math.max(1, v.videoHeight);
+    canvas.getContext('2d').drawImage(v, 0, 0, canvas.width, canvas.height);
+    return canvas;
+  };
 
   // Parsea el string crudo, detiene cámara y guarda resultado. true si tenía DNI.
   const applyRaw = (raw) => {
@@ -110,21 +92,21 @@ export default function Pdf417Scanner({ onScanned }) {
     if (!runningRef.current) return;
     const v = videoRef.current;
     if (v && v.readyState >= 2) {
-      // Camino 1: BarcodeDetector nativo (rápido, frame a frame).
+      // Camino 1: BarcodeDetector nativo (rápido, frame a frame) si soporta pdf417.
       if (pdf417Supported) {
         try {
           const codes = await getDetector().detect(v);
           if (codes && codes.length && codes[0].rawValue && applyRaw(codes[0].rawValue)) return;
         } catch {}
       }
-      // Camino 2: ZXing sobre el frame actual (mismo multi-motor que la imagen subida).
-      // Throttleado a ~3/s: ZXing es pesado y decodear a 60fps congelaría la cámara.
+      // Camino 2: ZXing-C++ WASM sobre el frame actual. Throttleado a ~3/s
+      // (el wasm es pesado; decodear a 60fps congelaría la cámara).
       const now = Date.now();
-      if (now - lastZxingRef.current > 300) {
-        lastZxingRef.current = now;
+      if (now - lastWasmRef.current > 300) {
+        lastWasmRef.current = now;
         if (v.videoWidth > 0) {
           try {
-            const raw = await decodeDrawableWithZxing(v, v.videoWidth, v.videoHeight);
+            const raw = await decodeWithWasm(videoToCanvas(v));
             if (raw && applyRaw(raw)) return;
           } catch {}
         }
@@ -135,6 +117,14 @@ export default function Pdf417Scanner({ onScanned }) {
 
   const startCamera = async () => {
     setStarting(true); setError('');
+    // Precarga el motor WASM (la 1ra vez) — muestra 'Inicializando motor de escaneo…'.
+    setEngineLoading(true);
+    try { await getWasm(); }
+    catch {
+      setError('No se pudo cargar el motor de escaneo. Probá recargar la página o usá la pestaña "Imagen".');
+      setEngineLoading(false); setStarting(false); return;
+    }
+    setEngineLoading(false);
     const cfg = { video: { facingMode: { ideal: 'environment' } }, audio: false };
     try { streamRef.current = await navigator.mediaDevices.getUserMedia(cfg); }
     catch {
@@ -181,26 +171,24 @@ export default function Pdf417Scanner({ onScanned }) {
   const handleFile = async (file) => {
     setScanningFile(true); setError(''); setResult(null);
     try {
-      const bitmap = await window.createImageBitmap(file);
       let raw = null;
-      // Camino 1: BarcodeDetector nativo (rápido, si el navegador soporta pdf417).
-      if (pdf417Supported) {
-        try { raw = await detectWithBrowser(bitmap); } catch {}
+      let bitmap = null;
+      // Camino 1: ZXing-C++ WASM sobre la imagen original (full-res) — motor principal.
+      try { raw = await decodeWithWasm(file); } catch {}
+      // Camino 2: BarcodeDetector nativo (si soporta pdf417) sobre el bitmap.
+      if (!raw && pdf417Supported) {
+        try { bitmap = await window.createImageBitmap(file); raw = await detectWithBrowser(bitmap); } catch {}
       }
-      // Camino 2: ZXing (puro JS, confiable para PDF417 — anda en preview y Ubuntu).
-      if (!raw) {
-        try { raw = await decodeWithZxing(bitmap); } catch {}
-      }
-      bitmap.close?.();
       if (raw) {
         if (!applyRaw(raw)) throw new Error('Se decodificó un código pero no se reconocieron los datos del DNI.');
       } else {
-        // Camino 3: servidor (zbarimg en Ubuntu). Respaldo confiable y air-gapped.
+        // Camino 3: servidor (zxing-cpp en Ubuntu). Respaldo confiable y air-gapped.
         const data = await decodeOnServer(file);
         if (data.parsed) { setResult(data.parsed); }
         else if (data.raw && applyRaw(data.raw)) { /* ok */ }
         else throw new Error('No se encontró el código PDF417 del DNI.');
       }
+      bitmap?.close?.();
     } catch (e) {
       setError(e.message || 'No se pudo decodificar el DNI.');
     } finally {
@@ -249,21 +237,16 @@ export default function Pdf417Scanner({ onScanned }) {
 
       {!result && tab === 'camera' && (
         <div className="space-y-3">
-          {pdf417Supported === false ? (
-            <div className="rounded-xl bg-slate-50 p-6 text-center text-sm text-slate-500">
-              La cámara requiere un navegador con soporte de PDF417 (Chrome/Edge). Usá la pestaña <b>Imagen</b>.
+          <>
+            <div className="overflow-hidden rounded-xl bg-slate-900" style={{ height: 300 }}>
+              <video ref={videoRef} className="h-full w-full object-cover" playsInline muted />
             </div>
-          ) : (
-            <>
-              <div className="overflow-hidden rounded-xl bg-slate-900" style={{ height: 300 }}>
-                <video ref={videoRef} className="h-full w-full object-cover" playsInline muted />
-              </div>
-              {!cameraOn ? (
-                <button onClick={startCamera} disabled={starting} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-50">
-                  {starting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
-                  {starting ? 'Iniciando cámara…' : 'Iniciar cámara'}
-                </button>
-              ) : (
+            {!cameraOn ? (
+              <button onClick={startCamera} disabled={starting} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-50">
+                {starting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
+                {starting ? (engineLoading ? 'Inicializando motor de escaneo…' : 'Iniciando cámara…') : 'Iniciar cámara'}
+              </button>
+            ) : (
                 <div className="flex items-center gap-3">
                   <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700"><ScanLine className="h-4 w-4 animate-pulse" /> Enfocá el código del DNI…</span>
                   <button onClick={stopCamera} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">
@@ -273,7 +256,6 @@ export default function Pdf417Scanner({ onScanned }) {
               )}
               <p className="text-xs text-slate-400">El recuadro debe abarcar el código completo. Si no hay cámara, usá la pestaña "Imagen".</p>
             </>
-          )}
         </div>
       )}
 
