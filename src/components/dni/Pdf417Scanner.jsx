@@ -63,8 +63,9 @@ export default function Pdf417Scanner({ onScanned }) {
     }
     return wasmPromiseRef.current;
   };
-  // Decodifica PDF417 de cualquier source que acepte readBarcodes (Blob/File,
-  // ImageBitmap, HTMLCanvasElement, HTMLVideoElement, ImageData, etc.).
+  // Decodifica PDF417 vía zxing-wasm. readBarcodes acepta Blob/File/ArrayBuffer/
+  // Uint8Array/ImageData (NO canvas ni video). El loop de cámara le pasa ImageData
+  // extraído en captureFrame; la subida de imagen le pasa el File directamente.
   const decodeWithWasm = async (source, options) => {
     try {
       const readBarcodes = await getWasm();
@@ -129,10 +130,13 @@ export default function Pdf417Scanner({ onScanned }) {
       setEngineLoading(false); setStarting(false); return;
     }
     setEngineLoading(false);
-    const cfg = { video: { facingMode: { ideal: 'environment' } }, audio: false };
+    // PDF417 del DNI es denso: necesita alta resolución + foco nítido para
+    // decodificar. Pedimos 1920×1080 ideal; el browser negocia la mejor
+    // disponible (caerá a 640×480 solo si la cámara no entrega más).
+    const cfg = { video: { width: { ideal: 1920 }, height: { ideal: 1080 }, facingMode: { ideal: 'environment' } }, audio: false };
     try { streamRef.current = await navigator.mediaDevices.getUserMedia(cfg); }
     catch {
-      try { streamRef.current = await navigator.mediaDevices.getUserMedia({ video: true, audio: false }); }
+      try { streamRef.current = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }); }
       catch (e) {
         setError('No se pudo acceder a la cámara. Subí la imagen del DNI desde la pestaña "Imagen". ' + (e?.message || ''));
         setStarting(false); return;
