@@ -204,6 +204,23 @@ export default function Pdf417Scanner({ onScanned }) {
     }
   };
 
+  // Captura el frame actual del video y lo pasa por el mismo pipeline probado
+  // de la subida de imagen (wasm → BarcodeDetector → servidor zxing-cpp). Así
+  // la cámara usa el motor que ya sabemos que decodifica el PDF417 del DNI.
+  const captureFrameToImage = () => {
+    const v = videoRef.current;
+    if (!v || v.readyState < 2 || !v.videoWidth) { setError('La cámara aún no está lista.'); return; }
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, v.videoWidth);
+    canvas.height = Math.max(1, v.videoHeight);
+    canvas.getContext('2d').drawImage(v, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (!blob) { setError('No se pudo capturar el frame de la cámara.'); return; }
+      const file = new File([blob], 'dni-frame.jpg', { type: 'image/jpeg' });
+      handleFile(file);
+    }, 'image/jpeg', 0.92);
+  };
+
   const copyRaw = () => { if (result?.raw) { navigator.clipboard?.writeText(result.raw); setCopied(true); setTimeout(() => setCopied(false), 1500); } };
   const reset = () => { setResult(null); setFileUrl(null); setError(''); };
   const switchTab = (t) => { stopCamera(); setTab(t); };
@@ -255,14 +272,20 @@ export default function Pdf417Scanner({ onScanned }) {
                 {starting ? (engineLoading ? 'Inicializando motor de escaneo…' : 'Iniciando cámara…') : 'Iniciar cámara'}
               </button>
             ) : (
-                <div className="flex items-center gap-3">
-                  <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700"><ScanLine className="h-4 w-4 animate-pulse" /> Enfocá el código del DNI…</span>
-                  <button onClick={stopCamera} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">
-                    <X className="h-3.5 w-3.5" /> Detener
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700"><ScanLine className="h-4 w-4 animate-pulse" /> Enfocá el código del DNI…</span>
+                    <button onClick={stopCamera} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">
+                      <X className="h-3.5 w-3.5" /> Detener
+                    </button>
+                  </div>
+                  <button onClick={captureFrameToImage} disabled={scanningFile} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-50">
+                    {scanningFile ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
+                    {scanningFile ? 'Decodificando frame…' : 'Capturar y decodificar'}
                   </button>
+                  <p className="text-xs text-slate-400">Si la detección automática no capta el código, posicioná el DNI y tocá el botón: captura el frame y lo decodifica el servidor (motor que ya funciona con la subida de imagen).</p>
                 </div>
               )}
-              <p className="text-xs text-slate-400">El recuadro debe abarcar el código completo. Si no hay cámara, usá la pestaña "Imagen".</p>
             </>
         </div>
       )}
