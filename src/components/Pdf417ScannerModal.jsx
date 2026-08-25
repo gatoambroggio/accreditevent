@@ -19,8 +19,8 @@ export default function Pdf417ScannerModal({ open, onClose, onScanned }) {
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="px-6 py-5">
-          <Pdf417Scanner onScanned={(result) => { onScanned(result); onClose(); }} />
+        <div className="px-4 py-4 sm:px-6 sm:py-5">
+          <Pdf417Scanner embedded onScanned={(result) => { onScanned(result); onClose(); }} />
         </div>
       </div>
     </div>

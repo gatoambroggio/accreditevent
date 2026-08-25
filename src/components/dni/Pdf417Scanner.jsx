@@ -9,7 +9,7 @@ import { Camera, Image as ImageIcon, Loader2, ScanLine, X, Check, AlertCircle, R
 // incluido iPhone/Chrome (donde no existe BarcodeDetector nativo).
 // Camino 2 (cámara): BarcodeDetector nativo si soporta pdf417 (Chrome/Edge/Android).
 // Respaldo (imagen): servidor `readDniPdf417` (zxing-cpp en Ubuntu) — air-gapped.
-export default function Pdf417Scanner({ onScanned }) {
+export default function Pdf417Scanner({ onScanned, embedded = false }) {
   const [tab, setTab] = useState('camera');
   const [cameraOn, setCameraOn] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -233,12 +233,14 @@ export default function Pdf417Scanner({ onScanned }) {
   );
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-slate-900">Lector PDF417</h2>
-          <p className="text-xs text-slate-500">Escaneá el código de barras 2D (PDF417) del DNI y devolvé los datos del titular.</p>
-        </div>
+    <div className={embedded ? '' : 'rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'}>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        {!embedded && (
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">Lector PDF417</h2>
+            <p className="text-xs text-slate-500">Escaneá el código de barras 2D (PDF417) del DNI y devolvé los datos del titular.</p>
+          </div>
+        )}
         {result ? (
           <button onClick={reset} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">
             <RefreshCw className="h-4 w-4" /> Otro
@@ -263,7 +265,7 @@ export default function Pdf417Scanner({ onScanned }) {
       {!result && tab === 'camera' && (
         <div className="space-y-3">
           <>
-            <div className="overflow-hidden rounded-xl bg-slate-900" style={{ height: 300 }}>
+            <div className="h-[240px] overflow-hidden rounded-xl bg-slate-900 sm:h-[300px]">
               <video ref={videoRef} className="h-full w-full object-cover" playsInline muted />
             </div>
             {!cameraOn ? (
@@ -342,7 +344,7 @@ export default function Pdf417Scanner({ onScanned }) {
             </div>
           </details>
           {onScanned && (
-            <button onClick={() => onScanned(result)} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800">
+            <button onClick={() => onScanned(result)} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 sm:w-auto">
               <Check className="h-4 w-4" /> Usar datos
             </button>
           )}
