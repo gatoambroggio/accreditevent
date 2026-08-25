@@ -57,6 +57,9 @@ export function parsePdf417(raw) {
     if (/^\d{7,8}$/.test(p) && !isDate8(p)) { if (!dni) dni = p; continue; }
     // Fecha: 8 dígitos con fecha válida y año plausible.
     if (isDate8(p)) { fechas.push(p); continue; }
+    // Fecha con barras (DD/MM/YYYY): normalizar a DDMMAAAA antes de validar.
+    const slash = p.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (slash) { const norm = `${slash[1]}${slash[2]}${slash[3]}`; if (isDate8(norm)) { fechas.push(norm); continue; } }
     // Sexo: un único char M/F/X.
     if (p.length === 1 && SEXOS.has(p.toUpperCase())) { sexo = p.toUpperCase(); continue; }
     // Ejemplar: un único char A/B/C.
