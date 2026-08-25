@@ -40,11 +40,11 @@ export default function DataTable({ loading, isEmpty, emptyIcon: EmptyIcon, empt
 }
 
 export function Th({ children, className = '' }) {
-  return <th className={`px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-slate-500 ${className}`}>{children}</th>;
+  return <th className={`px-3 py-2.5 font-mono text-[10px] uppercase tracking-wider text-slate-500 sm:px-4 sm:py-3 ${className}`}>{children}</th>;
 }
 
 export function Td({ children, className = '' }) {
-  return <td className={`px-4 py-3.5 ${className}`}>{children}</td>;
+  return <td className={`px-3 py-3 sm:px-4 ${className}`}>{children}</td>;
 }
 
 export function Tr({ children }) {

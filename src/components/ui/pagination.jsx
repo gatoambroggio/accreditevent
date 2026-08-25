@@ -6,7 +6,7 @@ export default function Pagination({ page, totalPages, onPageChange, totalItems,
   const start = (page - 1) * pageSize + 1;
   const end = Math.min(page * pageSize, totalItems);
   return (
-    <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+    <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
       <p className="text-xs text-slate-500">
         Mostrando {start}–{end} de {totalItems}
       </p>

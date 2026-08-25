@@ -311,7 +311,7 @@ export default function AppLayout() {
 
       {/* Main */}
       <div className="lg:pl-60">
-        <main className="mx-auto max-w-7xl px-5 py-8 sm:px-8 lg:px-10">
+        <main className="mx-auto max-w-7xl px-4 py-5 sm:px-8 sm:py-8 lg:px-10">
           <Outlet />
         </main>
       </div>
