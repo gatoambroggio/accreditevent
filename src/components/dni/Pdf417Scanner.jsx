@@ -54,6 +54,7 @@ export default function Pdf417Scanner({ onScanned }) {
   // ZXing: decodificador PDF417 puro JS (sin WASM). Anda en preview y Ubuntu,
   // más confiable que BarcodeDetector para el PDF417 denso del DNI argentino.
   const zxingRef = useRef(null);
+  const lastZxingRef = useRef(0);
   const getZxing = () => {
     if (!zxingRef.current) {
       const hints = new Map();
@@ -63,14 +64,16 @@ export default function Pdf417Scanner({ onScanned }) {
     }
     return zxingRef.current;
   };
-  const decodeWithZxing = async (bitmap) => {
+  // Decodifica cualquier source dibujable (ImageBitmap o frame de video) con ZXing,
+  // probando escalado y binarización. Reutilizado por imagen subida y cámara.
+  const decodeDrawableWithZxing = async (drawable, w, h) => {
     const reader = getZxing();
     const makeCanvas = (scale, binarize) => {
       const canvas = document.createElement('canvas');
-      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      canvas.width = Math.max(1, Math.round(w * scale));
+      canvas.height = Math.max(1, Math.round(h * scale));
       const ctx = canvas.getContext('2d');
-      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(drawable, 0, 0, canvas.width, canvas.height);
       // Binariza a B/N puro (threshold 50%) — replica el `convert -threshold 50%`
       // del pipeline probado, ayuda a ZXing con fotos de bajo contraste.
       if (binarize) {
@@ -94,6 +97,7 @@ export default function Pdf417Scanner({ onScanned }) {
     }
     return null;
   };
+  const decodeWithZxing = async (bitmap) => decodeDrawableWithZxing(bitmap, bitmap.width, bitmap.height);
 
   // Parsea el string crudo, detiene cámara y guarda resultado. true si tenía DNI.
   const applyRaw = (raw) => {
@@ -106,10 +110,25 @@ export default function Pdf417Scanner({ onScanned }) {
     if (!runningRef.current) return;
     const v = videoRef.current;
     if (v && v.readyState >= 2) {
-      try {
-        const codes = await getDetector().detect(v);
-        if (codes && codes.length && codes[0].rawValue && applyRaw(codes[0].rawValue)) return;
-      } catch {}
+      // Camino 1: BarcodeDetector nativo (rápido, frame a frame).
+      if (pdf417Supported) {
+        try {
+          const codes = await getDetector().detect(v);
+          if (codes && codes.length && codes[0].rawValue && applyRaw(codes[0].rawValue)) return;
+        } catch {}
+      }
+      // Camino 2: ZXing sobre el frame actual (mismo multi-motor que la imagen subida).
+      // Throttleado a ~3/s: ZXing es pesado y decodear a 60fps congelaría la cámara.
+      const now = Date.now();
+      if (now - lastZxingRef.current > 300) {
+        lastZxingRef.current = now;
+        if (v.videoWidth > 0) {
+          try {
+            const raw = await decodeDrawableWithZxing(v, v.videoWidth, v.videoHeight);
+            if (raw && applyRaw(raw)) return;
+          } catch {}
+        }
+      }
     }
     rafRef.current = requestAnimationFrame(scanLoop);
   };
