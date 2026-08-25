@@ -25,6 +25,7 @@ export default function Pdf417Scanner({ onScanned }) {
   const rafRef = useRef(null);
   const runningRef = useRef(false);
   const detectorRef = useRef(null);
+  const scanCanvasRef = useRef(null);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -64,21 +65,24 @@ export default function Pdf417Scanner({ onScanned }) {
   };
   // Decodifica PDF417 de cualquier source que acepte readBarcodes (Blob/File,
   // ImageBitmap, HTMLCanvasElement, HTMLVideoElement, ImageData, etc.).
-  const decodeWithWasm = async (source) => {
+  const decodeWithWasm = async (source, options) => {
     try {
       const readBarcodes = await getWasm();
-      const results = await readBarcodes(source, { formats: ['PDF417'] });
+      const results = await readBarcodes(source, { formats: ['PDF417'], ...(options || {}) });
       if (results && results.length) return results[0].text || null;
     } catch {}
     return null;
   };
-  // Dibuja un frame de video a canvas a resolución nativa para pasarlo al wasm.
-  const videoToCanvas = (v) => {
-    const canvas = document.createElement('canvas');
+  // Dibuja un frame de video a un canvas reutilizable (a resolución nativa) y
+  // devuelve el canvas + su ImageData. Reusar el canvas evita crear uno por frame.
+  const captureFrame = (v) => {
+    let canvas = scanCanvasRef.current;
+    if (!canvas) { canvas = document.createElement('canvas'); scanCanvasRef.current = canvas; }
     canvas.width = Math.max(1, v.videoWidth);
     canvas.height = Math.max(1, v.videoHeight);
-    canvas.getContext('2d').drawImage(v, 0, 0, canvas.width, canvas.height);
-    return canvas;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+    return { canvas, imageData: ctx.getImageData(0, 0, canvas.width, canvas.height) };
   };
 
   // Parsea el string crudo, detiene cámara y guarda resultado. true si tenía DNI.
@@ -91,25 +95,25 @@ export default function Pdf417Scanner({ onScanned }) {
   const scanLoop = async () => {
     if (!runningRef.current) return;
     const v = videoRef.current;
-    if (v && v.readyState >= 2) {
-      // Camino 1: BarcodeDetector nativo (rápido, frame a frame) si soporta pdf417.
+    if (v && v.readyState >= 2 && v.videoWidth > 0) {
+      const { canvas, imageData } = captureFrame(v);
+      // Camino 1: BarcodeDetector nativo sobre el canvas (más confiable que el
+      // elemento de video). Rápido, frame a frame.
       if (pdf417Supported) {
         try {
-          const codes = await getDetector().detect(v);
+          const codes = await getDetector().detect(canvas);
           if (codes && codes.length && codes[0].rawValue && applyRaw(codes[0].rawValue)) return;
         } catch {}
       }
-      // Camino 2: ZXing-C++ WASM sobre el frame actual. Throttleado a ~3/s
-      // (el wasm es pesado; decodear a 60fps congelaría la cámara).
+      // Camino 2: ZXing-C++ WASM con tryHarder sobre el ImageData del frame.
+      // Throttleado: el wasm es pesado y decodear a 60fps congelaría la cámara.
       const now = Date.now();
       if (now - lastWasmRef.current > 300) {
         lastWasmRef.current = now;
-        if (v.videoWidth > 0) {
-          try {
-            const raw = await decodeWithWasm(videoToCanvas(v));
-            if (raw && applyRaw(raw)) return;
-          } catch {}
-        }
+        try {
+          const raw = await decodeWithWasm(imageData, { tryHarder: true });
+          if (raw && applyRaw(raw)) return;
+        } catch {}
       }
     }
     rafRef.current = requestAnimationFrame(scanLoop);
